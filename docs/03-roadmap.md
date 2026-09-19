@@ -26,7 +26,7 @@
 
 | Phase | Name | Step in §3 of 02 | Sessions (est.) | Gate |
 |---|---|---|---|---|
-| 0 | Repository bootstrap | 3 | 1 | `make check` green on empty package |
+| 0 | Repository bootstrap | 3 | 1 | `make check` green on empty package — **done 2026-09-19** |
 | 1 | Contracts (ADR-011, ADR-013 → `docs/04-contracts.md`) | 3 | 1–2 | five example manifests validate; DST property tests pass |
 | 2 | Platform core library | 3 | 3–4 | `make demo` runs on fixtures end-to-end into Postgres |
 | 3 | Harness: CLI, MCP, CI gates | 3 | 2–3 | one bad PR per failure mode is rejected |
@@ -40,18 +40,18 @@
 
 ## Phase 0 — Repository bootstrap
 
-**Goal.** A repository that already enforces the constraints before any domain code exists.
+**Goal.** A repository that already enforces the constraints before any domain code exists. **Done 2026-09-19** (`docs/plans/phase-0.md`, `docs/progress.md`).
 
 **Deliverables.**
-- [ ] `pyproject.toml` (Python 3.12, `uv`, hash-pinned lock), `ruff` (incl. banned-API rules: naive `datetime.now()`, `except: pass`, `requests` without timeout), `mypy --strict`, `import-linter` layers (`targets/` may import only `energy_platform.contracts`; `energy_platform/` never imports `targets/`).
-- [ ] `Makefile`: `check`, `lint`, `type`, `test`, `local-up`, `local-down`, `smoke-test`, `demo`, `new-target`.
-- [ ] `CLAUDE.md` and `AGENTS.md` (identical content, see Appendix B).
-- [ ] `CODEOWNERS`, PR template (checklist mirrors the constraint matrix), branch protection notes.
-- [ ] `docs/adr/` with `ADR-template.md`; `docs/plans/`; `docs/progress.md` *(these three already exist from the 2026-09-19 decisions session)*; `docs/threat-model.md` (stub with the ADR-008 catalogue as headings).
-- [ ] `deps-allowlist.txt` and the CI check that fails on any lockfile package not in it.
-- [ ] CI skeleton (GitHub Actions per ADR-015; workflow files are thin wrappers that only call Make targets): lint, type, test, allowlist, secret scan, `helm-lint` against the `restricted` Pod Security profile (A-14), `terraform validate`.
-- [ ] Empty `energy_platform/` package with `contracts/` and `targets/` directories; a placeholder test so CI is green.
-- [ ] `deps-allowlist.txt` seeded with the ADR-019 list; `ruff` banned-API rules include the egress rule (no `httpx`/`requests`/`urllib` import outside `energy_platform/fetch/`, A-7).
+- [x] `pyproject.toml` (Python 3.12, `uv`, hash-pinned lock), `ruff` (incl. banned-API rules: naive `datetime.now()`, `except: pass`, `requests` without timeout), `mypy --strict`, `import-linter` layers (`targets/` may import only `energy_platform.contracts`; `energy_platform/` never imports `targets/`).
+- [x] `Makefile`: `check`, `lint`, `type`, `test`, `local-up`, `local-down`, `smoke-test`, `demo`, `new-target`.
+- [x] `CLAUDE.md` and `AGENTS.md` (identical content, see Appendix B).
+- [x] `CODEOWNERS`, PR template (checklist mirrors the constraint matrix), branch protection notes.
+- [x] `docs/adr/` with `ADR-template.md`; `docs/plans/`; `docs/progress.md` *(these three already exist from the 2026-09-19 decisions session)*; `docs/threat-model.md` (stub with the ADR-008 catalogue as headings).
+- [x] `deps-allowlist.txt` and the CI check that fails on any lockfile package not in it.
+- [x] CI skeleton (GitHub Actions per ADR-015; workflow files are thin wrappers that only call Make targets): lint, type, test, allowlist, secret scan, `helm-lint` against the `restricted` Pod Security profile (A-14), `terraform validate`.
+- [x] Empty `energy_platform/` package with `contracts/` and `targets/` directories; a placeholder test so CI is green.
+- [x] `deps-allowlist.txt` seeded with the ADR-019 list; `ruff` banned-API rules include the egress rule (no `httpx`/`requests`/`urllib` import outside `energy_platform/fetch/`, A-7).
 
 **Do not.** Write any parser, fetcher, or manifest. Do not choose Postgres/Timescale yet (D-2).
 
