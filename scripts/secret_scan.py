@@ -2,6 +2,11 @@
 
 Deliberately small and dependency-free (Phase 0). Replace with gitleaks via ADR if needed; keep
 the Make target name `secret-scan` so CI wrappers do not change (ADR-015).
+
+What is scanned: the current content of tracked and staged text files. Not scanned: Git history,
+lockfiles, binary files. A placeholder exemption applies to the *matched value* only (F10): a
+real-looking token next to the word "example" is still reported. A reviewed exception is the
+explicit marker `secret-scan:allow` on the same line.
 """
 
 from __future__ import annotations
@@ -15,21 +20,25 @@ from pathlib import Path
 PATTERNS: dict[str, re.Pattern[str]] = {
     "AWS access key id": re.compile(r"\b(AKIA|ASIA)[0-9A-Z]{16}\b"),
     "private key block": re.compile(r"-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----"),
-    "bearer token": re.compile(r"(?i)\bbearer\s+[a-z0-9._\-]{24,}"),
+    "bearer token": re.compile(r"(?i)\bbearer\s+(?P<value>[a-z0-9._\-]{24,})"),
     "rancher token": re.compile(r"\b(token|kubeconfig)-[a-z0-9]{5}:[a-z0-9]{40,}\b"),
-    "openstack app-cred secret": re.compile(r"OS_APPLICATION_CREDENTIAL_SECRET\s*=\s*\S{8,}"),
+    "openstack app-cred secret": re.compile(
+        r"OS_APPLICATION_CREDENTIAL_SECRET\s*=\s*(?P<value>\S{8,})"
+    ),
     "generic assignment": re.compile(
         r"(?i)\b(aws_secret_access_key|secret_key|api[_-]?key|access[_-]?token|password|passwd)"
-        r"\s*[:=]\s*['\"]?[A-Za-z0-9/+_\-]{16,}['\"]?"
+        r"\s*[:=]\s*['\"]?(?P<value>[A-Za-z0-9/+_\-]{16,})['\"]?"
     ),
     "github token": re.compile(r"\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{36,}\b"),
     "slack token": re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"),
 }
 
-# Placeholders used in docs and templates that must not trip the scan.
-ALLOW_LINE = re.compile(
-    r"(?i)(<redacted>|<token>|example|placeholder|REPLACE-WITH|\$\{?[A-Z_]+\}?$)"
+# Applied to the matched VALUE, never to the whole line (F10).
+ALLOW_VALUE = re.compile(
+    r"(?i)(example|placeholder|redacted|replace-with|your[_-]|dummy|changeme"
+    r"|<[a-z_-]+>|\$\{?[A-Z_]+\}?|x{6,}|\.{3,})"
 )
+EXPLICIT_ALLOW = "secret-scan:allow"
 SKIP_SUFFIXES = {".lock", ".png", ".jpg", ".gif", ".pdf", ".xlsx", ".woff", ".woff2"}
 SKIP_PATHS = {"scripts/secret_scan.py"}
 
@@ -44,6 +53,26 @@ def tracked_files() -> list[Path]:
     return [Path(p) for p in out.decode().split("\0") if p]
 
 
+def _candidate_value(match: re.Match[str]) -> str:
+    groups = match.groupdict()
+    return groups["value"] if groups.get("value") else match.group(0)
+
+
+def scan_text(path: Path | str, text: str) -> list[str]:
+    """Return findings for one file's text. Pure; used by the tests."""
+    findings: list[str] = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if EXPLICIT_ALLOW in line:
+            continue
+        for name, pat in PATTERNS.items():
+            for match in pat.finditer(line):
+                if ALLOW_VALUE.search(_candidate_value(match)):
+                    continue
+                findings.append(f"{path}:{lineno}: {name}")
+                break
+    return findings
+
+
 def scan(paths: list[Path]) -> list[str]:
     findings: list[str] = []
     for path in paths:
@@ -53,12 +82,7 @@ def scan(paths: list[Path]) -> list[str]:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        for lineno, line in enumerate(text.splitlines(), 1):
-            if ALLOW_LINE.search(line):
-                continue
-            for name, pat in PATTERNS.items():
-                if pat.search(line):
-                    findings.append(f"{path}:{lineno}: {name}")
+        findings.extend(scan_text(path, text))
     return findings
 
 
