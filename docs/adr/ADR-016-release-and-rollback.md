@@ -6,6 +6,7 @@
 | Date | 2026-09-19 |
 | Resolves | new; source `00-assumptions.md` §3 |
 | Supersedes | — |
+| Amended by | ADR-025 (2026-09-19): §2 `helm test` hook → `post-install,post-upgrade` hook chain; §3 migrations `post-install,pre-upgrade`; ADR-023: §4 `--parser-version` → `--derivation` |
 
 ## Context
 

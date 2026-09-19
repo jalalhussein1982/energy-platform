@@ -6,6 +6,7 @@
 | Date | 2026-09-19 |
 | Resolves | D-8 (`02-architecture-decisions.md` §4.2); amends ADR-002 "lifecycle to cold tier" |
 | Supersedes | — |
+| Amended by | ADR-025 (2026-09-19): §3 probe runs as a `post-install,post-upgrade` hook, not a `helm test` hook |
 
 ## Context
 
