@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **ACTIVE.** Assumptions are stated, not verified, until the Verification Log in §5 records a result. |
+| Status | **ACTIVE.** Assumptions are stated, not verified, until the Verification Log in §5 records a result. §5 filled and §6 applied on 2026-09-19 (V-4…V-10 run; V-1…V-3 remain for Phase 4 / documentation). |
 | Purpose | We cannot ask the evaluator what environment they run. We therefore adopt a **reference environment** (MetaCentrum / e-INFRA CZ), derive decisions from it, and score every decision by what it costs if the assumption is false. The value of an assumption is the constraint it reveals, not the environment it describes. |
 | Reads with | `01-data-scope.md`, `02-architecture-decisions.md`, `03-roadmap.md` |
 | Owner of verification | Claude Code, over the live SSH/`kubectl`/`openstack` access to MetaCentrum. Record results in §5 with date and raw command output. Do not "verify" from documentation when a command can answer. |
@@ -46,7 +46,7 @@ A decision is **robust** if it survives A, B and C without platform-code changes
 | A-13 | CI platform is **GitHub Actions** (ČEZ cannot be asked) | Assignment delivered as a Git repository; GitHub is the default host for a take-home | CI workflow files are thin wrappers that only call Make targets; all logic lives in the Makefile (ADR-015) | Y / Y / Y — CI host is orthogonal to the runtime | Port to GitLab CI: rewrite the wrapper YAML only; Make targets unchanged | — |
 | A-14 | Namespaces enforce the **`restricted` Pod Security Standard** (added 2026-09-19 from V-4) | `kubectl run` of a plain pod rejected by PodSecurity `restricted:latest` on the reference cluster | Every workload in the core chart sets `runAsNonRoot`, `seccompProfile: RuntimeDefault`, `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`; images run as non-root; CI renders the chart and lints it against the restricted profile | Y / Y / Y — restricted-clean pods run anywhere | None; strictly more portable | V-4 |
 
-### 2.1 Profiles (amends ADR-001: two profiles become three)
+### 2.1 Profiles (amends ADR-001: two profiles become three — ACCEPTED 2026-09-19, `docs/adr/ADR-001-amend-three-profiles.md`)
 
 | Profile | Where | Cluster-level capability | Postgres | Secrets | Metrics |
 |---|---|---|---|---|---|
@@ -62,7 +62,7 @@ A decision is **robust** if it survives A, B and C without platform-code changes
 
 ### ADR-003 rev. — Orchestration without CRDs
 
-**Status:** PROPOSED. Supersedes ADR-003 (Argo Workflows) in `02-architecture-decisions.md`. The tenant requirement (A-1) is independent of whether V-4 finds Argo pre-installed on the reference cluster, because it is ČEZ's cluster that matters.
+**Status:** ACCEPTED 2026-09-19 (`docs/adr/ADR-003-rev-orchestration-without-crds.md`, cites V-4). Supersedes ADR-003 (Argo Workflows) in `02-architecture-decisions.md`. The tenant requirement (A-1) is independent of whether V-4 finds Argo pre-installed on the reference cluster, because it is ČEZ's cluster that matters.
 
 **Decision.**
 - **Trigger:** Kubernetes `CronJob` (core API). One template in the Helm chart, rendered once per target from `targets/*/manifest.yaml`. Targets still cannot define topology.
@@ -81,7 +81,7 @@ A decision is **robust** if it survives A, B and C without platform-code changes
 
 ### ADR-016 — Release and rollback model
 
-**Status:** PROPOSED. Answers: "does Kubernetes let us roll back a bad release?" — yes for stateless code and configuration, **no** for schema, data, and semantic errors. The platform must supply the invariants that make Kubernetes rollback *safe*.
+**Status:** ACCEPTED 2026-09-19 (`docs/adr/ADR-016-release-and-rollback.md`). Answers: "does Kubernetes let us roll back a bad release?" — yes for stateless code and configuration, **no** for schema, data, and semantic errors. The platform must supply the invariants that make Kubernetes rollback *safe*.
 
 **Decision.**
 1. **A release is an immutable bundle**: chart version + image **digest** (never a mutable tag) + the set of target manifests. Rollback = `helm rollback <release> <revision>`. Images are retained for ≥ N revisions; CI refuses `latest`.
@@ -239,15 +239,15 @@ Access used: kubeconfig for the e-INFRA Rancher cluster (`rancher.cloud.e-infra.
 
 ---
 
-## 6. Reconciliation checklist (apply after §5 is filled)
+## 6. Reconciliation checklist (applied 2026-09-19; see `docs/adr/` and the dated notes in `02`/`03`)
 
-- [ ] `02` ADR-001: replace "two profiles" with the three-profile table from §2.1; name MetaCentrum/e-INFRA as the **reference environment** (assumption base), not as the production platform.
-- [ ] `02` ADR-003: replace body with ADR-003 rev. once accepted; keep the Argo rejection rationale.
-- [ ] `02` ADR-004: replay and gap detector reference the run ledger.
-- [ ] `02` §4: D-2 → "Postgres as DSN contract; modes `statefulset|cnpg|external`"; D-6 → "annotations by default, `PodMonitor` behind flag"; D-7 → "plain `Secret` by default, ESO behind flag"; add D-13 "canary target group (optional)".
-- [ ] `02` §2: append ADR-016 (release and rollback).
-- [ ] `02` §4.3: add V-4 … V-10 pointing to this file.
-- [ ] `03` Phase 2: add `ledger/` module and ledger migrations; add "downgrade script per migration" to the definition of done.
-- [ ] `03` Phase 3 constraint matrix: add rows "outbound HTTP outside `energy_platform.fetch`", "workload without resource requests", "mutable image tag", "migration without downgrade".
-- [ ] `03` Phase 5: remove Argo `CronWorkflow`; add "CronJob template rendered per target", "run ledger", "`helm test` hook", "rollback drill", "tenant profile deploy to the reference cluster as the first real environment".
-- [ ] `03` Phase 8 README: add a section "Assumptions and what they cost" summarising §2.
+- [x] `02` ADR-001: replace "two profiles" with the three-profile table from §2.1; name MetaCentrum/e-INFRA as the **reference environment** (assumption base), not as the production platform.
+- [x] `02` ADR-003: replace body with ADR-003 rev. once accepted; keep the Argo rejection rationale.
+- [x] `02` ADR-004: replay and gap detector reference the run ledger.
+- [x] `02` §4: D-2 → "Postgres as DSN contract; modes `statefulset|cnpg|external`"; D-6 → "annotations by default, `PodMonitor` behind flag"; D-7 → "plain `Secret` by default, ESO behind flag"; add D-13 "canary target group (optional)".
+- [x] `02` §2: append ADR-016 (release and rollback).
+- [x] `02` §4.3: add V-4 … V-10 pointing to this file.
+- [x] `03` Phase 2: add `ledger/` module and ledger migrations; add "downgrade script per migration" to the definition of done.
+- [x] `03` Phase 3 constraint matrix: add rows "outbound HTTP outside `energy_platform.fetch`", "workload without resource requests", "mutable image tag", "migration without downgrade".
+- [x] `03` Phase 5: remove Argo `CronWorkflow`; add "CronJob template rendered per target", "run ledger", "`helm test` hook", "rollback drill", "tenant profile deploy to the reference cluster as the first real environment".
+- [x] `03` Phase 8 README: add a section "Assumptions and what they cost" summarising §2.
