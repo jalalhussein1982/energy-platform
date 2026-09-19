@@ -6,6 +6,7 @@
 | Date | 2026-09-19 |
 | Resolves | supersedes ADR-003 "Argo Workflows" in `02-architecture-decisions.md` §2; source `00-assumptions.md` §3 |
 | Supersedes | ADR-003 (Argo Workflows / CronWorkflows) |
+| Amended by | ADR-024 (2026-09-19): `fence`, `run_attempts`, reconcile step, backfill verb |
 
 ## Context
 
