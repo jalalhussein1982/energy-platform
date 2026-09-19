@@ -1,0 +1,13 @@
+# Human review is mandatory on everything that constrains agents and juniors (ADR-006).
+# Replace the placeholder with the maintainer's GitHub handle before enabling branch protection.
+*                        @REPLACE-WITH-GITHUB-HANDLE
+/energy_platform/        @REPLACE-WITH-GITHUB-HANDLE
+/deployment/             @REPLACE-WITH-GITHUB-HANDLE
+/docs/adr/               @REPLACE-WITH-GITHUB-HANDLE
+/docs/00-assumptions.md  @REPLACE-WITH-GITHUB-HANDLE
+/docs/02-architecture-decisions.md @REPLACE-WITH-GITHUB-HANDLE
+/deps-allowlist.txt      @REPLACE-WITH-GITHUB-HANDLE
+/pyproject.toml          @REPLACE-WITH-GITHUB-HANDLE
+/Makefile                @REPLACE-WITH-GITHUB-HANDLE
+/.github/                @REPLACE-WITH-GITHUB-HANDLE
+/CODEOWNERS              @REPLACE-WITH-GITHUB-HANDLE
