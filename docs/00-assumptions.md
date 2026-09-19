@@ -205,7 +205,7 @@ Access used: kubeconfig for the e-INFRA Rancher cluster (`rancher.cloud.e-infra.
     HTTP 200  {"n":34,"ids":["agentic","qwen3.5","mini","multilingual-e5-large-instruct","deepseek-v4-flash-thinking","gpt-oss-120b","deepseek-thinking",…]}
     ($LLM_BASE_URL/v1/models → 404 {"detail":"Not Found"}: the configured base URL already includes /v1)
 
-2026-09-19  V-8   PARTIAL    kube identity is Shibboleth/Perun-federated (no local user) but the kubeconfig credential is an opaque Rancher token, TTL 1 year (expires 2027-02-28)   A-5 "identity is federated, no local users" CONFIRMED; "kube access is OIDC-issued short-lived token" REFUTED on the reference cluster: no exec/OIDC block, no JWT. CI deploy identity on a Rancher-fronted tenant cluster = a namespace-scoped Rancher API token held as a CI secret with a rotation date, not workload-identity federation. A-5 "Cost if false" updated (see §2). Would resolve fully: confirmation that Rancher's OIDC client (rancher.cloud.e-infra.cz → einfra.cesnet.cz) can mint short-lived kubeconfig tokens for a CI principal.
+2026-09-19  V-8   CONFIRMED  kube identity is Shibboleth/Perun-federated (no local user); the kubeconfig credential is an opaque Rancher token, TTL 1 year; second pass: Rancher mints short-lived (ttl=5 min), cluster-scoped API tokens on request, but only derived from an existing user token — there is no tenant-creatable CI principal — and ServiceAccount TokenRequest JWTs are rejected by the Rancher proxy as system:unauthenticated   A-5 "identity is federated, no local users" CONFIRMED. Derived decision "no static kubeconfig secrets in CI" is REFUTED for Rancher-fronted tenant clusters and replaced (ADR-015) by the two-token pattern: one long-lived, cluster-scoped Rancher token as the CI secret (bounded by auth-token-max-ttl 525600 min; expiry recorded; rotation job), used only to mint a ≤ 5-min cluster-scoped token per job that does the deploy. Where the cluster accepts workload-identity federation (scenario C, or a K8s ≥ 1.30 structured-auth cluster we control), federation replaces the long-lived token.
     $ kubectl config view --minify --raw -o json | jq '.users[0].user | keys'   → ["token"]   (no exec, no auth-provider)
     token: 83 chars, prefix "kubeconfig-u…", not a JWT (opaque Rancher token)
     $ kubectl auth whoami
@@ -215,6 +215,18 @@ Access used: kubeconfig for the e-INFRA Rancher cluster (`rancher.cloud.e-infra.
     {"ttl": 31536000000, "expiresAt": "2027-02-28T03:01:14Z", "created": "2026-02-28T03:01:14Z", "authProvider": "shibboleth", "description": "Kubeconfig token"}
     $ curl …/v3/settings/kubeconfig-default-token-ttl-minutes   → {"value": "525600", "default": "43200"}
     (kubectl get tokens/settings.management.cattle.io → Forbidden at cluster scope; Rancher REST API answered instead)
+    --- second pass (same day): can Rancher mint short-lived tokens for a CI principal?
+    $ curl $R/v3/settings/auth-token-max-ttl-minutes → value=525600 default=129600 ; auth-user-session-ttl-minutes → 720
+    $ curl -X POST $R/v3/tokens -d '{"type":"token","description":"energy-platform-verify-20260919","ttl":300000}'   → {"id":"token-b4fsf","ttl":300000}
+    $ kubectl --token=<5-min token> auth whoami   → Username u-gq5yxf3imu (same principal, same groups) ; get pods -n hussein-ns → works
+    $ curl -X POST $R/v3/tokens -d '{…,"ttl":300000,"clusterId":"c-m-qvndqhf6"}'   → {"id":"token-bm6qs","clusterId":"c-m-qvndqhf6"}  (cluster-scoped token accepted)
+    $ curl -X DELETE $R/v3/tokens/token-b4fsf ; …/token-bm6qs   → HTTP 204, 204
+    $ kubectl auth can-i create serviceaccounts|roles|rolebindings|serviceaccounts/token -n hussein-ns   → yes ×4
+    $ kubectl create sa energy-platform-verify-20260919 -n hussein-ns ; kubectl create token … --duration=10m
+    JWT iss=https://kubernetes.default.svc.cluster.local sub=system:serviceaccount:hussein-ns:energy-platform-verify-20260919 aud=[…,"rke2"] ttl=600 s
+    $ kubectl --token=<SA JWT> get pods -n hussein-ns   (via rancher.cloud.e-infra.cz/k8s/clusters/…)
+    {"Code":{"Code":"Forbidden","Status":403},"Message":"clusters.management.cattle.io \"c-m-qvndqhf6\" is forbidden: User \"system:unauthenticated\" cannot get resource \"clusters\" …"}
+    cleanup: sa and role deleted (rolebinding was never created: kubectl flag error) ; get sa → NotFound
 
 2026-09-19  V-9   CONFIRMED  no proxy env in pod; OTE 200, ČEPS 301/200, ENTSO-E host reachable (404 on root); egress IP 147.251.253.180   A-7 and A-12 hold on the reference cluster. The single-egress-path rule (energy_platform.fetch, HTTP_PROXY/NO_PROXY, injectable CA) stays because scenarios A/B are proxied. Network rate limiting cannot be shown by one request; politeness remains platform-enforced (D-5). Test pod required a restricted-PSS securityContext (see V-4) and was removed afterwards.
     $ kubectl run energy-platform-verify-20260919 --rm -i --restart=Never -n hussein-ns --image=curlimages/curl --overrides='{…runAsNonRoot,seccomp RuntimeDefault,drop ALL,allowPrivilegeEscalation=false…}' -- sh -c '…'

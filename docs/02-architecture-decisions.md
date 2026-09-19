@@ -469,7 +469,7 @@ Harness before code. Step 4 is the harness's own first test.
 | V-5 | OpenStack services, Magnum, quotas → `00` §5 (CONFIRMED: no Magnum) |
 | V-6 | S3 endpoints, versioning, object lock, lifecycle, second endpoint → `00` §5 (CONFIRMED; no cold storage class exists on the reference gateway → ADR-021) |
 | V-7 | OpenAI-compatible inference endpoint → `00` §5 (CONFIRMED) |
-| V-8 | Kube access identity and token lifetime → `00` §5 (PARTIAL: federated identity, but long-lived opaque Rancher token) |
+| V-8 | Kube access identity and token lifetime → `00` §5 (CONFIRMED: federated identity; Rancher mints short-lived cluster-scoped tokens only from an existing user token; SA tokens rejected by the proxy → two-token CI pattern in ADR-015) |
 | V-9 | Egress proxy and Tier-1 reachability from a pod → `00` §5 (CONFIRMED) |
 | V-10 | Managed Postgres offering → `00` §5 (CONFIRMED: none) |
 
