@@ -1,15 +1,16 @@
 # Same gates as CI, run locally before commit. Hooks call Make so laptop == CI (ADR-015).
+# `uv run pre-commit install` once per clone; this is not automatic.
 repos:
   - repo: local
     hooks:
-      - id: make-lint
-        name: make lint
-        entry: make lint
+      - id: make-check
+        name: make check (lint + lock-check + type + test)
+        entry: make check
         language: system
         pass_filenames: false
-      - id: make-type
-        name: make type
-        entry: make type
+      - id: make-deps-allowlist
+        name: make deps-allowlist
+        entry: make deps-allowlist
         language: system
         pass_filenames: false
       - id: make-secret-scan

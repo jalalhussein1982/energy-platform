@@ -7,19 +7,20 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 UV        ?= uv
+UV_VERSION ?= 0.11.7   # pinned installer version for ci-bootstrap (F11); bump deliberately
 RUN       := $(UV) run
 CHART_DIR := deployment/helm/energy-platform
 TF_DIR    := deployment/own-cluster/terraform
 KIND_NAME := energy-platform
 
-.PHONY: help check lint format type test deps-allowlist secret-scan helm-lint terraform-validate \
+.PHONY: help check lint lock-check format type test deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
 
 # ---------------------------------------------------------------- core gates
-check: lint type test ## lint + type + test — must be green before every commit (03 §0)
+check: lint lock-check type test ## lint + lock-check + type + test — must be green before every commit (03 §0)
 
 sync: ## Create/refresh the locked virtualenv (dev group included)
 	$(UV) sync --frozen --group dev
@@ -29,6 +30,9 @@ lint: sync ## ruff (rules incl. egress ban, naive datetime, swallowed except) + 
 	$(RUN) ruff format --check .
 	$(RUN) lint-imports
 	$(RUN) python scripts/check_target_surface.py targets
+
+lock-check: ## uv.lock must be consistent with pyproject.toml; --frozen alone does not check this (F11)
+	$(UV) lock --check
 
 format: sync ## Apply ruff formatting and safe fixes
 	$(RUN) ruff format .
@@ -73,7 +77,7 @@ terraform-validate: ## terraform fmt/validate/test with mock providers. Skips ho
 
 ci-bootstrap: ## Install uv on a bare CI runner (the only tool installation CI is allowed to do)
 	@command -v $(UV) >/dev/null && { echo "uv present: $$($(UV) --version)"; exit 0; } || true
-	curl -LsSf https://astral.sh/uv/install.sh | sh
+	curl -LsSf https://astral.sh/uv/$(UV_VERSION)/install.sh | sh
 	@echo 'add $$HOME/.local/bin to PATH in the workflow step if not already'
 
 # ---------------------------------------------------------------- local reproduction (ADR-010) — Phase 5
