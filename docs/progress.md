@@ -4,6 +4,28 @@ One dated entry per session. Newest first.
 
 ---
 
+## 2026-09-19 — Review 1: Codex pre-coding verdict answered (docs + gates, no platform code)
+
+**Input.** `codex-review/` (14 findings, 9 P1) against `7d872ea`. Verdict accepted: design checkpoint, not a submission; the executable gates were thinner than the documents claimed. Response per finding: `docs/reviews/2026-09-19-codex-review-response.md`; plan: `docs/plans/review-1.md`.
+
+**Decided** (`docs/adr/`, all ACCEPTED): ADR-022 source admission vs adapter addition (two routes; escalation is a pass in Phase 7); ADR-023 derivation identity (version key gains `derivation_id`; `contract_version` ≠ implementation; current view by capture ordering basis then derivation); ADR-024 capture recovery (Bronze capture-log entry is the durable boundary, `reconcile` rebuilds the ledger, `run_attempts` + fencing at commit, backfill ≠ replay, `history.max_age`); ADR-025 upgrade hooks (`smoke` = `post-install,post-upgrade,test`; `migrate` = `post-install,pre-upgrade`; probe joins the chain); ADR-026 egress boundary (NetworkPolicy = coarse layer with private/metadata `except`; per-host, resolution and redirect checks in `fetch` against a CODEOWNERS host registry; V-11 added); ADR-027 target capability boundary (positive file and import allowlists for targets, extended banned-API list, unit-test socket block).
+
+**Gates now real** (`make check` = lint + lock-check + type + test; 36 tests): `targets/**/tests` collected by default (pytester negative test); `scripts/check_target_surface.py` in `make lint` with 11 negative tests; ruff TID251 covers `http.client`, `socket`, `subprocess`, `importlib`, … outside `fetch/`; root `conftest.py` disables sockets unless `live`; secret-scan exempts the matched value, not the line (7 tests); `uv lock --check` in `check` and CI; hatchling, uv installer and `actions/checkout` pinned; pre-commit runs the same three gates as CI. Re-ran the reviewer's probes: the `http.client` parser fails lint, the planted failing target test fails the default run, a stale lock fails `lock-check`, the "token + # example" line is reported.
+
+**Learned.** A gate that is only a ban list is bypassed by the standard library; a positive allowlist on the smallest surface (targets) plus a runtime block is what actually holds. `helm test` hooks are not part of `--atomic`. Standard `NetworkPolicy` has no hostnames. `--frozen` is not `--locked`. Three findings were premises, not code: "cannot ask the evaluator" was reworded to a choice.
+
+**Blocked on the author.** F09: a Git remote and a real handle for `CODEOWNERS`, then apply `docs/branch-protection.md`. F12: the original `message-board/evidence/` ledger for the energy task was not found on this machine (the two message-board directories on disk belong to other projects); either supply it or let Phase 4 regenerate `docs/evidence/`.
+
+**Not done, by design.** No Phase 1 code (one phase per session, 03 §0). `docs/01-data-scope.md` untouched; F13 (ČEPS interval labelling) is a Phase 4 verification task. `codex-review/` committed verbatim as evidence.
+
+**Next prompt** (03 Phase 1 starter, as amended):
+
+```text
+Read CLAUDE.md, docs/02-architecture-decisions.md (§2 ADR-005, ADR-011, ADR-013; §4.1), docs/adr/ADR-017 … ADR-020 and ADR-022, ADR-023, ADR-026, ADR-027, docs/01-data-scope.md, docs/reviews/2026-09-19-codex-review-response.md, and docs/03-roadmap.md Phase 1. B-1, B-2, B-3, B-6 are resolved; implement them as amended. Author docs/04-contracts.md and implement the contracts package (observation, registry, hosts, manifest, parser protocol) with the property and negative tests. Stop when the six example manifests validate and the DST tests pass.
+```
+
+---
+
 ## 2026-09-19 — Reconciliation of 02/03 with 01 v1.0 (docs only, before the pre-coding review)
 
 02 and 03 had been written against 01 v0.1's wide catalogue. Corrected, each with a dated note: 02 §1.1 scope wording (intraday market results as the core; modality matrix = framework test suite, not live targets); ADR-002 capture-log field names follow 01 §6.1; ADR-005/ADR-013 fetch spec gains the declarative discovery step T2 needs and a `contract` block; ADR-011 points at 01 §6–§9 as source; ADR-012 freshness per 01 §5, "per tier" dropped; §3 step 4 and V-1 reworded; D-5 default = 01 §5 intervals; D-11 default → out. 03 Phase 1 example manifests (three real, two shape-only) and 04-contracts source; Phase 4 reduced to T1, T2, T3, E1 + the restricted stub, candidates explicitly not built, fixtures per 01 §7/§9, one-week polling campaign; Phase 7 unseen-source wording. CLAUDE.md/AGENTS.md/README scope line.
