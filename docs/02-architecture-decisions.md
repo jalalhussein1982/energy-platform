@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | Locked items are **FROZEN** as of 2026-09-19. Open items are tracked in §4 and are resolved only by appending a dated ADR, never by silently coding around them. **Reconciled 2026-09-19** with `00-assumptions.md` §5/§6: ADR-001 amended, ADR-003 revised, ADR-016 added, B-1…B-6 resolved (see `docs/adr/`). Superseded text is kept under a dated note, never deleted. |
-| Predecessor | `docs/00-assumptions.md` (assumptions register, verification log), `docs/01-data-scope.md` (Step 1 — sources, tiers, modality matrix) |
+| Predecessor | `docs/00-assumptions.md` (assumptions register, verification log), `docs/01-data-scope.md` v1.0 (Step 1 — committed targets, access classes, data/time/revision contracts) |
 | Successor | `docs/03-roadmap.md` (execution plan) |
 | Audience | Humans and coding agents. If you are an agent: this document constrains you. Do not "improve" a locked decision inside a task PR; open a decision PR instead. |
 
@@ -21,9 +21,9 @@
 
 ### 1.1 Reading of the assignment
 
-- "Intraday energy data" is read as **data published at intraday cadence** about the Czech/CE power system, with **intraday market results as the core subset** (see `01-data-scope.md`).
+- "Intraday energy data" is read as **intraday market results for the Czech bidding zone as the core** (OTE continuous intraday market: T1 SOAP, T2 daily XLSX), plus **physical-system observations published at intraday cadence** (T3 ČEPS load). The committed scope is `01-data-scope.md` §3: three class-A targets plus one adapter-addition demo (E1, OTE day-ahead). Everything else in 01 §4 is a candidate, not a deliverable. *(Aligned with 01 v1.0 on 2026-09-19; the earlier wording "data published at intraday cadence" was wider.)*
 - The deliverable under evaluation is the **engineering harness** — how coding agents and junior engineers are led and constrained — not the scrapers themselves. Scrapers are the exhaust; the harness is the engine.
-- The target list is a **modality matrix** (HTML table, dated file download, SOAP/XML, keyed REST/JSON, rate-limited REST/XML). It functions as a test suite for the framework.
+- The **modality matrix** (HTML table, dated file download, SOAP/XML, keyed REST/JSON, rate-limited REST/XML) is the test suite for the *framework*: five generic parsers (ADR-019) and five example manifests (Phase 1). It is **not** a list of live targets. The committed targets exercise SOAP/XML (T1, T3, E1) and dated-file XLSX with an HTML discovery step (T2); keyed REST is exercised only if ENTSO-E (class B, optional, disabled by default) is admitted. *(Corrected 2026-09-19: 02/03 had been written against 01 v0.1's wider catalogue.)*
 
 ### 1.2 Role of LLMs (authority by proximity to production)
 
@@ -136,7 +136,7 @@ bronze/
   captures/<target_id>/<YYYY>/<MM>/<DD>/<fetch_ts>.json   # capture log entry
 ```
 
-Capture log entry (metadata) — **no `parser_version` here**; parser lineage belongs to Silver:
+Capture log entry (metadata) — **no `parser_version` here**; parser lineage belongs to Silver. *(2026-09-19: field names in the implementation follow the 01 §6.1 envelope — `fetched_at`, `payload_sha256`, `source_published_at`, `source_transport`, `raw_ref` — the JSON below predates 01 v1.0 and is illustrative.)*
 
 ```json
 {
@@ -256,7 +256,7 @@ energyctl replay --target ote_intraday --from … --to … --parser-version <bad
 
 **Decision.** Adapters own **syntax**; the platform owns **semantics**.
 
-- **Fetch** is declarative per modality (URL template, method, headers, auth reference, pagination; SOAP body is a template, still data). No target writes fetch code.
+- **Fetch** is declarative per modality (URL template, method, headers, auth reference, pagination; SOAP body is a template, still data; a **discovery step** — fetch a page, extract a link by selector/regex, then download — is part of the declarative spec because T2 in 01 §3 needs it). No target writes fetch code.
 - **Parse** is the only code a target may contribute, and only when the platform's generic parser for that modality is insufficient.
 - **Normalise** is a declarative field mapping in the manifest (source field → canonical field, unit, timezone, interval convention, sign convention), executed by the platform.
 
@@ -359,6 +359,8 @@ with **no cloud credentials and no LLM credentials**. `make demo` runs the full 
 
 ### ADR-011 — Canonical schema *(locked in principle, unwritten)*
 
+**Source of truth (2026-09-19):** `01-data-scope.md` §6 (envelope, time fields, typed contracts and identity keys), §7 (time contract), §8 (revisions, deduplication, replay) and §9 (value semantics, metric registry) already specify the schema; ADR-011 in `docs/04-contracts.md` formalises them and ADR-018 fixes the storage parameters. Phase 1 must not invent fields that 01 does not name, and must not drop ones it does.
+
 Direction fixed:
 - `EnergyObservation` is **bitemporal**: delivery interval (valid time) and publication/observation time (transaction time), plus source version.
 - Must survive DST days with 92 and 100 quarter-hour intervals; this is a mandatory property test.
@@ -371,15 +373,15 @@ Direction fixed:
 ### ADR-012 — Availability as freshness *(locked in principle, unwritten)*
 
 Direction fixed:
-- SLI = age of the newest observation per target relative to its expected cadence.
-- SLO per tier; alerts fire on **staleness**, not pod restarts.
+- SLI = age of the newest observation per target relative to its **expected publication** (01 §5 freshness contract: `pending` / `partial` / `late` / `complete`, and `stale fetch` for an unchanged 200).
+- SLO per target; alerts fire on **staleness**, not pod restarts. *(2026-09-19: "per tier" replaced — 01 v1.0 uses access classes, not tiers.)*
 - Metrics distinguish `source_unavailable` from `pipeline_failed`. A ČEPS outage at 03:00 is not our incident.
 
 ---
 
 ### ADR-013 — Manifest schema *(locked in principle, unwritten)*
 
-Direction fixed: declarative, versioned JSON Schema, one file per target, mandatory `license`/`terms_url`/`allowed_hosts`, modality-specific fetch block, mapping block executed by the platform. Written with ADR-011. Parameters fixed by ADR-017.
+Direction fixed: declarative, versioned JSON Schema, one file per target, mandatory `license`/`terms_url`/`allowed_hosts`, modality-specific fetch block (including the optional discovery step of ADR-005), mapping block executed by the platform, and a `contract` block naming the 01 §6.3 `dataset_id` and declared metric set (a target registers a contract; it cannot invent dimensions, units or metric names). Written with ADR-011. Parameters fixed by ADR-017.
 
 ---
 
@@ -419,7 +421,7 @@ Direction fixed: declarative, versioned JSON Schema, one file per target, mandat
 1. **Source domain** — complete enough to begin (`01-data-scope.md`). ✔
 2. **Architecture ADRs** — this document. ✔ (011/012/013 pending authoring)
 3. **Engineering harness** — repository contract, library, CLI/MCP, CI gates, `CLAUDE.md`/`AGENTS.md`.
-4. **Source discovery/verification of Tier-1 targets, performed through the harness.**
+4. **Verification of the committed targets (01 §3: T1, T2, T3, E1), performed through the harness.**
 5. **Platform + IaC + HA + DR implementation.**
 6. **Blind acceptance test** — fresh agent and junior human.
 
@@ -448,13 +450,13 @@ Harness before code. Step 4 is the harness's own first test.
 | D-2 | Postgres as a **DSN contract** (changed 2026-09-19, `00` §6; was "engine and HA") | chart takes a DSN; profiles provide Postgres via `postgres.mode` = `statefulset` \| `cnpg` \| `external`; engine (plain vs TimescaleDB) still open | `statefulset` for local/tenant, `cnpg` for own-cluster (and for tenant where the operator pre-exists, `00` V-10), `external` for managed; engine decided by ADR before the Phase 2 schema |
 | D-3 | Object storage per profile | MinIO local; Ceph RGW / Swift on OpenStack; what is the "independent copy" in each profile | MinIO (2 instances local); RGW + second bucket/region on OpenStack |
 | D-4 | Gap detector internals | expected-interval calendars per target; tolerance windows; where it runs | CronWorkflow every cadence; tolerance = 2× cadence |
-| D-5 | Polling cadence and politeness | per-target intervals; jitter; backoff caps; conditional requests (ETag/If-Modified-Since) | 5 min OTE IM; jitter ±10%; capped exponential backoff; conditional where supported |
+| D-5 | Polling cadence and politeness | per-target intervals; jitter; backoff caps; conditional requests (ETag/If-Modified-Since) | intervals from 01 §5 (T1/T2: 15 min during the delivery day, hourly for D-1..D-3; T3: 15 min; E1: hourly from 12:00 CET on D-1); jitter ±10%; capped exponential backoff; conditional where supported; one-week observation campaign before any latency is quoted *(2026-09-19: "5 min OTE IM" replaced by the 01 v1.0 values)* |
 | D-6 | Observability stack (changed 2026-09-19, `00` §6) | metrics exposure: `/metrics` + annotations vs `PodMonitor`; stack in local profile | **annotations by default; `PodMonitor` behind `metrics.operator.enabled`** (core chart needs no CRD); full stack only in `own-cluster`, minimal in local |
 | D-7 | Secrets backend (changed 2026-09-19, `00` §6) | plain `Secret` vs External Secrets Operator; SOPS locally | **plain `Secret` by default (from CI/SOPS); ESO behind `secrets.eso.enabled`** (ESO absent on the reference cluster, `00` V-4); SOPS for local |
 | D-8 | Retention and cold tier per profile — **resolved 2026-09-19 by ADR-021** | tiering job (`move`) vs lifecycle transition vs none | `bronze.tiering.mode`: `none` (local, reference tenant), `move` (portable default for A/B/C), `lifecycle` only where the probe passes; hot 90 d; Silver indefinite |
 | D-9 | Serving layer and consumer MCP (Role C) | SQL only vs read API; MCP in/out | read-only FastAPI + SQL; MCP out unless time permits |
 | D-10 | Drift-triage agent (Role B) | fully implemented vs pipeline with LLM step stubbed | pipeline built, LLM step stubbed, documented |
-| D-11 | Gas intraday in v1 | in / out | in (one extra target, proves generality) |
+| D-11 | Gas intraday in v1 | in / out | **out** of v1 — 01 §4 lists it as "not examined"; promotion needs a 01 §3-style contract and a §10 admission row first *(2026-09-19: default was "in"; changed to match 01 v1.0)* |
 | D-12 | Naming | `energyctl`, repository name | `energyctl`; repo `energy-platform` |
 | D-13 | Canary target group (optional; added 2026-09-19 by ADR-016) | none vs one low-risk target on `image.canary` one cadence ahead of `image.stable` | out of v1; values keys reserved |
 
@@ -462,7 +464,7 @@ Harness before code. Step 4 is the harness's own first test.
 
 | ID | Item |
 |---|---|
-| V-1 | ČEPS public API mechanics; whether OTE public SOAP services still serve after the 2023 pruning; ENTSO-E token acquisition — outputs of Step 4 |
+| V-1 | Publication latency per target (one-week polling campaign, 01 §5); ČEPS `Load` cadence/history; ENTSO-E token acquisition only if admitted — outputs of Phase 4. *(2026-09-19: OTE SOAP and ČEPS SOAP mechanics are already live-verified in 01 §3, S04/S14.)* |
 | V-2 | Decree 408/2025 scope and thresholds, from the primary text |
 | V-3 | OTE and ENTSO-E terms of use on redistribution — bounds D-9 (whether Silver may be served outside the organisation) |
 | V-4 | Tenant rights, CRDs, pre-installed operators, cluster services, quotas → `00-assumptions.md` §4/§5 (2026-09-19: CONFIRMED) |
@@ -470,7 +472,7 @@ Harness before code. Step 4 is the harness's own first test.
 | V-6 | S3 endpoints, versioning, object lock, lifecycle, second endpoint → `00` §5 (CONFIRMED; no cold storage class exists on the reference gateway → ADR-021) |
 | V-7 | OpenAI-compatible inference endpoint → `00` §5 (CONFIRMED) |
 | V-8 | Kube access identity and token lifetime → `00` §5 (CONFIRMED: federated identity; Rancher mints short-lived cluster-scoped tokens only from an existing user token; SA tokens rejected by the proxy → two-token CI pattern in ADR-015) |
-| V-9 | Egress proxy and Tier-1 reachability from a pod → `00` §5 (CONFIRMED) |
+| V-9 | Egress proxy and committed-source (OTE, ČEPS, ENTSO-E) reachability from a pod → `00` §5 (CONFIRMED) |
 | V-10 | Managed Postgres offering → `00` §5 (CONFIRMED: none) |
 
 ---

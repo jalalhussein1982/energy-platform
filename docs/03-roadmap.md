@@ -30,7 +30,7 @@
 | 1 | Contracts (ADR-011, ADR-013 → `docs/04-contracts.md`) | 3 | 1–2 | five example manifests validate; DST property tests pass |
 | 2 | Platform core library | 3 | 3–4 | `make demo` runs on fixtures end-to-end into Postgres |
 | 3 | Harness: CLI, MCP, CI gates | 3 | 2–3 | one bad PR per failure mode is rejected |
-| 4 | Tier-1 source verification through the harness | 4 | 2–3 | all Tier-1 targets green on fixtures; nightly live smoke defined |
+| 4 | Committed-target verification through the harness (01 §3) | 4 | 1–2 | T1, T2, T3, E1 green on fixtures; nightly live smoke defined |
 | 5 | Deployment, IaC, HA, DR, observability | 5 | 3–4 | clean-clone `make local-up && make smoke-test`; restore drill passes |
 | 6 | Threat model, triage pipeline, documentation | 5 | 1–2 | `docs/threat-model.md` complete; triage pipeline runs with stubbed LLM |
 | 7 | Blind acceptance tests | 6 | 1 | agent PR + junior dry-run pass without core changes |
@@ -70,7 +70,8 @@
 - [ ] `energy_platform/contracts/observation.py` — `EnergyObservation` (bitemporal: `delivery_interval` as `tstzrange`-equivalent, `published_at`, `observed_at`, `source_version`, `unit`, `sign_convention`), plus the upsert key definition.
 - [ ] `energy_platform/contracts/manifest.py` — Pydantic model + exported JSON Schema (`schemas/manifest.v1.json`), mandatory `license`, `terms_url`, `allowed_hosts`, modality-specific `fetch` block, `mapping` block, `cadence`.
 - [ ] `energy_platform/contracts/parser.py` — `Parser` protocol (input: Bronze capture; output: `Iterable[SourceRecord]`), nothing else.
-- [ ] Five example manifests, one per modality (html-table, dated-file, soap-xml, rest-json-keyed, rest-xml-ratelimited), validating against the schema. Use real Tier-1 URLs from `01-data-scope.md`; they are not fetched in this phase.
+- [ ] Five example manifests, one per modality (html-table, dated-file, soap-xml, rest-json-keyed, rest-xml-ratelimited), validating against the schema. Three are the real committed contracts from `01-data-scope.md` §3 (soap-xml = T1 `GetImPricePeriodE`; dated-file with HTML discovery step = T2; a second soap-xml = T3 ČEPS `Load`); the html-table and the two REST examples are **shape-only** (REST keyed = ENTSO-E's shape, class B, optional). Nothing is fetched in this phase. *(2026-09-19: clarified against 01 v1.0.)*
+- [ ] `docs/04-contracts.md` takes 01 §6–§9 as its source: envelope fields, `dataset_id` registry with identity keys, metric registry with units/sign/null meaning, revision and ordering rules. No field invented, none dropped.
 - [ ] Property tests: DST spring (92 intervals) and autumn (100 intervals) days; interval-start vs interval-end mapping; sign inversion.
 
 **Do not.** Write fetch or persistence code. Do not fetch from the network.
@@ -123,20 +124,28 @@
 
 ---
 
-## Phase 4 — Tier-1 source verification through the harness
+## Phase 4 — Committed-target verification through the harness
 
-**Goal.** The harness's first real workload. Agents "look around" at Level 1 authority only.
+**Goal.** The harness's first real workload. Agents "look around" at Level 1 authority only. Scope is `01-data-scope.md` §3, nothing more. *(2026-09-19: list reduced from the 01 v0.1 catalogue to the v1.0 commitments.)*
 
 **Deliverables.**
-- [ ] ADR for D-5 (cadence/politeness) and D-11 (gas in/out).
-- [ ] Targets, each via `energyctl new-target` → `record-fixture` → goldens → PR: `ote_intraday_market`, `ote_ida`, `ote_dam`, `ote_imbalance_settlement`, `ceps_load`, `ceps_generation`, `ceps_imbalance`, `ceps_crossborder_flows`, `ceps_balancing_activated`, `entsoe_load_cz`, `entsoe_generation_per_type_cz`, `entsoe_physical_flows_cz`, (`ote_gas_intraday` if D-11 = in), `epex_intraday` as a `license: restricted` stub that the scheduler refuses.
-- [ ] `docs/06-source-verification.md`: per source — endpoint verified, auth, rate limits observed, terms-of-use notes (V-1, V-3), quirks (decimal comma, DST rows, progressive fill).
+- [ ] ADR for D-5 (cadence/politeness per 01 §5). D-11 is resolved "out" in 02 §4.2.
+- [ ] Committed targets, each via `energyctl new-target` → `record-fixture` → goldens → PR:
+  - `ote_intraday_market` (T1, SOAP `GetImPricePeriodE`, system of record for `price_vwap`/`volume_total`)
+  - `ote_intraday_market_xlsx` (T2, HTML discovery → daily XLSX; supplies buy/sell volumes and min/max/last; reconciliation rules of 01 §3 implemented as quality events)
+  - `ceps_load` (T3, SOAP `Load`, QH/AVG/RT only)
+  - `ote_dam` (E1, SOAP `GetDamPricePeriodE`) — **added last, by the contributor workflow, as the adapter-addition demo**
+  - `epex_intraday` as a `license: restricted` stub that the scheduler refuses (negative demo).
+- [ ] Candidates from 01 §4 (`ote_imbalance_settlement`, `ote_ida`, ČEPS generation/flows/imbalance/balancing, ENTSO-E class-B adapters, gas) are **not built**; each needs a 01 §3-style contract, a bounded live read and a §10 admission row first.
+- [ ] Fixtures per 01 §7 and §9: ordinary day, 23-hour day, 25-hour day, native hourly sample, partially filled day; negative and zero prices, absent `Price`, empty `<Result/>`, decimal-comma string, extra column, changed unit header. Repository fixtures are **synthetic copies of the real shape** (01 §10) until redistribution is confirmed.
+- [ ] One-week polling observation per target (01 §5) → publication latency recorded before any figure is quoted.
+- [ ] `docs/06-source-verification.md`: per source — endpoint verified, auth, rate limits observed, terms-of-use notes (V-1, V-3), quirks (decimal comma, DST rows, progressive fill), T1/T2 reconciliation mismatches seen.
 - [ ] Nightly live-smoke workflow definition (not run in PR CI).
 
 **Do not.** Edit `energy_platform/` in a target PR. If a source needs a platform change, open a separate PR with an ADR. Do not scrape anything without `license`/`terms_url` filled from the source's own terms page.
 
 **Starter prompt.**
-> Read CLAUDE.md, docs/01-data-scope.md, docs/04-contracts.md, docs/05-constraint-matrix.md and docs/03-roadmap.md Phase 4. For each Tier-1 target: scaffold with energyctl, verify the live endpoint once, record a fixture, write goldens with values you checked by hand against the fixture, and open a PR touching only targets/<id>/. Record findings in docs/06-source-verification.md. Stop when all listed targets pass contract tests offline.
+> Read CLAUDE.md, docs/01-data-scope.md §3, §5, §7, §9, §10, docs/04-contracts.md, docs/05-constraint-matrix.md and docs/03-roadmap.md Phase 4. For T1, T2, T3 in that order: scaffold with energyctl, verify the live endpoint once, record a fixture, write goldens with values you checked by hand against the fixture, and open a PR touching only targets/<id>/. Then add E1 strictly through the contributor workflow as the adapter-addition demo. Do not add any 01 §4 candidate. Record findings in docs/06-source-verification.md. Stop when all four pass contract tests offline.
 
 ---
 
@@ -179,7 +188,7 @@
 ## Phase 7 — Blind acceptance tests
 
 **Protocol.**
-1. New Claude Code session, **`/clear`**, no prior context. Provide only: `README.md`, `docs/07-adding-a-target.md`, and the URL of an unseen Tier-3 source (e.g. an Open-Meteo endpoint).
+1. New Claude Code session, **`/clear`**, no prior context. Provide only: `README.md`, `docs/07-adding-a-target.md`, and the URL of an unseen class-A source not in 01 §3 (e.g. an Open-Meteo endpoint, or the OTE imbalance-settlement operation from 01 §4).
 2. Instruction: "Add this as a target and open a PR." Nothing else.
 3. Record: files touched, CI result, whether `energy_platform/` was modified, number of turns.
 4. Repeat via the CLI golden path following `docs/07-adding-a-target.md` literally, as a junior would (no MCP).

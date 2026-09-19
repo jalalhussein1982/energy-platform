@@ -1,7 +1,7 @@
 # energy-platform
 
-High-availability ingestion of public intraday energy data (OTE, ČEPS, ENTSO-E) with a
-constrained extension path, so that a junior engineer or a coding agent can add a target
+High-availability ingestion of public intraday energy data — OTE continuous intraday market results,
+ČEPS system load; ENTSO-E optional (see `docs/01-data-scope.md` §3) — with a constrained extension path, so that a junior engineer or a coding agent can add a target
 without touching the core.
 
 Status: **Phase 0 — repository bootstrap.** No platform code yet. Start with

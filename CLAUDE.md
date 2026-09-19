@@ -1,8 +1,9 @@
 # energy-platform — agent instructions
 
 ## What this is
-High-availability ingestion of public intraday energy data (OTE, ČEPS, ENTSO-E) with a
-constrained extension path so a junior or an agent can add a target without touching core.
+High-availability ingestion of public intraday energy data — OTE continuous intraday market (SOAP +
+XLSX), ČEPS load; ENTSO-E optional — with a constrained extension path so a junior or an agent can
+add a target without touching core. Committed scope: docs/01-data-scope.md §3 (T1, T2, T3 + demo E1).
 
 ## Read first
 docs/00-assumptions.md, docs/02-architecture-decisions.md (frozen), docs/adr/ (accepted),
