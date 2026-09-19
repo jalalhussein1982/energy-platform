@@ -1,0 +1,114 @@
+[project]
+name = "energy-platform"
+version = "0.0.1"
+description = "High-availability ingestion of public intraday energy data (OTE, ČEPS, ENTSO-E) with a constrained extension path."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "hypothesis>=6.112",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "import-linter>=2.0",
+  "pre-commit>=3.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["energy_platform"]
+
+# `energyctl` entry point is added in Phase 2 when energy_platform.cli exists.
+
+# ---------------------------------------------------------------------------
+# ruff — ADR-014. Banned-API rules enforce A-7 (single egress path) and the
+# "never" list in CLAUDE.md. Do not weaken a rule inside a task PR.
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["energy_platform", "targets", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",      # pycodestyle / pyflakes
+  "I",                # isort
+  "B",                # bugbear
+  "UP",               # pyupgrade
+  "DTZ",              # flake8-datetimez: naive datetimes are banned
+  "S",                # bandit: S110 try-except-pass, S113 request without timeout, S105-107 hardcoded secrets
+  "BLE",              # blind except
+  "TID",              # tidy imports incl. TID251 banned-api
+  "T20",              # no print() in library code
+  "RUF",
+]
+ignore = [
+  "S101",             # assert is fine in tests (re-enabled for library code below)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S106", "T20"]
+"scripts/**" = ["T20"]
+"energy_platform/fetch/**" = ["TID251"]   # the ONLY place outbound HTTP clients may be imported (A-7)
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"httpx".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
+"requests".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
+"urllib.request".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
+"urllib3".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
+"aiohttp".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
+"datetime.datetime.utcnow".msg = "Naive UTC; use datetime.now(tz=UTC) (ADR-014)."
+"datetime.datetime.utcfromtimestamp".msg = "Naive UTC; use datetime.fromtimestamp(ts, tz=UTC) (ADR-014)."
+
+[tool.ruff.lint.isort]
+known-first-party = ["energy_platform", "targets"]
+
+# ---------------------------------------------------------------------------
+# mypy — ADR-014: strict everywhere, including targets/.
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["energy_platform", "targets", "tests", "scripts"]
+
+# ---------------------------------------------------------------------------
+# import-linter — ADR-014 / ADR-005 layering.
+# ---------------------------------------------------------------------------
+[tool.importlinter]
+root_packages = ["energy_platform", "targets"]
+
+[[tool.importlinter.contracts]]
+name = "targets may import only energy_platform.contracts"
+type = "forbidden"
+source_modules = ["targets"]
+forbidden_modules = [
+  "energy_platform.fetch",
+  "energy_platform.bronze",
+  "energy_platform.parse",
+  "energy_platform.mapping",
+  "energy_platform.silver",
+  "energy_platform.ledger",
+  "energy_platform.cli",
+  "energy_platform.mcp",
+]
+
+[[tool.importlinter.contracts]]
+name = "energy_platform never imports targets"
+type = "forbidden"
+source_modules = ["energy_platform"]
+forbidden_modules = ["targets"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = ["live: needs network; never run in CI (ADR-010)"]

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+*.egg-info/
+dist/
+build/
+
+# Local secrets and environments — never committed
+.env
+*.env
+!*.env.example
+*openrc*.sh
+clouds.yaml
+kubeconfig*
+*.pem
+*.key
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Terraform (Phase 5)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
