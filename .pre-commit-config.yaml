@@ -1,0 +1,19 @@
+# Same gates as CI, run locally before commit. Hooks call Make so laptop == CI (ADR-015).
+repos:
+  - repo: local
+    hooks:
+      - id: make-lint
+        name: make lint
+        entry: make lint
+        language: system
+        pass_filenames: false
+      - id: make-type
+        name: make type
+        entry: make type
+        language: system
+        pass_filenames: false
+      - id: make-secret-scan
+        name: make secret-scan
+        entry: make secret-scan
+        language: system
+        pass_filenames: false
