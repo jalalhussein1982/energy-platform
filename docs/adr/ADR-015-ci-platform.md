@@ -8,7 +8,7 @@
 
 ## Context
 
-We cannot ask ČEZ whether they run GitHub or GitLab. The assignment is delivered as a Git repository; GitHub Actions is the default for a take-home. The cost of being wrong must be bounded.
+The brief allows questions, but which Git host ČEZ runs is not worth blocking delivery on: the assignment is delivered as a Git repository, GitHub Actions is the default for a take-home, and the cost of being wrong must be bounded. *(2026-09-19: premise reworded after review; was "we cannot ask". Decision unchanged.)*
 
 ## Decision
 

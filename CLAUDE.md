@@ -29,13 +29,15 @@ green before every commit. Tick roadmap checkboxes and append to docs/progress.m
 - Never add a dependency without docs/adr/ entry + deps-allowlist.txt.
 - Never call the network from unit tests. Fixtures are Bronze objects.
 - Never edit docs/00, docs/01 or docs/02 inside a task; propose an ADR.
-- A target PR touches only targets/<id>/. Anything else is a platform PR.
+- A target PR touches only targets/<id>/ (the ADR-027 surface: manifest, optional parser, README, fixtures, golden tests). Anything else is a platform PR.
+- Registry entries (dataset, metric, host) are platform PRs (ADR-022). An unadmitted source gets an admission request, never an invented unit.
 - Timezones: every datetime is aware; delivery intervals are tstzrange; DST days have 92/100 intervals.
 - Decimal comma is common in Czech sources; parse explicitly, never float() on raw strings.
 - All outbound HTTP goes through energy_platform.fetch. Images by digest. Every migration has a downgrade.
 - The core Helm chart needs no CRDs and passes the restricted Pod Security profile.
 - Orchestration is CronJob + run ledger (ADR-003 rev.), not Argo.
 - Never weaken a lint rule, a CI gate or a negative test to make a task pass.
+- Unit tests run with sockets disabled (ADR-027); a test that needs the network is marked `live` and never runs in CI.
 
 ## Authority
 Level 0 read · Level 1 generate targets · Level 2 propose PRs · Level 3 forbidden:

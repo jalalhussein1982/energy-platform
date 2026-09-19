@@ -248,6 +248,8 @@ energyctl replay --target ote_intraday --from 2026-09-19T10:00Z --to 2026-09-19T
 energyctl replay --target ote_intraday --from … --to … --parser-version <bad>   # repair after a bad release (ADR-016)
 ```
 
+*(2026-09-19, ADR-023/ADR-024: the lineage column is `derivation_id` and the flag is `--derivation`; replay never fetches, the fetching verb for a period with no capture is `backfill`; the ledger gains `fence`/`run_attempts` and a `reconcile` step from Bronze.)*
+
 *(2026-09-19: replay and gap detector re-pointed at the run ledger; see ADR-003 rev. Original wording said only "replay never refetches".)*
 
 ---
@@ -319,7 +321,7 @@ Never: `Internet → LLM → production action`.
 Minimum threat catalogue: indirect prompt injection; malicious source response; dependency hallucination/slopsquatting; credential exfiltration; unsafe shell generation; SSRF via manifest URL; malicious redirects; archive poisoning; PR supply-chain attack; mapping-level data poisoning (a patch that silently flips a sign or unit).
 
 Mechanisms locked:
-- **SSRF**: manifest URLs validated against a per-target host allowlist in the schema **and** Kubernetes egress `NetworkPolicy` so a capture pod can reach only its declared hosts.
+- **SSRF**: manifest URLs validated against a per-target host allowlist in the schema **and** Kubernetes egress `NetworkPolicy` so a capture pod can reach only its declared hosts. *(2026-09-19, ADR-026: standard `NetworkPolicy` cannot express hostnames; it is the coarse boundary (default deny, public 443 only, private/metadata ranges excepted) and per-host enforcement, resolution checks and per-hop redirect validation live in `energy_platform.fetch` against a CODEOWNERS-protected host registry.)*
 - **Data poisoning**: contract tests assert **golden values**, not merely "parses without error".
 - **Licensing**: `license` and `terms_url` are mandatory manifest fields; the scheduler refuses targets without them (this is also how EPEX/Nord Pool stays out).
 - Triage agent: least-privilege tools, content passed as data with length limits, output restricted to a PR.
@@ -389,9 +391,9 @@ Direction fixed: declarative, versioned JSON Schema, one file per target, mandat
 
 **Decision.**
 1. A release is an immutable bundle: chart version + image **digest** + target manifests. Rollback = `helm rollback`. CI refuses mutable tags.
-2. `helm upgrade --atomic --wait` plus a **`helm test` hook** running one fixture capture+process against the new image; the freshness SLI over the next two cadences confirms.
+2. `helm upgrade --atomic --wait` plus a **`helm test` hook** running one fixture capture+process against the new image; the freshness SLI over the next two cadences confirms. *(2026-09-19, ADR-025: the smoke Job is a `post-install,post-upgrade` hook so that `--atomic` rolls back on its failure; `helm test` re-runs it on demand; migrations are `post-install,pre-upgrade`.)*
 3. Migrations are **expand/contract**, compatible with code N−1, run as a `pre-upgrade` hook, each with a **downgrade script exercised in CI**; the application refuses to start on an incompatible schema.
-4. Data from a bad release is repaired by `energyctl replay --parser-version <bad>` from Bronze, using ledger lineage — never by rollback.
+4. Data from a bad release is repaired by `energyctl replay --parser-version <bad>` from Bronze, using ledger lineage — never by rollback. *(2026-09-19, ADR-023: `--derivation <bad>`; the version identity includes `derivation_id`, which is what makes this repair append corrected rows instead of a no-op.)*
 5. Semantic failures are caught upstream: golden tests, quality checks, optional canary target group (D-13).
 6. Rollback is **drilled** on a schedule, like restore.
 
@@ -413,6 +415,12 @@ Direction fixed: declarative, versioned JSON Schema, one file per target, mandat
 | ADR-019-generic-parsers-and-allowlist | B-3 | ACCEPTED |
 | ADR-020-test-strategy | B-6 | ACCEPTED |
 | ADR-021-bronze-tiering | D-8; amends ADR-002 | ACCEPTED |
+| ADR-022-source-admission-vs-adapter-addition | review F04; amends §5 criterion 4, `03` Phase 7 | ACCEPTED |
+| ADR-023-derivation-identity | review F05; amends ADR-018, ADR-016 §4 | ACCEPTED |
+| ADR-024-capture-recovery-invariants | review F06; amends ADR-003 rev., ADR-004 | ACCEPTED |
+| ADR-025-upgrade-hooks-and-install-ordering | review F07; amends ADR-016 §2–3, ADR-021 §3 | ACCEPTED |
+| ADR-026-egress-boundary | review F08; amends ADR-008 SSRF mechanism | ACCEPTED |
+| ADR-027-target-capability-boundary | review F03; amends ADR-014, ADR-017 | ACCEPTED |
 
 ---
 
@@ -439,7 +447,7 @@ Harness before code. Step 4 is the harness's own first test.
 | B-2 | Canonical schema details (ADR-011) | interval as `tstzrange` vs start+duration; revisions as version column vs history table; `observed_at` = fetch time vs source publication time | `tstzrange`; append-only versions with a current view; store both timestamps | ADR-018 (no `observed_at` column; `source_published_at` + `fetched_at` + `processed_at` per 01 §6.1) |
 | B-3 | Generic parsers in v1 and dependency allowlist | html-table, xlsx, xml/soap, json-path, csv; library choices | all five; `lxml`, `openpyxl`, `pydantic` v2 | ADR-019 |
 | B-4 | Tooling baseline | Python version; `uv`; `ruff`; `mypy --strict`; `import-linter`; `pre-commit`; CODEOWNERS | all; Python 3.12 | ADR-014 |
-| B-5 | CI platform | GitHub Actions vs GitLab CI | GitHub Actions unless ČEZ indicates GitLab (ask) | ADR-015 — cannot ask; GitHub Actions assumed (`00` A-13); workflows are thin wrappers over Make |
+| B-5 | CI platform | GitHub Actions vs GitLab CI | GitHub Actions unless ČEZ indicates GitLab (ask) | ADR-015 — chosen without blocking on the question (`00` A-13); workflows are thin wrappers over Make *(2026-09-19: "cannot ask" reworded — the brief invites questions)* |
 | B-6 | Test strategy | fixtures as reused Bronze objects vs VCR cassettes; golden file format; property tests for DST; nightly-only live smoke | Bronze objects as fixtures; YAML goldens; Hypothesis for DST; nightly live smoke | ADR-020 |
 
 ### 4.2 Deferrable to Steps 4–5
@@ -449,7 +457,7 @@ Harness before code. Step 4 is the harness's own first test.
 | D-1 | Kubernetes bootstrap on OpenStack | Magnum vs Terraform VMs + cloud-init k3s/RKE2 | VMs + cloud-init k3s/RKE2 (Magnum not universal) |
 | D-2 | Postgres as a **DSN contract** (changed 2026-09-19, `00` §6; was "engine and HA") | chart takes a DSN; profiles provide Postgres via `postgres.mode` = `statefulset` \| `cnpg` \| `external`; engine (plain vs TimescaleDB) still open | `statefulset` for local/tenant, `cnpg` for own-cluster (and for tenant where the operator pre-exists, `00` V-10), `external` for managed; engine decided by ADR before the Phase 2 schema |
 | D-3 | Object storage per profile | MinIO local; Ceph RGW / Swift on OpenStack; what is the "independent copy" in each profile | MinIO (2 instances local); RGW + second bucket/region on OpenStack |
-| D-4 | Gap detector internals | expected-interval calendars per target; tolerance windows; where it runs | CronWorkflow every cadence; tolerance = 2× cadence |
+| D-4 | Gap detector internals | expected-interval calendars per target; tolerance windows; where it runs | `CronJob` every cadence; tolerance = 2× cadence; emits `missing_capture` vs `unprocessed_capture` (ADR-024) *(2026-09-19: "CronWorkflow" was residual Argo wording)* |
 | D-5 | Polling cadence and politeness | per-target intervals; jitter; backoff caps; conditional requests (ETag/If-Modified-Since) | intervals from 01 §5 (T1/T2: 15 min during the delivery day, hourly for D-1..D-3; T3: 15 min; E1: hourly from 12:00 CET on D-1); jitter ±10%; capped exponential backoff; conditional where supported; one-week observation campaign before any latency is quoted *(2026-09-19: "5 min OTE IM" replaced by the 01 v1.0 values)* |
 | D-6 | Observability stack (changed 2026-09-19, `00` §6) | metrics exposure: `/metrics` + annotations vs `PodMonitor`; stack in local profile | **annotations by default; `PodMonitor` behind `metrics.operator.enabled`** (core chart needs no CRD); full stack only in `own-cluster`, minimal in local |
 | D-7 | Secrets backend (changed 2026-09-19, `00` §6) | plain `Secret` vs External Secrets Operator; SOPS locally | **plain `Secret` by default (from CI/SOPS); ESO behind `secrets.eso.enabled`** (ESO absent on the reference cluster, `00` V-4); SOPS for local |
@@ -482,6 +490,6 @@ Harness before code. Step 4 is the harness's own first test.
 1. `git clone && make local-up && make smoke-test` passes on a clean machine with no credentials.
 2. Restore drill passes from cold Bronze and Postgres backups.
 3. Freshness dashboard shows per-target SLI; a simulated source outage produces `source_unavailable`, not `pipeline_failed`.
-4. **Blind agent test**: a fresh agent, given only the README and the URL of an unseen source, opens a PR that passes CI and touches nothing outside `targets/<id>/`.
+4. **Blind agent test**: a fresh agent, given only the README and the URL of an unseen source, opens a PR that passes CI and touches nothing outside `targets/<id>/`. *(2026-09-19, ADR-022: the unseen source is **pre-admitted**; given an **unadmitted** source the correct outcome is an admission request and nothing else.)*
 5. **Junior human test**: the same exercise via the CLI golden path, same outcome.
 6. Negative harness tests: one deliberately bad PR per catalogued failure mode is rejected by the mapped gate.
