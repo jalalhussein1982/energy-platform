@@ -24,10 +24,11 @@ check: lint type test ## lint + type + test — must be green before every commi
 sync: ## Create/refresh the locked virtualenv (dev group included)
 	$(UV) sync --frozen --group dev
 
-lint: sync ## ruff (rules incl. egress ban, naive datetime, swallowed except) + format check + import-linter
+lint: sync ## ruff (rules incl. egress ban, naive datetime, swallowed except) + format check + import-linter + target surface (ADR-027)
 	$(RUN) ruff check .
 	$(RUN) ruff format --check .
 	$(RUN) lint-imports
+	$(RUN) python scripts/check_target_surface.py targets
 
 format: sync ## Apply ruff formatting and safe fixes
 	$(RUN) ruff format .

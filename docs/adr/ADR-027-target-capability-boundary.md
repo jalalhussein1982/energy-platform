@@ -21,7 +21,8 @@ tests.
 
 1. **Positive definition of a target.** `targets/<id>/` may contain exactly: `manifest.yaml`,
    `parser.py` (optional), `README.md`, `fixtures/**` (Bronze objects: blob + capture-log entry),
-   `tests/golden/*.yaml`, `tests/test_*.py`. `scripts/check_target_surface.py` (run by `make lint`)
+   `tests/golden/*.yaml`, `tests/test_*.py`, and empty `__init__.py` files in `<id>/` and
+   `<id>/tests/` (packaging only, so that two targets' `parser.py` are distinct modules). `scripts/check_target_surface.py` (run by `make lint`)
    fails on any other file, and on any of the following inside `targets/`: `# noqa`,
    `# type: ignore`, `# pragma`, `pytest.mark.skip`, `pytest.mark.xfail`, `pytest.importorskip`,
    `__import__`, `exec(`, `eval(`, `open(`, `getattr(__builtins__`, `conftest.py`. The check has a

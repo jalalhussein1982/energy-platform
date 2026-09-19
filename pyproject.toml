@@ -54,7 +54,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S106", "T20"]
-"scripts/**" = ["T20"]
+"scripts/**" = ["T20", "TID251"]          # Make helpers (git, filesystem); never imported by the platform
+"conftest.py" = ["TID251"]                # installs the socket block (ADR-027 §4)
+"tests/harness/**" = ["TID251"]           # negative tests name the banned modules on purpose
 "energy_platform/fetch/**" = ["TID251"]   # the ONLY place outbound HTTP clients may be imported (A-7)
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
@@ -63,6 +65,23 @@ ignore = [
 "urllib.request".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
 "urllib3".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
 "aiohttp".msg = "Outbound HTTP only via energy_platform.fetch (A-7, ADR-014)."
+# ADR-027 §3 — standard-library egress and escape paths (F03).
+"http".msg = "Outbound HTTP only via energy_platform.fetch (ADR-027)."
+"http.client".msg = "Outbound HTTP only via energy_platform.fetch (ADR-027)."
+"socket".msg = "No raw sockets outside energy_platform.fetch (ADR-027)."
+"ssl".msg = "TLS is configured by energy_platform.fetch only (ADR-027)."
+"ftplib".msg = "No egress outside energy_platform.fetch (ADR-027)."
+"smtplib".msg = "No egress outside energy_platform.fetch (ADR-027)."
+"telnetlib".msg = "No egress outside energy_platform.fetch (ADR-027)."
+"xmlrpc".msg = "No egress outside energy_platform.fetch (ADR-027)."
+"webbrowser".msg = "No egress outside energy_platform.fetch (ADR-027)."
+"subprocess".msg = "No shell from platform code (ADR-027)."
+"os.system".msg = "No shell from platform code (ADR-027)."
+"os.popen".msg = "No shell from platform code (ADR-027)."
+"importlib".msg = "No dynamic imports (ADR-027)."
+"ctypes".msg = "No native calls (ADR-027)."
+"multiprocessing".msg = "No process spawning from platform code (ADR-027)."
+"asyncio.open_connection".msg = "No raw connections outside energy_platform.fetch (ADR-027)."
 "datetime.datetime.utcnow".msg = "Naive UTC; use datetime.now(tz=UTC) (ADR-014)."
 "datetime.datetime.utcfromtimestamp".msg = "Naive UTC; use datetime.fromtimestamp(ts, tz=UTC) (ADR-014)."
 
@@ -76,7 +95,7 @@ known-first-party = ["energy_platform", "targets"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-files = ["energy_platform", "targets", "tests", "scripts"]
+files = ["energy_platform", "targets", "tests", "scripts", "conftest.py"]
 
 # ---------------------------------------------------------------------------
 # import-linter — ADR-014 / ADR-005 layering.
@@ -109,6 +128,6 @@ forbidden_modules = ["targets"]
 # pytest
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "targets"]   # targets/<id>/tests/ are collected by default (F02, ADR-020)
 addopts = "-q --strict-markers"
 markers = ["live: needs network; never run in CI (ADR-010)"]
