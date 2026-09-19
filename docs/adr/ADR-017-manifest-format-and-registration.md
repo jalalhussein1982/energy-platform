@@ -5,6 +5,7 @@
 | Status | ACCEPTED |
 | Date | 2026-09-19 |
 | Resolves | B-1 (`02-architecture-decisions.md` §4.1) |
+| Amended by | ADR-027 (2026-09-19): parser input is a platform-decoded document; `parser.py` imports are positively allowlisted. ADR-022/ADR-026: `contract.dataset_id` and `allowed_hosts` must exist in platform registries |
 
 ## Context
 

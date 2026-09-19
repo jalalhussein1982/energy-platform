@@ -5,6 +5,7 @@
 | Status | ACCEPTED |
 | Date | 2026-09-19 |
 | Resolves | B-4 (`02-architecture-decisions.md` §4.1) |
+| Amended by | ADR-027 (2026-09-19): egress lint rule replaced by a positive target surface, extended banned-API list and a runtime socket block |
 
 ## Context
 
