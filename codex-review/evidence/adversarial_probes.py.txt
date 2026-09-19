@@ -1,0 +1,48 @@
+import importlib.util
+import json
+import os
+import pathlib
+import subprocess
+
+root = pathlib.Path.cwd()
+meta = json.loads((root / "codex-review/evidence/review-environment.json").read_text())
+snap = pathlib.Path(meta["snapshot"])
+out = root / "codex-review/evidence"
+env = os.environ.copy()
+env.update(UV_PROJECT_ENVIRONMENT=meta["venv"], UV_CACHE_DIR=meta["temp_workspace"]+"/uv-cache", UV_OFFLINE="1", PYTHONDONTWRITEBYTECODE="1")
+results = []
+def run(name, cmd):
+    p = subprocess.run(cmd, cwd=snap, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+    result = {"name":name,"command":cmd,"exit_code":p.returncode,"output":p.stdout}
+    results.append(result)
+    print(json.dumps(result))
+    return p
+
+def uv(*args):
+    return ["uv","run","--no-sync","--offline",*args]
+
+# Negative target code exists only in the isolated copy; it is never imported or executed.
+probe = snap / "targets/review_probe"
+(probe / "tests").mkdir(parents=True, exist_ok=True)
+(probe / "__init__.py").write_text("")
+(probe / "parser.py").write_text('import http.client\n\n\ndef request_status(host: str) -> int:\n    connection = http.client.HTTPSConnection(host, timeout=1)\n    connection.request("GET", "/")\n    return connection.getresponse().status\n')
+(probe / "tests/test_rejected.py").write_text('def test_target_golden() -> None:\n    raise AssertionError("Deliberately invalid target must not be accepted")\n')
+run("target_with_direct_http_and_failing_test_make_check", ["make","-o","sync","check","RUN=uv run --no-sync --offline"])
+run("explicit_target_test_control", uv("pytest","targets/review_probe/tests/test_rejected.py"))
+run("ordinary_collection", uv("pytest","--collect-only","-q"))
+
+spec = importlib.util.spec_from_file_location("review_secret_scanner", snap/"scripts/secret_scan.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+tracked = json.loads((out/"baseline-sha256.json").read_text())
+scan = module.scan([snap/f for f in tracked if f != "scripts/secret_scan.py"])
+results.append({"name":"secret_scan_baseline_current_files","findings":scan})
+# Fake alphabetic markers only; no real secrets are read or generated.
+synthetic = "ghp_" + "A"*36
+fixture = pathlib.Path(meta["temp_workspace"])/"fake-credential.txt"
+secret_results = {}
+for label, line in {"bare_marker":synthetic, "marker_with_comment":synthetic+" # example", "marker_in_example_url":"https://example.org/"+synthetic}.items():
+    fixture.write_text(line+"\n")
+    secret_results[label] = module.scan([fixture])
+results.append({"name":"secret_scanner_line_exemptions","results":secret_results})
+print(json.dumps(results[-2:])); (out/"adversarial-probes.json").write_text(json.dumps(results,indent=2)+"\n")

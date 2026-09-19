@@ -1,0 +1,4 @@
+$ ['make', 'helm-lint']
+helm-lint: no chart at deployment/helm/energy-platform yet (Phase 5) — nothing to check
+
+EXIT_CODE=0

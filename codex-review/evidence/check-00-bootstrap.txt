@@ -1,0 +1,17 @@
+Repeated isolated offline bootstrap attempt (same synchronization failure as initial baseline attempt).
+$ UV_OFFLINE=1 UV_CACHE_DIR=<temporary-empty-cache> UV_PROJECT_ENVIRONMENT=<copied-env> make check
+uv sync --frozen --group dev
+   Building energy-platform @ file:///private/tmp/energy-codex-review-07qyg76h/snapshot
+  × Failed to build `energy-platform @
+  │ file:///private/tmp/energy-codex-review-07qyg76h/snapshot`
+  ├─▶ Failed to resolve requirements from `build-system.requires`
+  ├─▶ No solution found when resolving: `hatchling`
+  ╰─▶ Because hatchling was not found in the cache and you require hatchling,
+      we can conclude that your requirements are unsatisfiable.
+
+      hint: Packages were unavailable because the network was disabled. When
+      the network is disabled, registry packages may only be read from the
+      cache.
+make: *** [sync] Error 1
+
+EXIT_CODE=2

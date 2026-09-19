@@ -1,0 +1,5 @@
+$ ['make', 'local-up']
+local-up: not implemented until Phase 5 (deployment/local/)
+make: *** [local-up] Error 1
+
+EXIT_CODE=2

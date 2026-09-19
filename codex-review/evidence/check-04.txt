@@ -1,0 +1,4 @@
+$ ['make', 'terraform-validate']
+terraform-validate: no Terraform at deployment/own-cluster/terraform yet (Phase 5) — nothing to check
+
+EXIT_CODE=0

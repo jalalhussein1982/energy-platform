@@ -1,0 +1,80 @@
+[
+  {
+    "command": [
+      "make",
+      "-o",
+      "sync",
+      "check",
+      "RUN=uv run --no-sync --offline"
+    ],
+    "exit_code": 0,
+    "log": "check-01.txt",
+    "output": "uv run --no-sync --offline ruff check .\nAll checks passed!\nuv run --no-sync --offline ruff format --check .\n32 files already formatted\nuv run --no-sync --offline lint-imports\n\n\u2554\u2550\u2550\u2557\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25b6\u2554\u2557 \u2554\u2557      \u2554\u2557\u25c0\u2500\u2500\u2500\u2510\n\u255a\u2563\u2560\u255d\u25c0\u2500\u2500\u2500\u2500\u2500\u2510  \u2554\u255d\u255a\u2557\u2551\u2551\u2500\u2500\u2500\u2500\u25b6\u2554\u255d\u255a\u2557   \u2502\n \u2551\u2551   \u2554\u2550\u2550\u2566\u2550\u2550\u2566\u2569\u2557\u2554\u255d\u2551\u2551  \u2554\u2566\u2550\u2569\u2557\u2554\u255d\u2554\u2550\u2566\u2550\u2550\u2557\n \u2551\u2551\u2554\u2550\u2550\u2563\u2554\u2557\u2551\u2554\u2557\u2551\u2554\u2563\u2551 \u2551\u2551 \u2554\u256c\u2563\u2554\u2557\u2551\u2551 \u2551\u2502\u2551\u2554\u2550\u255d\n\u2554\u2563\u2560\u2563\u2551\u2551\u2551\u255a\u255d\u2551\u255a\u255d\u2551\u2551\u2551\u255a\u2557\u2551\u255a\u2550\u255d\u2551\u2551\u2551\u2551\u2551\u255a\u2557\u2551\u2550\u2563\u2551\n\u255a\u2550\u2550\u2569\u2569\u2569\u2563\u2554\u2550\u2569\u2550\u2550\u2569\u255d\u255a\u2550\u255d\u255a\u2550\u2550\u2550\u2569\u2569\u255d\u255a\u2569\u2550\u2569\u2569\u2550\u2569\u255d\n  \u2514\u2500\u2500\u25b6\u2551\u2551                    \u25b2 \n      \u255a\u255d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n\n---------\nContracts\n---------\n\nAnalyzed 3 files, 0 dependencies.\n---------------------------------\n\ntargets may import only energy_platform.contracts KEPT\nenergy_platform never imports targets KEPT\n\nContracts: 2 kept, 0 broken.\nuv run --no-sync --offline mypy\nSuccess: no issues found in 8 source files\nuv run --no-sync --offline pytest -m \"not live\"\n.                                                                        [100%]\n1 passed in 0.46s\n"
+  },
+  {
+    "command": [
+      "make",
+      "-o",
+      "sync",
+      "deps-allowlist",
+      "RUN=uv run --no-sync --offline"
+    ],
+    "exit_code": 0,
+    "log": "check-02.txt",
+    "output": "uv run --no-sync --offline python scripts/check_deps_allowlist.py uv.lock deps-allowlist.txt\ndeps-allowlist: OK \u2014 31 locked packages all allowlisted\n"
+  },
+  {
+    "command": [
+      "make",
+      "helm-lint"
+    ],
+    "exit_code": 0,
+    "log": "check-03.txt",
+    "output": "helm-lint: no chart at deployment/helm/energy-platform yet (Phase 5) \u2014 nothing to check\n"
+  },
+  {
+    "command": [
+      "make",
+      "terraform-validate"
+    ],
+    "exit_code": 0,
+    "log": "check-04.txt",
+    "output": "terraform-validate: no Terraform at deployment/own-cluster/terraform yet (Phase 5) \u2014 nothing to check\n"
+  },
+  {
+    "command": [
+      "make",
+      "demo"
+    ],
+    "exit_code": 2,
+    "log": "check-05.txt",
+    "output": "demo: not implemented until Phase 2 (energyctl demo)\nmake: *** [demo] Error 1\n"
+  },
+  {
+    "command": [
+      "make",
+      "local-up"
+    ],
+    "exit_code": 2,
+    "log": "check-06.txt",
+    "output": "local-up: not implemented until Phase 5 (deployment/local/)\nmake: *** [local-up] Error 1\n"
+  },
+  {
+    "command": [
+      "make",
+      "smoke-test"
+    ],
+    "exit_code": 2,
+    "log": "check-07.txt",
+    "output": "smoke-test: not implemented until Phase 5\nmake: *** [smoke-test] Error 1\n"
+  },
+  {
+    "command": [
+      "make",
+      "new-target"
+    ],
+    "exit_code": 2,
+    "log": "check-08.txt",
+    "output": "new-target: not implemented until Phase 3 (energyctl new-target)\nmake: *** [new-target] Error 1\n"
+  }
+]

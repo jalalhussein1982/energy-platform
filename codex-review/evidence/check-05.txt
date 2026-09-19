@@ -1,0 +1,5 @@
+$ ['make', 'demo']
+demo: not implemented until Phase 2 (energyctl demo)
+make: *** [demo] Error 1
+
+EXIT_CODE=2

@@ -1,0 +1,5 @@
+$ ['make', 'smoke-test']
+smoke-test: not implemented until Phase 5
+make: *** [smoke-test] Error 1
+
+EXIT_CODE=2

@@ -1,0 +1,35 @@
+$ ['make', '-o', 'sync', 'check', 'RUN=uv run --no-sync --offline']
+uv run --no-sync --offline ruff check .
+All checks passed!
+uv run --no-sync --offline ruff format --check .
+32 files already formatted
+uv run --no-sync --offline lint-imports
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 3 files, 0 dependencies.
+---------------------------------
+
+targets may import only energy_platform.contracts KEPT
+energy_platform never imports targets KEPT
+
+Contracts: 2 kept, 0 broken.
+uv run --no-sync --offline mypy
+Success: no issues found in 8 source files
+uv run --no-sync --offline pytest -m "not live"
+.                                                                        [100%]
+1 passed in 0.46s
+
+EXIT_CODE=0

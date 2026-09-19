@@ -1,0 +1,6 @@
+{
+  "uv": "uv 0.11.7 (9d177269e 2026-04-15 aarch64-apple-darwin)",
+  "python": "Python 3.12.13",
+  "pytest": "pytest 9.1.1",
+  "ruff": "ruff 0.16.8"
+}

@@ -1,0 +1,5 @@
+$ ['make', 'new-target']
+new-target: not implemented until Phase 3 (energyctl new-target)
+make: *** [new-target] Error 1
+
+EXIT_CODE=2

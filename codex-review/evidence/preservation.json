@@ -1,0 +1,9 @@
+{
+  "tracked_files_checked": 41,
+  "modified_tracked_files": [],
+  "missing_tracked_files": [],
+  "git_diff_exit_code": 0,
+  "git_status": "?? codex-review/\n",
+  "pre_commit_hook_file_present": false,
+  "only_repository_addition_is_codex_review": true
+}

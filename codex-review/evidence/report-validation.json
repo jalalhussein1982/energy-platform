@@ -1,0 +1,17 @@
+{
+  "markdown_files": 7,
+  "local_links_checked": 108,
+  "findings": 14,
+  "p1": 9,
+  "p2": 5,
+  "errors": [],
+  "preservation": {
+    "tracked_files_checked": 41,
+    "modified_tracked_files": [],
+    "missing_tracked_files": [],
+    "git_diff_exit_code": 0,
+    "git_status": "?? codex-review/\n",
+    "pre_commit_hook_file_present": false,
+    "only_repository_addition_is_codex_review": true
+  }
+}

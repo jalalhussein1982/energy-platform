@@ -1,0 +1,28 @@
+{
+  "mutation": "In isolated copy only: dev constraint pytest>=8.3 changed to pytest>=100 without lock update. --no-install-project avoids uncached build dependency; it is not a full make check.",
+  "results": [
+    {
+      "command": [
+        "uv",
+        "sync",
+        "--frozen",
+        "--offline",
+        "--group",
+        "dev",
+        "--no-install-project"
+      ],
+      "exit_code": 0,
+      "output": "Uninstalled 1 package in 3ms\n - energy-platform==0.0.1 (from file:///Users/jalalhussein/Desktop/Desktop%20-%20Jalal%E2%80%99s%20MacBook%20Air/task-cze)\n"
+    },
+    {
+      "command": [
+        "uv",
+        "lock",
+        "--check",
+        "--offline"
+      ],
+      "exit_code": 1,
+      "output": "  \u00d7 No solution found when resolving dependencies:\n  \u2570\u2500\u25b6 Because hypothesis was not found in the cache and energy-platform:dev\n      depends on hypothesis>=6.112, we can conclude that energy-platform:dev's\n      requirements are unsatisfiable.\n      And because your project requires energy-platform:dev, we can conclude\n      that your project's requirements are unsatisfiable.\n\n      hint: Packages were unavailable because the network was disabled. When\n      the network is disabled, registry packages may only be read from the\n      cache.\n"
+    }
+  ]
+}

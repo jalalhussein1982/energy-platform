@@ -1,0 +1,55 @@
+[
+  {
+    "name": "target_with_direct_http_and_failing_test_make_check",
+    "command": [
+      "make",
+      "-o",
+      "sync",
+      "check",
+      "RUN=uv run --no-sync --offline"
+    ],
+    "exit_code": 0,
+    "output": "uv run --no-sync --offline ruff check .\nAll checks passed!\nuv run --no-sync --offline ruff format --check .\n35 files already formatted\nuv run --no-sync --offline lint-imports\n\n\u2554\u2550\u2550\u2557\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u25b6\u2554\u2557 \u2554\u2557      \u2554\u2557\u25c0\u2500\u2500\u2500\u2510\n\u255a\u2563\u2560\u255d\u25c0\u2500\u2500\u2500\u2500\u2500\u2510  \u2554\u255d\u255a\u2557\u2551\u2551\u2500\u2500\u2500\u2500\u25b6\u2554\u255d\u255a\u2557   \u2502\n \u2551\u2551   \u2554\u2550\u2550\u2566\u2550\u2550\u2566\u2569\u2557\u2554\u255d\u2551\u2551  \u2554\u2566\u2550\u2569\u2557\u2554\u255d\u2554\u2550\u2566\u2550\u2550\u2557\n \u2551\u2551\u2554\u2550\u2550\u2563\u2554\u2557\u2551\u2554\u2557\u2551\u2554\u2563\u2551 \u2551\u2551 \u2554\u256c\u2563\u2554\u2557\u2551\u2551 \u2551\u2502\u2551\u2554\u2550\u255d\n\u2554\u2563\u2560\u2563\u2551\u2551\u2551\u255a\u255d\u2551\u255a\u255d\u2551\u2551\u2551\u255a\u2557\u2551\u255a\u2550\u255d\u2551\u2551\u2551\u2551\u2551\u255a\u2557\u2551\u2550\u2563\u2551\n\u255a\u2550\u2550\u2569\u2569\u2569\u2563\u2554\u2550\u2569\u2550\u2550\u2569\u255d\u255a\u2550\u255d\u255a\u2550\u2550\u2550\u2569\u2569\u255d\u255a\u2569\u2550\u2569\u2569\u2550\u2569\u255d\n  \u2514\u2500\u2500\u25b6\u2551\u2551                    \u25b2 \n      \u255a\u255d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n\n---------\nContracts\n---------\n\nAnalyzed 5 files, 0 dependencies.\n---------------------------------\n\ntargets may import only energy_platform.contracts KEPT\nenergy_platform never imports targets KEPT\n\nContracts: 2 kept, 0 broken.\nuv run --no-sync --offline mypy\nSuccess: no issues found in 11 source files\nuv run --no-sync --offline pytest -m \"not live\"\n.                                                                        [100%]\n1 passed in 0.12s\n"
+  },
+  {
+    "name": "explicit_target_test_control",
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "--offline",
+      "pytest",
+      "targets/review_probe/tests/test_rejected.py"
+    ],
+    "exit_code": 1,
+    "output": "F                                                                        [100%]\n=================================== FAILURES ===================================\n______________________________ test_target_golden ______________________________\n\n    def test_target_golden() -> None:\n>       raise AssertionError(\"Deliberately invalid target must not be accepted\")\nE       AssertionError: Deliberately invalid target must not be accepted\n\ntargets/review_probe/tests/test_rejected.py:2: AssertionError\n=========================== short test summary info ============================\nFAILED targets/review_probe/tests/test_rejected.py::test_target_golden - Asse...\n1 failed in 0.10s\n"
+  },
+  {
+    "name": "ordinary_collection",
+    "command": [
+      "uv",
+      "run",
+      "--no-sync",
+      "--offline",
+      "pytest",
+      "--collect-only",
+      "-q"
+    ],
+    "exit_code": 0,
+    "output": "tests/test_placeholder.py: 1\n\n"
+  },
+  {
+    "name": "secret_scan_baseline_current_files",
+    "findings": []
+  },
+  {
+    "name": "secret_scanner_line_exemptions",
+    "results": {
+      "bare_marker": [
+        "/private/tmp/energy-codex-review-07qyg76h/fake-credential.txt:1: github token"
+      ],
+      "marker_with_comment": [],
+      "marker_in_example_url": []
+    }
+  }
+]

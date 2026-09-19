@@ -1,0 +1,5 @@
+$ ['make', '-o', 'sync', 'deps-allowlist', 'RUN=uv run --no-sync --offline']
+uv run --no-sync --offline python scripts/check_deps_allowlist.py uv.lock deps-allowlist.txt
+deps-allowlist: OK — 31 locked packages all allowlisted
+
+EXIT_CODE=0
