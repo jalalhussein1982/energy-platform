@@ -1,0 +1,41 @@
+# deps-allowlist.txt — every package that may appear in uv.lock, transitive ones included.
+# Rule (ADR-006, ADR-019): adding a line requires an ADR in docs/adr/ and a human reviewer.
+# CI (`make deps-allowlist`) fails on any locked package not listed here.
+# Format: one package name per line; `#` comments allowed. Names are compared case-insensitively.
+#
+# Runtime packages approved by ADR-019 but not yet locked (added in the phase that uses them):
+#   pydantic, lxml, openpyxl, httpx, psycopg, alembic, sqlalchemy, typer, pyyaml, jsonschema,
+#   python-dateutil, tzdata
+#
+# --- dev group (ADR-014) and their transitive closure, as locked on 2026-09-19 ---
+ast-serialize
+cfgv
+click
+colorama
+distlib
+filelock
+grimp
+hypothesis
+identify
+import-linter
+iniconfig
+librt
+markdown-it-py
+mdurl
+mypy
+mypy-extensions
+nodeenv
+packaging
+pathspec
+platformdirs
+pluggy
+pre-commit
+pygments
+pytest
+python-discovery
+pyyaml
+rich
+ruff
+sortedcontainers
+typing-extensions
+virtualenv
