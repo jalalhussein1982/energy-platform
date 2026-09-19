@@ -5,6 +5,7 @@
 | Status | ACCEPTED |
 | Date | 2026-09-19 |
 | Resolves | B-2 (`02-architecture-decisions.md` §4.1); feeds ADR-011 in `docs/04-contracts.md` |
+| Amended by | ADR-023 (2026-09-19): version identity gains `derivation_id`; `parser_version (= contract_version)` retired |
 
 ## Context
 
