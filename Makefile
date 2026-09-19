@@ -48,19 +48,27 @@ secret-scan: sync ## Fail on credential-looking strings in tracked files
 
 # ---------------------------------------------------------------- deployment gates (real from Phase 5)
 helm-lint: ## helm lint + render with tenant values + restricted-PSS check (A-14). Skips honestly until the chart exists.
-	@if [ ! -d "$(CHART_DIR)" ]; then echo "helm-lint: no chart at $(CHART_DIR) yet (Phase 5) — nothing to check"; exit 0; fi
-	@command -v helm >/dev/null || { echo "helm-lint: chart exists but helm is not installed"; exit 1; }
-	helm lint $(CHART_DIR) -f deployment/tenant/values-tenant.yaml
-	helm template ep $(CHART_DIR) -f deployment/tenant/values-tenant.yaml > /tmp/ep-rendered.yaml
-	$(RUN) python scripts/check_restricted_pss.py /tmp/ep-rendered.yaml
+	@if [ ! -d "$(CHART_DIR)" ]; then \
+	  echo "helm-lint: no chart at $(CHART_DIR) yet (Phase 5) — nothing to check"; \
+	elif ! command -v helm >/dev/null; then \
+	  echo "helm-lint: chart exists but helm is not installed"; exit 1; \
+	else \
+	  helm lint $(CHART_DIR) -f deployment/tenant/values-tenant.yaml && \
+	  helm template ep $(CHART_DIR) -f deployment/tenant/values-tenant.yaml > /tmp/ep-rendered.yaml && \
+	  $(RUN) python scripts/check_restricted_pss.py /tmp/ep-rendered.yaml; \
+	fi
 
 terraform-validate: ## terraform fmt/validate/test with mock providers. Skips honestly until the profile exists.
-	@if [ ! -d "$(TF_DIR)" ]; then echo "terraform-validate: no Terraform at $(TF_DIR) yet (Phase 5) — nothing to check"; exit 0; fi
-	@command -v terraform >/dev/null || { echo "terraform-validate: Terraform exists but terraform is not installed"; exit 1; }
-	terraform -chdir=$(TF_DIR) fmt -check -recursive
-	terraform -chdir=$(TF_DIR) init -backend=false -input=false
-	terraform -chdir=$(TF_DIR) validate
-	terraform -chdir=$(TF_DIR) test
+	@if [ ! -d "$(TF_DIR)" ]; then \
+	  echo "terraform-validate: no Terraform at $(TF_DIR) yet (Phase 5) — nothing to check"; \
+	elif ! command -v terraform >/dev/null; then \
+	  echo "terraform-validate: Terraform exists but terraform is not installed"; exit 1; \
+	else \
+	  terraform -chdir=$(TF_DIR) fmt -check -recursive && \
+	  terraform -chdir=$(TF_DIR) init -backend=false -input=false && \
+	  terraform -chdir=$(TF_DIR) validate && \
+	  terraform -chdir=$(TF_DIR) test; \
+	fi
 
 ci-bootstrap: ## Install uv on a bare CI runner (the only tool installation CI is allowed to do)
 	@command -v $(UV) >/dev/null && { echo "uv present: $$($(UV) --version)"; exit 0; } || true
