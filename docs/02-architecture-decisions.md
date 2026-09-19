@@ -124,7 +124,7 @@ deployment/
 
 | Tier | Content | Authority | Protection |
 |---|---|---|---|
-| **Bronze** | Immutable source captures | Irreplaceable | Versioned + object-locked object store; **independent copy in a second failure domain**; lifecycle to cold tier |
+| **Bronze** | Immutable source captures | Irreplaceable | Versioned + object-locked object store; **independent copy in a second failure domain**; cold tier by a platform tiering job (ADR-021; lifecycle transition only where probed) |
 | **Silver** | Canonical normalised observations | **PostgreSQL is authoritative** | pgBackRest/WAL-G with PITR; reconstructable from Bronze |
 | **Gold** | Serving aggregates and exports (incl. Parquet) | Disposable | Rebuild only |
 
@@ -176,7 +176,7 @@ Blob store and capture log are separate: an unchanged page produces a new captur
 
 **Rejected.** Parquet and Postgres as dual authoritative Silver (dual-write inconsistency). A single-failure-domain object store described as "backup".
 
-*(2026-09-19, `00` §5 V-6: versioning and object lock verified on the reference S3 store; the second independent endpoint is Swift on a different site. The cold-tier storage class could not be demonstrated, so "lifecycle to cold tier" is a profile value — `bronze.coldStorageClass`, empty = no transition — never a hard requirement. Bronze replication is an `rclone` job, not native bucket replication.)*
+*(2026-09-19, `00` §5 V-6: versioning and object lock verified on the reference S3 store; the second independent endpoint is Swift on a different site. The reference gateway implements only the STANDARD class and its lifecycle API accepts non-existent class names without error, so "lifecycle to cold tier" was replaced by **ADR-021**: a platform `rclone` tiering job with `bronze.tiering.mode = none|move|lifecycle` and a deploy-time probe. Bronze replication is an `rclone` job, not native bucket replication. Superseded wording: "lifecycle to cold tier".)*
 
 ---
 
@@ -410,6 +410,7 @@ Direction fixed: declarative, versioned JSON Schema, one file per target, mandat
 | ADR-018-canonical-schema-details | B-2 | ACCEPTED |
 | ADR-019-generic-parsers-and-allowlist | B-3 | ACCEPTED |
 | ADR-020-test-strategy | B-6 | ACCEPTED |
+| ADR-021-bronze-tiering | D-8; amends ADR-002 | ACCEPTED |
 
 ---
 
@@ -450,7 +451,7 @@ Harness before code. Step 4 is the harness's own first test.
 | D-5 | Polling cadence and politeness | per-target intervals; jitter; backoff caps; conditional requests (ETag/If-Modified-Since) | 5 min OTE IM; jitter ±10%; capped exponential backoff; conditional where supported |
 | D-6 | Observability stack (changed 2026-09-19, `00` §6) | metrics exposure: `/metrics` + annotations vs `PodMonitor`; stack in local profile | **annotations by default; `PodMonitor` behind `metrics.operator.enabled`** (core chart needs no CRD); full stack only in `own-cluster`, minimal in local |
 | D-7 | Secrets backend (changed 2026-09-19, `00` §6) | plain `Secret` vs External Secrets Operator; SOPS locally | **plain `Secret` by default (from CI/SOPS); ESO behind `secrets.eso.enabled`** (ESO absent on the reference cluster, `00` V-4); SOPS for local |
-| D-8 | Retention and cold tier per profile | none local; lifecycle rules on OpenStack | Bronze hot 90 d → cold; Silver indefinite |
+| D-8 | Retention and cold tier per profile — **resolved 2026-09-19 by ADR-021** | tiering job (`move`) vs lifecycle transition vs none | `bronze.tiering.mode`: `none` (local, reference tenant), `move` (portable default for A/B/C), `lifecycle` only where the probe passes; hot 90 d; Silver indefinite |
 | D-9 | Serving layer and consumer MCP (Role C) | SQL only vs read API; MCP in/out | read-only FastAPI + SQL; MCP out unless time permits |
 | D-10 | Drift-triage agent (Role B) | fully implemented vs pipeline with LLM step stubbed | pipeline built, LLM step stubbed, documented |
 | D-11 | Gas intraday in v1 | in / out | in (one extra target, proves generality) |
@@ -466,7 +467,7 @@ Harness before code. Step 4 is the harness's own first test.
 | V-3 | OTE and ENTSO-E terms of use on redistribution — bounds D-9 (whether Silver may be served outside the organisation) |
 | V-4 | Tenant rights, CRDs, pre-installed operators, cluster services, quotas → `00-assumptions.md` §4/§5 (2026-09-19: CONFIRMED) |
 | V-5 | OpenStack services, Magnum, quotas → `00` §5 (CONFIRMED: no Magnum) |
-| V-6 | S3 endpoints, versioning, object lock, lifecycle, second endpoint → `00` §5 (PARTIAL: cold storage class unresolved) |
+| V-6 | S3 endpoints, versioning, object lock, lifecycle, second endpoint → `00` §5 (CONFIRMED; no cold storage class exists on the reference gateway → ADR-021) |
 | V-7 | OpenAI-compatible inference endpoint → `00` §5 (CONFIRMED) |
 | V-8 | Kube access identity and token lifetime → `00` §5 (PARTIAL: federated identity, but long-lived opaque Rancher token) |
 | V-9 | Egress proxy and Tier-1 reachability from a pod → `00` §5 (CONFIRMED) |

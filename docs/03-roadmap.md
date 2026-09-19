@@ -86,7 +86,7 @@
 
 **Deliverables.**
 - [ ] `fetch/` — declarative fetchers per modality (httpx, timeouts, capped backoff with jitter, conditional requests, host-allowlist enforcement before any request).
-- [ ] `bronze/` — blob store (SHA-256 keyed) + capture log; `content_changed` detection; S3 backend (MinIO locally) and an in-memory backend for tests.
+- [ ] `bronze/` — blob store (SHA-256 keyed) + capture log; `content_changed` detection; S3 backend (MinIO locally) and an in-memory backend for tests; read path tries hot then cold and the capture log carries `tier` (ADR-021).
 - [ ] `parse/` — generic parsers: html-table, xlsx, xml/soap, json-path, csv.
 - [ ] `mapping/` — executes the manifest `mapping` block: units, timezone, interval convention, sign convention → `EnergyObservation`.
 - [ ] `silver/` — Postgres schema and migrations (Alembic); bitemporal idempotent upsert per ADR-018; current-view. **Definition of done: every migration ships a downgrade script, exercised in CI (ADR-016 §3).**
@@ -145,14 +145,14 @@
 **Goal.** Reproducible by the evaluator; resilient by the ADR-004 invariants; measurable by ADR-012.
 
 **Deliverables.**
-- [ ] ADRs for D-1, D-3, D-4, D-8 (D-6 and D-7 are already contracts in 02 §4.2; an ADR is needed only for the `own-cluster` stack details).
+- [ ] ADRs for D-1, D-3, D-4 (D-6, D-7 are contracts in 02 §4.2; D-8 is resolved by ADR-021; an ADR is needed only for the `own-cluster` stack details).
 - [ ] Helm chart `deployment/helm/energy-platform` (core = `tenant`-clean, no CRDs, `restricted`-PSS-clean, requests/limits on every workload): **`CronJob` template rendered once per target** from `targets/*/manifest.yaml` (capture, process), gap-detector `CronJob`, **run ledger** migrations as a `pre-upgrade` hook Job, Postgres per `postgres.mode` (`statefulset` \| `cnpg` \| `external`), MinIO ×2 (local), NetworkPolicies (egress per target allowlist), plain `Secret` by default with ESO behind `secrets.eso.enabled`, `/metrics` annotations with `PodMonitor` behind `metrics.operator.enabled`.
 - [ ] **`helm test` hook** (ADR-016): one fixture capture+process end-to-end against the new image; `helm upgrade --atomic --wait` in every deploy Make target; images by digest only.
 - [ ] **Rollback drill** (ADR-016 §6): scheduled job deploys revision N, then N+1 with an injected failure, asserts automatic rollback, zero Bronze loss, correct ledger state.
 - [ ] `deployment/local/`: `make local-up` = kind → Helm deps → Helm platform → migrations → smoke tests.
 - [ ] `deployment/tenant/`: values for a namespace-only deploy; **deploy to the reference cluster (e-INFRA Rancher, `00` §5 V-4) as the first real environment**; deploy identity per ADR-015 (namespace-scoped token in CI secrets, expiry recorded).
 - [ ] `deployment/own-cluster/terraform/`: networking, nodes, cluster bootstrap (D-1 — Magnum is absent on the reference cloud, `00` §5 V-5), storage, security groups; sized to the verified quota (20 vCPU / 50 GB RAM / 1 floating IP); `terraform test` with mocks in CI.
-- [ ] Backups: pgBackRest/WAL-G to object store; Bronze replication as an `rclone` job to the independent endpoint (S3 → Swift on the reference environment, `00` §5 V-6); lifecycle rules with `bronze.coldStorageClass` as a value; **restore drill** as a scheduled `CronJob` with assertions.
+- [ ] Backups: pgBackRest/WAL-G to object store; Bronze replication as an `rclone` job to the independent endpoint (S3 → Swift on the reference environment, `00` §5 V-6); **`bronze-tier` CronJob** per ADR-021 (`bronze.tiering.mode = none|move|lifecycle`) with the storage-class **probe in `helm test`** (a gateway that answers `400 InvalidArgument` or reports STANDARD fails the deploy); **restore drill** as a scheduled `CronJob` with assertions, including a replay that reads from the cold location.
 - [ ] Observability: freshness SLI per target, `source_unavailable` vs `pipeline_failed`, alert rules, Grafana dashboard JSON.
 - [ ] `make smoke-test`: cluster up, one capture+process run on a fixture target, freshness metric present, restore drill dry-run.
 
