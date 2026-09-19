@@ -4,6 +4,20 @@ One dated entry per session. Newest first.
 
 ---
 
+## 2026-09-19 — ADR-028: demo environment (docs only, no platform code)
+
+**Why.** Roadmap Phase 5 had the tenant profile running for real on the e-INFRA Rancher cluster. e-INFRA CZ terms cover research and education; this is a commercial deliverable, so a scheduled workload there is out of policy. One-off probes (V-4 … V-10) stay.
+
+**Decided** (`docs/adr/ADR-028-demo-environment.md`, ACCEPTED): three environment words — *reference* (MetaCentrum, probes only, no release), *demo* (author-paid, handed to the evaluator live), *production* (ČEZ). Demo = Hetzner Cloud two-node k3s built by the `own-cluster` Terraform through a new `hcloud` root sharing modules with the `openstack` root, deployed with `tenant` values into a namespace-scoped Role so one cluster proves both profiles; Bronze store A on Hetzner Object Storage, store B on OCI Object Storage Frankfurt (S3-compatible endpoint, retention rule) — two providers, two countries, which is what A-3 means by independent. Residency declared `DE` on the demo. Budget alerts before the first apply; apply/destroy/bucket deletion stay Level 3 (author). Rejected: stay on MetaCentrum, OCI-only (free ARM tier halved 2026-06-15, capacity, multi-arch), Hetzner-only (one operator), OKE, a `demo` profile.
+
+**Reconciled.** `02` ADR-001 paragraph and `tenant` bullet, §4.2 D-1/D-3, §4.3 V-11 … V-14; `00` §2.1 row, A-9 note, §4 V-12 … V-14, §6 checklist; ADR-001 amendment header; `03` Phase 5 (demo cluster, `hcloud` root, A → B replication, cost guard, V-12 … V-14 gate) and Phase 8 (live-demo block).
+
+**Open, author-run before Phase 5 Terraform work:** V-12 (does Hetzner Object Storage support Object Lock?), V-13 (OCI retention + `rclone` A → B), V-14 (k3s structured auth with GitHub OIDC). Accounts exist: Hetzner project, OCI pay-as-you-go. Credentials outside the repository.
+
+**Next.** Phase 1 (contracts), unchanged.
+
+---
+
 ## 2026-09-19 — Review 1: Codex pre-coding verdict answered (docs + gates, no platform code)
 
 **Input.** `codex-review/` (14 findings, 9 P1) against `7d872ea`. Verdict accepted: design checkpoint, not a submission; the executable gates were thinner than the documents claimed. Response per finding: `docs/reviews/2026-09-19-codex-review-response.md`; plan: `docs/plans/review-1.md`.

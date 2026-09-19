@@ -67,7 +67,7 @@ Constraints:
 |---|---|---|---|---|---|
 | `local` | kind on a laptop | We install everything (ingress-nginx, cert-manager, MinIO×2) | `statefulset` | SOPS-decrypted `Secret` | `/metrics` + annotations |
 | `tenant` | Any shared cluster (reference: e-INFRA Rancher; scenario A of `00` §1) | **None** — consume by name (`ingressClassName`, `clusterIssuer`, `storageClassName`) | `statefulset` or `external` (`cnpg` only where the operator pre-exists) | plain `Secret` from CI/SOPS | `/metrics` + annotations (`PodMonitor` behind flag where prometheus-operator pre-exists) |
-| `own-cluster` | Terraform on OpenStack (reference: MetaCentrum Cloud; scenario B/C) | Operators allowed behind values flags | `cnpg` | ESO behind `secrets.eso.enabled` | `PodMonitor` behind `metrics.operator.enabled` |
+| `own-cluster` | Terraform on an IaaS — roots `openstack` (reference: MetaCentrum Cloud, mock-tested in CI) and `hcloud` (demo environment, applied; ADR-028); scenario B/C | Operators allowed behind values flags | `cnpg` | ESO behind `secrets.eso.enabled` | `PodMonitor` behind `metrics.operator.enabled` |
 
 ```text
 deployment/
@@ -81,12 +81,14 @@ deployment/
 ```
 
 - `make local-up` = `kind create cluster` → Helm dependencies → Helm platform → migrations → smoke tests.
-- `tenant`: `helm upgrade --install` with tenant values into a namespace that forbids CRDs; every pod is `restricted`-PSS-clean with requests/limits (`00` A-8, A-14). This is the first real environment (03 Phase 5).
+- `tenant`: `helm upgrade --install` with tenant values into a namespace that forbids CRDs; every pod is `restricted`-PSS-clean with requests/limits (`00` A-8, A-14). The first real deployment of these values is the **demo cluster** (ADR-028; 03 Phase 5); the reference cluster hosts no release. *(2026-09-19: was "the first real environment" = reference cluster.)*
 - `terraform apply` (own-cluster profile) = networking → Kubernetes nodes/cluster → storage → security groups; then Helm.
 - CI runs `terraform validate` and `terraform test` with mock providers so the own-cluster profile is proven without credentials; CI also renders the chart with tenant values and lints it against the restricted Pod Security profile.
 - **Anything cluster-level appears only in `own-cluster`, behind a flag, never in the core chart.**
 
-**Reference environment.** MetaCentrum / e-INFRA CZ is the **assumption base** from which the constraints above were derived and verified (`00` §2, §5). It is *not* the production platform and is never named as such (academic-only terms, best-effort SLA, not reproducible by the evaluator).
+**Reference environment.** MetaCentrum / e-INFRA CZ is the **assumption base** from which the constraints above were derived and verified (`00` §2, §5). It is *not* the production platform and is never named as such (academic-only terms, best-effort SLA, not reproducible by the evaluator). **No scheduled workload, Helm release or bucket of ours runs there**; only one-off verification commands, recorded in `00` §5.
+
+**Demo environment** *(2026-09-19, ADR-028)*. The live instance the author operates and pays for and hands to the evaluator: a two-node k3s cluster on Hetzner Cloud built by the `own-cluster` Terraform `hcloud` root and deployed with `tenant` values into a namespace-scoped `Role`; Bronze store A on Hetzner Object Storage, store B on OCI Object Storage (Frankfurt) — another provider and country, which is what A-3's "independently operated" means. Residency is declared `DE` there (A-9 note). It is a third word next to *reference* and *production*, never a fourth profile.
 
 **Rejected.** Terraform-managed kind cluster (an obscure provider used only to claim "everything is Terraform"). Two profiles with `openstack` doing double duty (hides the tenant case). A separate chart per profile (three drifts). Naming MetaCentrum/e-INFRA as the production platform.
 
@@ -454,9 +456,9 @@ Harness before code. Step 4 is the harness's own first test.
 
 | ID | Item | Options | Default |
 |---|---|---|---|
-| D-1 | Kubernetes bootstrap on OpenStack | Magnum vs Terraform VMs + cloud-init k3s/RKE2 | VMs + cloud-init k3s/RKE2 (Magnum not universal) |
+| D-1 | Kubernetes bootstrap on an IaaS | Magnum vs Terraform VMs + cloud-init k3s/RKE2 | VMs + cloud-init k3s/RKE2 (Magnum not universal) *(2026-09-19, ADR-028: two Terraform roots over shared modules — `openstack` reference, `terraform test` with mocks; `hcloud` demo, applied by the author, never by the agent)* |
 | D-2 | Postgres as a **DSN contract** (changed 2026-09-19, `00` §6; was "engine and HA") | chart takes a DSN; profiles provide Postgres via `postgres.mode` = `statefulset` \| `cnpg` \| `external`; engine (plain vs TimescaleDB) still open | `statefulset` for local/tenant, `cnpg` for own-cluster (and for tenant where the operator pre-exists, `00` V-10), `external` for managed; engine decided by ADR before the Phase 2 schema |
-| D-3 | Object storage per profile | MinIO local; Ceph RGW / Swift on OpenStack; what is the "independent copy" in each profile | MinIO (2 instances local); RGW + second bucket/region on OpenStack |
+| D-3 | Object storage per profile | MinIO local; Ceph RGW / Swift on OpenStack; what is the "independent copy" in each profile | MinIO (2 instances local); RGW + Swift on the reference environment (V-6); **demo: A = Hetzner Object Storage, B = OCI Object Storage via the S3-compatible endpoint with a retention rule** (ADR-028, V-12/V-13) |
 | D-4 | Gap detector internals | expected-interval calendars per target; tolerance windows; where it runs | `CronJob` every cadence; tolerance = 2× cadence; emits `missing_capture` vs `unprocessed_capture` (ADR-024) *(2026-09-19: "CronWorkflow" was residual Argo wording)* |
 | D-5 | Polling cadence and politeness | per-target intervals; jitter; backoff caps; conditional requests (ETag/If-Modified-Since) | intervals from 01 §5 (T1/T2: 15 min during the delivery day, hourly for D-1..D-3; T3: 15 min; E1: hourly from 12:00 CET on D-1); jitter ±10%; capped exponential backoff; conditional where supported; one-week observation campaign before any latency is quoted *(2026-09-19: "5 min OTE IM" replaced by the 01 v1.0 values)* |
 | D-6 | Observability stack (changed 2026-09-19, `00` §6) | metrics exposure: `/metrics` + annotations vs `PodMonitor`; stack in local profile | **annotations by default; `PodMonitor` behind `metrics.operator.enabled`** (core chart needs no CRD); full stack only in `own-cluster`, minimal in local |
@@ -482,6 +484,10 @@ Harness before code. Step 4 is the harness's own first test.
 | V-8 | Kube access identity and token lifetime → `00` §5 (CONFIRMED: federated identity; Rancher mints short-lived cluster-scoped tokens only from an existing user token; SA tokens rejected by the proxy → two-token CI pattern in ADR-015) |
 | V-9 | Egress proxy and committed-source (OTE, ČEPS, ENTSO-E) reachability from a pod → `00` §5 (CONFIRMED) |
 | V-10 | Managed Postgres offering → `00` §5 (CONFIRMED: none) |
+| V-11 | Tenant CNI enforces egress `NetworkPolicy` (ADR-026) → `00` §4/§5 (pending; one-off probe on the reference cluster) |
+| V-12 | Hetzner Object Storage: versioning, Object Lock, storage-class probe (ADR-028) → `00` §4/§5 (pending) |
+| V-13 | OCI Object Storage S3-compatible endpoint: versioning, retention rule enforced, `rclone` A → B round-trip (ADR-028) → `00` §4/§5 (pending) |
+| V-14 | k3s structured authentication with the GitHub Actions OIDC issuer; namespace rights only (ADR-015 federation clause, ADR-028) → `00` §4/§5 (pending) |
 
 ---
 

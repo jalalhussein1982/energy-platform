@@ -6,6 +6,7 @@
 | Date | 2026-09-19 |
 | Resolves | amends ADR-001 (`02-architecture-decisions.md` §2); source `00-assumptions.md` §2.1 |
 | Supersedes | the "two reproducibility profiles" paragraph and directory tree of ADR-001 |
+| Amended by | ADR-028 (2026-09-19): rule 4 gains "no scheduled workload, release or bucket on the reference environment"; rule 5's "first real environment" is the demo cluster (Hetzner), not the reference cluster; `own-cluster` gains a second Terraform root (`hcloud`) |
 
 ## Context
 
