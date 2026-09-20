@@ -3,7 +3,7 @@
 A capture is two objects: a content-addressed **blob** (written once) and a **capture-log
 entry** (metadata, 01 §6.1 names). The blob is written first; the entry second; the ledger row
 (Phase 2 ``store``) only after both. Backends in this phase: memory (tests) and a directory
-(demo, fixtures). The S3 backend is ADR-032 (PROPOSED).
+(demo, fixtures) and S3 (``s3.py``, over ``fetch.objectstore`` — ADR-032 Option B).
 """
 
 from energy_platform.bronze.bronze import Bronze, BronzeError, BronzeObject, CaptureOutcome
@@ -16,6 +16,7 @@ from energy_platform.bronze.capture_log import (
     entry_key,
 )
 from energy_platform.bronze.fixtures import import_fixture, load_fixture, write_fixture
+from energy_platform.bronze.s3 import S3BlobStore, S3CaptureLog
 from energy_platform.bronze.store import (
     BlobStore,
     FileBlobStore,
@@ -36,6 +37,8 @@ __all__ = [
     "FileCaptureLog",
     "MemoryBlobStore",
     "MemoryCaptureLog",
+    "S3BlobStore",
+    "S3CaptureLog",
     "blob_key",
     "capture_id",
     "entry_key",

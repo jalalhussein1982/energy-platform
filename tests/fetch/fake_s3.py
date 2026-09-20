@@ -49,6 +49,8 @@ class FakeS3:
     host: str = "minio.local:9000"
     access_key_id: str = "AKIAIOSFODNN7EXAMPLE"
     region: str = "us-east-1"
+    max_keys: int = 1000
+    """Server-side page cap, as S3's 1000: a client asking for more gets this many."""
     objects: dict[str, StoredObject] = field(default_factory=dict)
     requests: list[Request] = field(default_factory=list)
     faults: list[int | None] = field(default_factory=list)
@@ -139,7 +141,7 @@ class FakeS3:
         params = request.url.params
         assert params.get("list-type") == "2", "ListObjectsV2 only"
         prefix = params.get("prefix", "")
-        max_keys = int(params.get("max-keys", "1000"))
+        max_keys = min(int(params.get("max-keys", "1000")), self.max_keys)
         token = params.get("continuation-token")
         keys = sorted(k for k in self.objects if k.startswith(prefix))
         if token is not None:
