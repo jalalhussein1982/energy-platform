@@ -1,0 +1,20 @@
+{
+  "capture_id": "ote_idm_soap:2026-09-17T221500Z:1",
+  "target_id": "ote_idm_soap",
+  "scheduled_for": "2026-09-17T22:15:00Z",
+  "attempt": 1,
+  "fetched_at": "2026-09-17T22:15:04Z",
+  "source_url": "https://www.ote-cr.cz/pw-data/services/PublicDataService",
+  "http_status": 200,
+  "content_type": "text/xml; charset=utf-8",
+  "payload_sha256": "d11fa402533377381b9705f83af1054c388a9e5883c3f1b38eb953079cc27f4a",
+  "raw_ref": "bronze/blobs/d1/d11fa402533377381b9705f83af1054c388a9e5883c3f1b38eb953079cc27f4a",
+  "size": 20561,
+  "content_changed": true,
+  "source_transport": "soap",
+  "source_published_at": null,
+  "tier": "hot",
+  "etag": null,
+  "last_modified": null,
+  "hops": []
+}

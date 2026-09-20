@@ -13,7 +13,7 @@ CHART_DIR := deployment/helm/energy-platform
 TF_DIR    := deployment/own-cluster/terraform
 KIND_NAME := energy-platform
 
-.PHONY: help check lint lock-check format type test db-test schema deps-allowlist secret-scan helm-lint terraform-validate \
+.PHONY: help check lint lock-check format type test db-test schema fixtures deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target
 
 help: ## List targets
@@ -96,8 +96,11 @@ local-down: ## Tear the kind cluster down
 smoke-test: ## One capture+process on a fixture target, freshness metric present, restore-drill dry-run
 	@echo "smoke-test: not implemented until Phase 5"; exit 1
 
-demo: ## fixture → capture → Bronze → parse → map → Postgres → query, offline
-	@echo "demo: not implemented until Phase 2 (energyctl demo)"; exit 1
+demo: sync ## fixture → capture → Bronze → parse → map → Postgres → query, offline (ephemeral PostgreSQL unless ENERGY_PLATFORM_DSN is set)
+	scripts/with_postgres.sh $(RUN) python -m energy_platform.cli demo
+
+fixtures: sync ## Regenerate examples/fixtures (synthetic Bronze objects, deterministic)
+	$(RUN) python -m scripts.make_example_fixtures
 
 new-target: ## energyctl new-target <id> --modality <m>
 	@echo "new-target: not implemented until Phase 3 (energyctl new-target)"; exit 1

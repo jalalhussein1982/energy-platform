@@ -25,6 +25,7 @@ from energy_platform.store.protocol import (
     StoreUnavailable,
     derivation_for,
 )
+from energy_platform.store.unavailable import UnavailableStore
 
 __all__ = [
     "AttemptKind",
@@ -42,5 +43,6 @@ __all__ = [
     "StoreUnavailable",
     "StoredEvent",
     "StoredObservation",
+    "UnavailableStore",
     "derivation_for",
 ]

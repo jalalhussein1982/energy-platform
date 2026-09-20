@@ -64,7 +64,9 @@ class PostgresStore:
     def __init__(self, dsn: str) -> None:
         self._dsn = dsn
         try:
-            self._conn = psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+            self._conn = psycopg.connect(
+                dsn, row_factory=dict_row, autocommit=False, options="-c timezone=UTC"
+            )
         except psycopg.OperationalError as exc:
             raise StoreUnavailable(f"cannot connect: {exc}") from exc
         with self._conn.cursor() as cur:
