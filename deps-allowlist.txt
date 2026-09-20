@@ -4,7 +4,7 @@
 # Format: one package name per line; `#` comments allowed. Names are compared case-insensitively.
 #
 # Runtime packages approved by ADR-019 but not yet locked (added in the phase that uses them):
-#   lxml, openpyxl, httpx, psycopg, alembic, sqlalchemy, typer, jsonschema, python-dateutil
+#   jsonschema, python-dateutil
 #
 # --- runtime, Phase 1 (ADR-019) and their transitive closure, locked 2026-09-20 ---
 pydantic
@@ -14,8 +14,31 @@ typing-inspection    # pydantic
 tzdata
 # pyyaml is listed below (already locked as a pre-commit transitive)
 #
+# --- runtime, Phase 2 (ADR-019) and their transitive closure, locked 2026-09-20 ---
+httpx
+httpcore             # httpx
+h11                  # httpcore
+anyio                # httpx
+idna                 # httpx
+certifi              # httpx
+lxml
+openpyxl
+et-xmlfile           # openpyxl
+psycopg
+alembic
+mako                 # alembic
+markupsafe           # mako
+sqlalchemy           # alembic engine only
+greenlet             # sqlalchemy (platform-marker dependency)
+typer
+shellingham          # typer
+annotated-doc        # typer
+# click, rich, typing-extensions: typer transitives already listed in the dev group below
+#
 # --- typing stubs for allowlisted packages (ADR-029), dev group ---
 types-pyyaml         # stubs for pyyaml
+lxml-stubs           # stubs for lxml
+types-openpyxl       # stubs for openpyxl
 #
 # --- dev group (ADR-014) and their transitive closure, as locked on 2026-09-19 ---
 ast-serialize

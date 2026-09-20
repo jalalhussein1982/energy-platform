@@ -9,6 +9,14 @@ dependencies = [
   "pydantic>=2.9,<3",   # ADR-019
   "pyyaml>=6.0",        # ADR-019
   "tzdata>=2024.1",     # ADR-019 (zoneinfo data on images without a system tz database)
+  # --- Phase 2 (ADR-019) ---
+  "httpx>=0.28",        # the only HTTP client; imported solely under energy_platform/fetch/ (A-7)
+  "lxml>=5.3",          # xml/soap and html-table decoding
+  "openpyxl>=3.1",      # xlsx decoding
+  "psycopg>=3.2",       # Silver + ledger (plain PostgreSQL >= 16, ADR-030)
+  "alembic>=1.13",      # migrations, each with a downgrade (ADR-016 §3)
+  "sqlalchemy>=2.0",    # Alembic's engine only; no ORM
+  "typer>=0.12",        # energyctl
 ]
 
 [dependency-groups]
@@ -20,6 +28,8 @@ dev = [
   "import-linter>=2.0",
   "pre-commit>=3.8",
   "types-pyyaml>=6.0",  # ADR-029
+  "lxml-stubs>=0.5",    # ADR-029 (stubs for lxml)
+  "types-openpyxl>=3.1",  # ADR-029 (stubs for openpyxl)
 ]
 
 [build-system]
@@ -29,7 +39,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["energy_platform"]
 
-# `energyctl` entry point is added in Phase 2 when energy_platform.cli exists.
+[project.scripts]
+energyctl = "energy_platform.cli:app"   # ADR-000: a thin client of the library
 
 # ---------------------------------------------------------------------------
 # ruff — ADR-014. Banned-API rules enforce A-7 (single egress path) and the
@@ -135,4 +146,7 @@ forbidden_modules = ["targets"]
 [tool.pytest.ini_options]
 testpaths = ["tests", "targets"]   # targets/<id>/tests/ are collected by default (F02, ADR-020)
 addopts = "-q --strict-markers"
-markers = ["live: needs network; never run in CI (ADR-010)"]
+markers = [
+  "live: needs network; never run in CI (ADR-010)",
+  "db: needs a local PostgreSQL via ENERGY_PLATFORM_TEST_DSN; run by `make db-test` (ADR-030)",
+]
