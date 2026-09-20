@@ -177,7 +177,7 @@ implementing `Parser` (§3.8).
 | `allowed_hosts` | yes | ≥ 1 lowercase hostnames, no wildcards, no IPs; every URL in `fetch` must use one of them; each must be in the host registry (§4, admission) |
 | `allow_insecure` | no (false) | `http` is allowed only when this is true **and** the host registry entry allows it (ADR-026 §2) |
 | `modality` | yes | `soap-xml \| dated-file \| html-table \| rest-json \| rest-xml` |
-| `cadence` | yes | `{cron: "<5 fields>", timezone: "<IANA zone>"}`; the CronJob schedule (ADR-003 rev.) |
+| `cadence` | yes | `{cron: "<5 fields>", timezone: "<IANA zone>", correction?: {cron, days}}`; the CronJob schedule (ADR-003 rev.); `correction` is the optional re-poll of the previous `days` delivery days (ADR-033 §3, runtime verb in Phase 5) |
 | `history` | yes | `{max_age: "<ISO 8601 duration>" \| "none"}` — how far back the source still serves data; the gap detector consults it before backfilling (ADR-024 §5) |
 | `fetch` | yes | exactly one modality-named block (§3.3) |
 | `contract` | yes | §3.5 |
@@ -200,7 +200,8 @@ body. A URL must not carry a port (ports come from the host registry).
 | `rest-xml` | `rest_xml` | same fields as `rest_json` |
 
 Placeholder expressions are rendered by the Phase 2 fetch layer from the run context
-(`delivery_day`, `scheduled_for`); Phase 1 only checks that they contain no credential.
+(`delivery_day`, `next_delivery_day` — the following civil day, for a source that publishes day D
+on D-1, ADR-033 §4 — and `scheduled_for`); Phase 1 only checks that they contain no credential.
 
 ### 3.4 `secretRef`
 
@@ -238,6 +239,7 @@ mapping:
     interval_label: start | end                         # which edge the timestamp names
   source_version: {constant: RT} | {source: Version} | null
   source_published_at: {source: ...} | null            # never derived from fetch time
+  ignore_fields: ["Time interval"]                     # display-only fields, no unknown_field (ADR-034)
   metrics:
     price_vwap: {source: Price, unit: EUR/MWh, sign: as_published, decimal_separator: dot}
 ```
@@ -249,6 +251,11 @@ keys equal the dataset's non-time, non-version identity dimensions, that fixed v
 dataset with `version` in its key maps `source_version`, that a constant `resolution` is declared
 for the dataset, and that every `unit` equals the registry unit. `decimal_separator` is `dot` or
 `comma`, never auto-detected (P1-D6). `sign` is `as_published` or `inverted`.
+
+*(2026-09-20, Phase 4 — ADR-034.)* `ignore_fields` names source fields the document carries and
+the mapping deliberately does not read (T2 `Time interval`, T1 `Emerg`, E1 `PeriodInterval`).
+A name that is also a mapped `source` is a structural error; a bare column number is refused
+(05 C-04). Ignored fields raise no `unknown_field`; every other unmapped field still does.
 
 ### 3.7 Validation: two stages, one result shape (ADR-022 §2)
 
@@ -315,8 +322,8 @@ a target.
 
 | Open question (needs an ADR, not a target change) | Raised |
 |---|---|
-| **Display-only columns.** 01 §9 says an unknown column quarantines the document, but 01 §3 documents T2's `Time interval` column as display only and the manifest has no way to say so. Phase 2 (P2-D6) reports such fields as `unknown_field` warnings, so every T2 run carries one. Resolving it means a manifest field (`mapping.ignore_fields`), i.e. an ADR and a schema minor bump. | 2026-09-20, Phase 2 |
-| **Delivery-day offset.** 01 §5 polls T1/T2 "hourly for D-1..D-3"; the run context derives the delivery day from `scheduled_for` alone (`runtime.delivery_day_for`). A per-target offset needs a manifest field, decided with D-5 (Phase 4). | 2026-09-20, Phase 2 |
+| **Display-only columns.** 01 §9 says an unknown column quarantines the document, but 01 §3 documents T2's `Time interval` column as display only and the manifest has no way to say so. Phase 2 (P2-D6) reports such fields as `unknown_field` warnings, so every T2 run carries one. Resolving it means a manifest field (`mapping.ignore_fields`), i.e. an ADR and a schema minor bump. **Resolved 2026-09-20 by ADR-034** (`mapping.ignore_fields`, §3.6). | 2026-09-20, Phase 2 |
+| **Delivery-day offset.** 01 §5 polls T1/T2 "hourly for D-1..D-3"; the run context derives the delivery day from `scheduled_for` alone (`runtime.delivery_day_for`). A per-target offset needs a manifest field, decided with D-5 (Phase 4). **Resolved 2026-09-20 by ADR-033**: no offset field; the correction window is `cadence.correction` (re-capture of past runs, Phase 5 verb) and a D-1 publisher asks for `{next_delivery_day}` (§3.3). | 2026-09-20, Phase 2 |
 
 ## 6. Where the tests are
 
@@ -332,6 +339,8 @@ a target.
 | six example manifests (`examples/manifests/`) | `tests/contracts/test_examples.py` |
 | S3 client: SigV4 known-answer vector, path-style keys, object-lock headers, endpoint allowlist, pagination, `404 → None`, no socket (ADR-032) | `tests/fetch/test_objectstore.py` on the fake gateway `tests/fetch/fake_s3.py` |
 | Bronze on S3: ADR-002 key layout, idempotent `put` by content address, hot → cold read with `tier`, capture-log entry round trip incl. `tier`, listing windows (ADR-021, ADR-032) | `tests/bronze/test_s3.py` |
-| golden file model: rows or a quarantine, `checked_by`, no YAML floats (ADR-020; 05 C-16) | `tests/contracts/test_golden.py` |
+| golden file model: rows, a quarantine or `row_count: 0` (an empty document), `checked_by`, no YAML floats (ADR-020; 05 C-16; P4-D6) | `tests/contracts/test_golden.py`, `tests/harness/test_goldens.py::test_empty_document_golden_passes` |
+| `cadence.correction` shape; `mapping.ignore_fields` never names a mapped source, silences only the listed fields (ADR-033, ADR-034) | `tests/contracts/test_manifest.py`, `test_manifest_negative.py`, `tests/mapping/test_engine.py::test_ignore_fields_silences_only_the_listed_columns` |
+| `next_delivery_day` renders the following civil day (ADR-033 §4) | `tests/fetch/test_render.py::test_next_delivery_day_is_the_following_civil_day` |
 | a `source` that is a column position is refused (05 C-04) | `tests/contracts/test_manifest_negative.py::test_numeric_source_is_positional_parsing` |
 | every Phase 3 gate of `docs/05-constraint-matrix.md`: one negative test per row | `tests/harness/` (see 05 §1 for the row → test map; `tests/harness/test_matrix.py` checks the map itself) |

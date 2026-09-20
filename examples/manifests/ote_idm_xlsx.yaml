@@ -38,6 +38,7 @@ mapping:
     resolution: {constant: PT15M}
   source_version: null
   source_published_at: null
+  ignore_fields: ["Time interval"]   # display only (01 §3); named here so it raises no unknown_field (ADR-034)
   metrics:                      # header texts of row 6 (S13); cells are numeric, comma rule unused
     volume_total: {source: "Traded volume (MWh)", unit: MWh}
     volume_buy: {source: "Traded volume - purchase (MWh)", unit: MWh}

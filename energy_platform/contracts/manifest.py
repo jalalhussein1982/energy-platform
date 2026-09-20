@@ -197,16 +197,35 @@ _MODALITY_DECODES: dict[str, tuple[DecodeKind, ...]] = {
 # ------------------------------------------------------------------ cadence, history, contract
 
 
-class Cadence(_Model):
-    cron: str = Field(description="five-field cron expression, evaluated in `timezone`")
-    timezone: str = "Europe/Prague"
+def _five_field_cron(v: str) -> str:
+    if not _CRON.match(v.strip()):
+        raise ValueError(f"cron must have five fields: {v!r}")
+    return v.strip()
+
+
+class Correction(_Model):
+    """Re-poll of the previous ``days`` delivery days on ``cron`` (ADR-033 §3)."""
+
+    cron: str = Field(description="five-field cron expression, evaluated in `cadence.timezone`")
+    days: int = Field(ge=1, le=31, description="delivery days D-1 … D-days re-captured per firing")
 
     @field_validator("cron")
     @classmethod
     def _five_fields(cls, v: str) -> str:
-        if not _CRON.match(v.strip()):
-            raise ValueError(f"cron must have five fields: {v!r}")
-        return v.strip()
+        return _five_field_cron(v)
+
+
+class Cadence(_Model):
+    cron: str = Field(description="five-field cron expression, evaluated in `timezone`")
+    timezone: str = "Europe/Prague"
+    correction: Correction | None = Field(
+        default=None, description="optional correction window re-poll (ADR-033 §3)"
+    )
+
+    @field_validator("cron")
+    @classmethod
+    def _five_fields(cls, v: str) -> str:
+        return _five_field_cron(v)
 
     @field_validator("timezone")
     @classmethod
@@ -330,6 +349,46 @@ class MappingBlock(_Model):
     source_version: FieldRef | None = None
     source_published_at: FieldRef | None = None
     metrics: Mapping[str, MetricMapping] = Field(min_length=1)
+    ignore_fields: tuple[str, ...] = Field(
+        default=(),
+        description="source fields the document carries and the mapping deliberately does not "
+        "read; they raise no `unknown_field` (ADR-034)",
+    )
+
+    @field_validator("ignore_fields")
+    @classmethod
+    def _named_and_unique(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        for name in v:
+            if not name.strip():
+                raise ValueError("ignore_fields: a name must not be blank")
+            _not_positional(name)
+        if len(set(v)) != len(v):
+            raise ValueError("ignore_fields must not repeat a name")
+        return v
+
+    def source_fields(self) -> tuple[str, ...]:
+        """Every `source`-typed reference of the block, time fields first (04 §3.6)."""
+        refs = [
+            self.time.resolution,
+            self.time.date,
+            self.time.index,
+            self.time.timestamp,
+            self.source_version,
+            self.source_published_at,
+        ]
+        names = [r.source for r in refs if r is not None and r.source is not None]
+        names.extend(m.source for m in self.metrics.values())
+        return tuple(dict.fromkeys(names))
+
+    @model_validator(mode="after")
+    def _ignored_are_not_mapped(self) -> MappingBlock:
+        clash = sorted(set(self.ignore_fields) & set(self.source_fields()))
+        if clash:
+            raise ValueError(
+                f"ignore_fields {clash} are read by the mapping; a field is mapped or ignored, "
+                "never both (ADR-034)"
+            )
+        return self
 
 
 # ------------------------------------------------------------------ the manifest

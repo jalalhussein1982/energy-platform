@@ -260,10 +260,7 @@ def test_t2_and_t3_run_end_to_end_with_reconciliation_across_transports() -> Non
     assert r2.inserted == 7 * 96
     # synthetic T1 and T2 share price_vwap generation (170 + i*0.13) and volume (120 + i*0.275)
     assert store.quality_events("ote_idm_xlsx", kind="reconciliation_mismatch") == ()
-    assert [e.kind for e in store.quality_events("ote_idm_xlsx")] == [
-        "unknown_field",
-        "partition_status",
-    ]
+    assert [e.kind for e in store.quality_events("ote_idm_xlsx")] == ["partition_status"]
     t3 = runtime(T3, store=store)
     capture(t3, SCHEDULED)
     assert process(t3)[0].inserted == 2 * 96

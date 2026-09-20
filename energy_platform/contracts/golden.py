@@ -1,9 +1,10 @@
 """Golden files: expected canonical rows for one fixture (ADR-020; 05 C-16, C-17).
 
 ``targets/<id>/tests/golden/<name>.yaml`` names a fixture directory and either the rows a human
-checked against the source document or the quarantine the platform must raise for it. Values are
-written as quoted strings (``"97.31"``) or ``null``; a YAML float is refused, the same way a
-parser may never call ``float()`` on a raw value (01 §9).
+checked against the source document, the quarantine the platform must raise for it, or
+``row_count: 0`` for a well-formed document that carries no observation (an empty ``<Result/>``,
+01 §9; plan P4-D6). Values are written as quoted strings (``"97.31"``) or ``null``; a YAML float
+is refused, the same way a parser may never call ``float()`` on a raw value (01 §9).
 """
 
 from __future__ import annotations
@@ -55,8 +56,11 @@ class Expect(_Model):
 
     @model_validator(mode="after")
     def _rows_or_quarantine(self) -> Expect:
-        if self.quarantine is None and not self.rows:
-            raise ValueError("expect.rows needs at least one row, or expect.quarantine a reason")
+        if self.quarantine is None and not self.rows and self.row_count != 0:
+            raise ValueError(
+                "expect.rows needs at least one row, or expect.quarantine a reason, or "
+                "expect.row_count: 0 for an empty document"
+            )
         if self.quarantine is not None and (self.rows or self.row_count is not None):
             raise ValueError("expect.quarantine excludes rows and row_count")
         return self

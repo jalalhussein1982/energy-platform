@@ -57,13 +57,14 @@ def map_records(
     if contract is None:
         raise Quarantined(f"dataset {manifest.contract.dataset_id!r} is not registered")
     mapped = set(mapped_source_fields(manifest))
+    ignored = set(manifest.mapping.ignore_fields)  # display-only fields (ADR-034)
     seen: dict[tuple[object, ...], EnergyObservation] = {}
     events: list[QualityEvent] = []
     unknown: set[str] = set()
     tz = ZoneInfo(manifest.mapping.time.timezone)
 
     for record in records:
-        unknown.update(set(record.fields) - mapped)
+        unknown.update(set(record.fields) - mapped - ignored)
         for obs in _map_one(manifest, contract, record, ctx, tz, events):
             key = observation_identity(obs)
             earlier = seen.get(key)

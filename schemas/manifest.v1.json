@@ -32,6 +32,18 @@
     "Cadence": {
       "additionalProperties": false,
       "properties": {
+        "correction": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Correction"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "optional correction window re-poll (ADR-033 \u00a73)"
+        },
         "cron": {
           "description": "five-field cron expression, evaluated in `timezone`",
           "title": "Cron",
@@ -95,6 +107,30 @@
         "metrics"
       ],
       "title": "Contract",
+      "type": "object"
+    },
+    "Correction": {
+      "additionalProperties": false,
+      "description": "Re-poll of the previous ``days`` delivery days on ``cron`` (ADR-033 \u00a73).",
+      "properties": {
+        "cron": {
+          "description": "five-field cron expression, evaluated in `cadence.timezone`",
+          "title": "Cron",
+          "type": "string"
+        },
+        "days": {
+          "description": "delivery days D-1 \u2026 D-days re-captured per firing",
+          "maximum": 31,
+          "minimum": 1,
+          "title": "Days",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cron",
+        "days"
+      ],
+      "title": "Correction",
       "type": "object"
     },
     "DatedFileFetch": {
@@ -310,6 +346,15 @@
           },
           "title": "Dimensions",
           "type": "object"
+        },
+        "ignore_fields": {
+          "default": [],
+          "description": "source fields the document carries and the mapping deliberately does not read; they raise no `unknown_field` (ADR-034)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Ignore Fields",
+          "type": "array"
         },
         "metrics": {
           "additionalProperties": {

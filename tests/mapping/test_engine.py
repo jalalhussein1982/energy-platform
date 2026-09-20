@@ -23,7 +23,7 @@ from energy_platform.mapping import (
 )
 from energy_platform.mapping.completeness import status_of
 from energy_platform.parse import decode, generic_parser
-from tests.synthetic import ceps_load_response, ote_im_price_period_response, ote_xlsx
+from tests.synthetic import XLSX_HEADER, ceps_load_response, ote_im_price_period_response, ote_xlsx
 
 EX = Path("examples/manifests")
 T1 = load_manifest(EX / "ote_idm_soap.yaml")
@@ -152,9 +152,23 @@ def test_t2_days_map_completely_and_tile_the_day(day: date, n: int) -> None:
     assert starts == expected
     status = partition_status(result.observations, "PT15M", "Europe/Prague")
     assert status_of(status[0]) == "complete"
-    # "Time interval" is display only (01 §3) and the manifest cannot say so: P2-D6 warning
+    # "Time interval" is display only (01 §3) and the manifest says so: no warning (ADR-034)
+    assert result.events == ()
+
+
+def test_ignore_fields_silences_only_the_listed_columns() -> None:
+    header = (*XLSX_HEADER, "Note")
+    result = run(T2, ote_xlsx(DAY, header=header))
     assert [e.kind for e in result.events] == ["unknown_field"]
-    assert "Time interval" in result.events[0].message
+    assert "Note" in result.events[0].message and "Time interval" not in result.events[0].message
+
+
+def test_ignore_fields_on_t1_silences_emerg() -> None:
+    data = T1.model_dump(mode="json")
+    data["mapping"]["ignore_fields"] = ["Emerg"]
+    m = Manifest.model_validate(data)
+    result = run(m, ote_im_price_period_response(DAY, [(1, "1", "1")], emerg=True))
+    assert result.events == () and len(result.observations) == 2
 
 
 def test_t2_partial_day_is_partial() -> None:

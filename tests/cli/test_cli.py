@@ -97,7 +97,7 @@ def test_demo_end_to_end(tmp_path: Path) -> None:
         assert len(idm) == 7 * 96  # 7 metrics; the two shared ones have one current copy each
         assert len(store.current_rows("ceps.load")) == 2 * 96
         kinds = {e.kind for e in store.quality_events()}
-        assert kinds == {"partition_status", "unknown_field"}
+        assert kinds == {"partition_status"}  # T2's display column is declared (ADR-034)
         assert not [e for e in store.quality_events() if e.kind == "quarantine"]
         statuses = [e.message for e in store.quality_events(kind="partition_status")]
         # one per attempt: first process and the no-op replay, for each of the three targets

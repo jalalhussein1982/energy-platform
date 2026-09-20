@@ -118,6 +118,24 @@ def test_bad_cron_and_timezone() -> None:
     _rejects(with_(t1_manifest(), "cadence.timezone", "Prague"), "timezone")
 
 
+def test_correction_window_validated() -> None:
+    bad_cron = {"cron": "* * *", "days": 1}
+    _rejects(with_(t1_manifest(), "cadence.correction", bad_cron), "five fields")
+    _rejects(with_(t1_manifest(), "cadence.correction", {"cron": "7 * * * *", "days": 0}), "days")
+    _rejects(with_(t1_manifest(), "cadence.correction", {"cron": "7 * * * *"}), "days")
+
+
+def test_ignore_fields_may_not_name_a_mapped_source() -> None:
+    _rejects(with_(t1_manifest(), "mapping.ignore_fields", ["Price"]), "mapped or ignored")
+    _rejects(with_(t1_manifest(), "mapping.ignore_fields", ["PeriodIndex"]), "mapped or ignored")
+
+
+def test_ignore_fields_are_names_not_positions() -> None:
+    _rejects(with_(t1_manifest(), "mapping.ignore_fields", ["3"]), "positional")
+    _rejects(with_(t1_manifest(), "mapping.ignore_fields", ["Emerg", "Emerg"]), "repeat")
+    _rejects(with_(t1_manifest(), "mapping.ignore_fields", [" "]), "blank")
+
+
 def test_bad_max_age() -> None:
     _rejects(with_(t1_manifest(), "history.max_age", "2 years"), "max_age")
     _rejects(with_(t1_manifest(), "history.max_age", "P"), "max_age")

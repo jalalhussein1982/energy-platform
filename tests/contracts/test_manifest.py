@@ -42,6 +42,30 @@ def test_t3_is_admitted_with_version_bound_to_source_version() -> None:
     assert validate_manifest(m).status == "OK"
 
 
+def test_correction_window_and_ignore_fields_are_accepted() -> None:
+    data = t1_manifest()
+    data["cadence"]["correction"] = {"cron": "7 * * * *", "days": 3}
+    data["mapping"]["ignore_fields"] = ["Emerg"]
+    m = Manifest.model_validate(data)
+    assert m.cadence.correction is not None and m.cadence.correction.days == 3
+    assert m.mapping.ignore_fields == ("Emerg",)
+    assert m.mapping.source_fields() == (
+        "PeriodResolution",
+        "Date",
+        "PeriodIndex",
+        "Price",
+        "Volume",
+    )
+    assert "ignore_fields" in m.mapping_block()  # part of derivation_id (ADR-034 §4)
+    assert validate_manifest(m).status == "OK"
+
+
+def test_manifest_without_correction_or_ignore_fields_is_unchanged() -> None:
+    m = Manifest.model_validate(t1_manifest())
+    assert m.cadence.correction is None and m.mapping.ignore_fields == ()
+    assert m.mapping_block()["ignore_fields"] == []  # present and empty: explicit derivation input
+
+
 def test_mapping_block_is_canonical_json() -> None:
     m = Manifest.model_validate(t1_manifest())
     block = m.mapping_block()

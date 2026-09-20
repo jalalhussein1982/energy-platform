@@ -24,6 +24,13 @@ def test_rows_golden_loads_with_decimal_values() -> None:
     assert g.expect.rows[0].dimensions is None
 
 
+def test_empty_document_golden_loads() -> None:
+    g = GoldenFile.model_validate(
+        {"fixture": "empty_result", "checked_by": "me", "expect": {"row_count": 0}}
+    )
+    assert g.expect.rows == () and g.expect.row_count == 0 and g.expect.quarantine is None
+
+
 def test_quarantine_golden_loads() -> None:
     g = GoldenFile.model_validate(
         {"fixture": "bad_header", "checked_by": "me", "expect": {"quarantine": "header"}}
@@ -35,6 +42,8 @@ def test_quarantine_golden_loads() -> None:
     ("expect", "match"),
     [
         ({"rows": []}, "at least one row"),
+        ({"row_count": 1}, "at least one row"),
+        ({}, "at least one row"),
         ({"quarantine": "x", "rows": [ROW]}, "excludes rows"),
         ({"quarantine": "x", "row_count": 1}, "excludes rows"),
         ({"rows": [{**ROW, "value": 97.31}]}, "quoted string"),

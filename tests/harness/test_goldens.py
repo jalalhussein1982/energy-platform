@@ -12,7 +12,7 @@ import pytest
 
 from energy_platform.harness.goldens import discover, run_golden, run_target
 from tests.harness.targets_builder import GOOD_GOLDEN, make_target, write_bronze_fixture
-from tests.synthetic import soap_fault
+from tests.synthetic import ote_empty_result, soap_fault
 
 REPO = Path(__file__).resolve().parents[2]
 DISCOVERED = discover(REPO / "targets")
@@ -34,6 +34,24 @@ def test_example_target_golden_passes(tmp_path: Path) -> None:
     (report,) = run_target(t)
     assert report.ok, report.problems
     assert report.observations == 192 and "partition_status" in report.events
+
+
+def test_empty_document_golden_passes(tmp_path: Path) -> None:
+    t = make_target(tmp_path)
+    write_bronze_fixture(t / "fixtures" / "empty_result", "good_target", ote_empty_result())
+    (t / "tests" / "golden" / "empty_result.yaml").write_text(
+        "fixture: empty_result\nchecked_by: me\nexpect: {row_count: 0}\n"
+    )
+    reports = {r.golden: r for r in run_target(t)}
+    assert reports["empty_result.yaml"].ok, reports["empty_result.yaml"].problems
+    assert reports["empty_result.yaml"].observations == 0
+
+
+def test_expected_empty_document_that_has_rows_fails(tmp_path: Path) -> None:
+    golden = "fixture: ordinary_day\nchecked_by: me\nexpect: {row_count: 0}\n"
+    t = make_target(tmp_path, golden=golden)
+    (report,) = run_target(t)
+    assert any("row_count: expected 0, got 192" in p for p in report.problems), report.problems
 
 
 def test_expected_quarantine_passes(tmp_path: Path) -> None:

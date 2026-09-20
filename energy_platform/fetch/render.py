@@ -1,15 +1,16 @@
 """Placeholder rendering for the declarative fetch block (04 §3.3).
 
-Only two names exist: ``delivery_day`` (a date, so ``{delivery_day:%Y-%m-%d}`` works) and
-``scheduled_for`` (an aware datetime). Anything else is a :class:`RenderError`, never silently
-left in place.
+Only three names exist: ``delivery_day`` (a date, so ``{delivery_day:%Y-%m-%d}`` works),
+``next_delivery_day`` (the following civil day, for sources that publish day D on D-1 — ADR-033
+§4) and ``scheduled_for`` (an aware datetime). Anything else is a :class:`RenderError`, never
+silently left in place.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -39,13 +40,25 @@ class FetchContext:
         day = delivery_day or scheduled_for.astimezone(ZoneInfo(tz)).date()
         return cls(scheduled_for=scheduled_for, delivery_day=day)
 
+    @property
+    def next_delivery_day(self) -> date:
+        """The civil day after ``delivery_day`` (calendar arithmetic, no timezone involved)."""
+        return self.delivery_day + timedelta(days=1)
+
     def as_mapping(self) -> Mapping[str, Any]:
-        return {"delivery_day": self.delivery_day, "scheduled_for": self.scheduled_for}
+        return {
+            "delivery_day": self.delivery_day,
+            "next_delivery_day": self.next_delivery_day,
+            "scheduled_for": self.scheduled_for,
+        }
 
 
 class _Strict(dict[str, Any]):
     def __missing__(self, key: str) -> Any:
-        raise RenderError(f"unknown placeholder {{{key}}}; only delivery_day/scheduled_for exist")
+        raise RenderError(
+            f"unknown placeholder {{{key}}}; only delivery_day, next_delivery_day and "
+            "scheduled_for exist"
+        )
 
 
 def render(template: str, ctx: FetchContext) -> str:

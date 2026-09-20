@@ -1,4 +1,4 @@
-"""Placeholder rendering: only delivery_day and scheduled_for exist; nothing is left unrendered."""
+"""Placeholder rendering: only delivery_day, next_delivery_day and scheduled_for exist."""
 
 from __future__ import annotations
 
@@ -38,6 +38,16 @@ def test_date_format_spec_and_t2_url_template() -> None:
     assert render(t, ctx()) == (
         "https://www.ote-cr.cz/pubweb/attachments/27/2026/month09/day18/IM_15MIN_18_09_2026_EN.xlsx"
     )
+
+
+def test_next_delivery_day_is_the_following_civil_day() -> None:
+    assert render("{next_delivery_day:%Y-%m-%d}", ctx()) == "2026-09-19"
+    month_end = FetchContext.for_run(datetime(2026, 9, 30, 12, 0, tzinfo=UTC))
+    assert render("{next_delivery_day:%Y-%m-%d}", month_end) == "2026-10-01"
+    # 2026-03-28 22:30 UTC is 23:30 CET on the 28th; the next civil day is the spring DST day
+    dst_eve = FetchContext.for_run(datetime(2026, 3, 28, 22, 30, tzinfo=UTC))
+    assert dst_eve.delivery_day == date(2026, 3, 28)
+    assert render("{next_delivery_day:%Y-%m-%d}", dst_eve) == "2026-03-29"
 
 
 def test_scheduled_for_renders_iso() -> None:
