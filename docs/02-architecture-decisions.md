@@ -427,7 +427,7 @@ Direction fixed: declarative, versioned JSON Schema, one file per target, mandat
 | ADR-029-typing-stubs | amends ADR-019 (stub packages) | ACCEPTED *(2026-09-20)* |
 | ADR-030-postgres-engine-plain | D-2 engine: plain PostgreSQL ≥ 16 | ACCEPTED *(2026-09-20)* |
 | ADR-031-gap-detector-defaults | D-4 | ACCEPTED *(2026-09-20)* |
-| ADR-032-object-store-client | Bronze S3 client (amends ADR-019, ADR-027 §3) | PROPOSED *(2026-09-20)* |
+| ADR-032-object-store-client | Bronze S3 client (amends ADR-019, ADR-027 §3) | ACCEPTED *(2026-09-20, Option B: SigV4 over httpx in `fetch/`)* |
 
 ---
 

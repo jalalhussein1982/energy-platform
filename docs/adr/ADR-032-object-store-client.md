@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | PROPOSED — needs the author's decision; nothing is implemented until accepted |
+| Status | ACCEPTED — Option B (2026-09-20, author's decision); implementation is the first task of the next session |
 | Date | 2026-09-20 |
 | Resolves | amends ADR-019 (dependency allowlist) and ADR-027 §3 (outbound HTTP only in `fetch/`) for the Bronze S3 backend of `03` Phase 2 |
 | Supersedes | — |
@@ -16,7 +16,9 @@ allowlist names no S3 client, and ADR-027 §3 bans `httpx` and every other HTTP 
 leaves the S3 backend to this decision. Phase 5 (`local-up` with MinIO ×2, Hetzner/OCI stores,
 `rclone` replication and tiering) is where the backend is first exercised for real.
 
-## Decision (proposed; pick one)
+## Decision
+
+**Option B is adopted** (2026-09-20). Option A is kept below as the rejected alternative with its reasoning.
 
 **Option A — `boto3`** (plus `botocore`, `s3transfer`, `jmespath`, `python-dateutil`, `urllib3`
 transitively) as a runtime dependency, used only inside `energy_platform/bronze/s3.py`; the
@@ -27,7 +29,7 @@ named egress site ("object store, not sources").
 (so the single-egress rule stays literally true), ~200 lines: `PUT`/`GET`/`HEAD`/`LIST` with
 `x-amz-content-sha256`, versioned endpoints, object-lock headers. No new package.
 
-Recommendation: **Option B**. It adds no dependency, keeps A-7 exact, and the five verbs the
+Why B: it adds no dependency, keeps A-7 exact, and the five verbs the
 platform needs are small; `boto3`'s value (pagination helpers, retries, credential chain) is
 partly provided by `fetch/` already and partly not needed (credentials come from the chart's
 `Secret`, one endpoint per store).
