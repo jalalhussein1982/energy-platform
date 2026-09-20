@@ -13,7 +13,7 @@ CHART_DIR := deployment/helm/energy-platform
 TF_DIR    := deployment/own-cluster/terraform
 KIND_NAME := energy-platform
 
-.PHONY: help check lint lock-check format type test deps-allowlist secret-scan helm-lint terraform-validate \
+.PHONY: help check lint lock-check format type test schema deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target
 
 help: ## List targets
@@ -43,6 +43,9 @@ type: sync ## mypy --strict
 
 test: sync ## pytest (unit only; live tests are never selected here — ADR-010)
 	$(RUN) pytest -m "not live"
+
+schema: sync ## Export schemas/manifest.v1.json from the Pydantic model (ADR-017); a test fails when it is stale
+	$(RUN) python -m scripts.export_manifest_schema > schemas/manifest.v1.json
 
 # ---------------------------------------------------------------- supply chain and secrets
 deps-allowlist: sync ## Every package in uv.lock must be listed in deps-allowlist.txt (ADR-006/ADR-019)

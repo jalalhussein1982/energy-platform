@@ -1,0 +1,739 @@
+{
+  "$defs": {
+    "Auth": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "enum": [
+            "query",
+            "header"
+          ],
+          "title": "Location",
+          "type": "string"
+        },
+        "param": {
+          "description": "query parameter or header name",
+          "minLength": 1,
+          "title": "Param",
+          "type": "string"
+        },
+        "secretRef": {
+          "$ref": "#/$defs/SecretRef"
+        }
+      },
+      "required": [
+        "secretRef",
+        "location",
+        "param"
+      ],
+      "title": "Auth",
+      "type": "object"
+    },
+    "Cadence": {
+      "additionalProperties": false,
+      "properties": {
+        "cron": {
+          "description": "five-field cron expression, evaluated in `timezone`",
+          "title": "Cron",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "Europe/Prague",
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cron"
+      ],
+      "title": "Cadence",
+      "type": "object"
+    },
+    "Contract": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "minLength": 1,
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "decode": {
+          "enum": [
+            "xlsx",
+            "xml",
+            "soap",
+            "json",
+            "html-table",
+            "csv"
+          ],
+          "title": "Decode",
+          "type": "string"
+        },
+        "metrics": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Metrics",
+          "type": "array"
+        },
+        "source_transport": {
+          "enum": [
+            "soap",
+            "xlsx",
+            "html",
+            "rest"
+          ],
+          "title": "Source Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataset_id",
+        "source_transport",
+        "decode",
+        "metrics"
+      ],
+      "title": "Contract",
+      "type": "object"
+    },
+    "DatedFileFetch": {
+      "additionalProperties": false,
+      "properties": {
+        "discovery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Discovery"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "file_format": {
+          "enum": [
+            "xlsx",
+            "csv"
+          ],
+          "title": "File Format",
+          "type": "string"
+        },
+        "url_template": {
+          "description": "direct URL; `{delivery_day:%d}`-style placeholders",
+          "title": "Url Template",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url_template",
+        "file_format"
+      ],
+      "title": "DatedFileFetch",
+      "type": "object"
+    },
+    "Discovery": {
+      "additionalProperties": false,
+      "description": "Fetch a page and extract the download link (ADR-005 discovery step; T2).",
+      "properties": {
+        "link_regex": {
+          "minLength": 1,
+          "title": "Link Regex",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "link_regex"
+      ],
+      "title": "Discovery",
+      "type": "object"
+    },
+    "FetchBlock": {
+      "additionalProperties": false,
+      "description": "Exactly one key, named after the modality (plan P1-D3).",
+      "properties": {
+        "dated_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DatedFileFetch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "html_table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HtmlTableFetch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rest_json": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RestJsonFetch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rest_xml": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RestXmlFetch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "soap_xml": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SoapXmlFetch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "FetchBlock",
+      "type": "object"
+    },
+    "FieldRef": {
+      "additionalProperties": false,
+      "description": "Where a canonical field comes from: a source field, a constant, or the capture context.",
+      "properties": {
+        "constant": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Constant"
+        },
+        "context": {
+          "anyOf": [
+            {
+              "enum": [
+                "delivery_day",
+                "scheduled_for"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Context"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "title": "FieldRef",
+      "type": "object"
+    },
+    "History": {
+      "additionalProperties": false,
+      "description": "How far back the source still serves data; consulted before any backfill (ADR-024 \u00a75).",
+      "properties": {
+        "max_age": {
+          "description": "ISO 8601 duration (P2Y, P31D, PT48H) or `none`",
+          "title": "Max Age",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_age"
+      ],
+      "title": "History",
+      "type": "object"
+    },
+    "HtmlTableFetch": {
+      "additionalProperties": false,
+      "properties": {
+        "table_selector": {
+          "description": "CSS selector of the table",
+          "minLength": 1,
+          "title": "Table Selector",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "table_selector"
+      ],
+      "title": "HtmlTableFetch",
+      "type": "object"
+    },
+    "MappingBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "dimensions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Dimensions",
+          "type": "object"
+        },
+        "metrics": {
+          "additionalProperties": {
+            "$ref": "#/$defs/MetricMapping"
+          },
+          "minProperties": 1,
+          "title": "Metrics",
+          "type": "object"
+        },
+        "source_published_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FieldRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_version": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FieldRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "time": {
+          "$ref": "#/$defs/TimeMapping"
+        }
+      },
+      "required": [
+        "time",
+        "metrics"
+      ],
+      "title": "MappingBlock",
+      "type": "object"
+    },
+    "MetricMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "decimal_separator": {
+          "default": "dot",
+          "enum": [
+            "dot",
+            "comma"
+          ],
+          "title": "Decimal Separator",
+          "type": "string"
+        },
+        "sign": {
+          "default": "as_published",
+          "enum": [
+            "as_published",
+            "inverted"
+          ],
+          "title": "Sign",
+          "type": "string"
+        },
+        "source": {
+          "description": "source field / column / attribute name",
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "unit": {
+          "description": "must equal the registry unit; no conversion",
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "unit"
+      ],
+      "title": "MetricMapping",
+      "type": "object"
+    },
+    "RateLimit": {
+      "additionalProperties": false,
+      "properties": {
+        "per": {
+          "description": "ISO 8601 duration, e.g. PT1M",
+          "title": "Per",
+          "type": "string"
+        },
+        "requests": {
+          "minimum": 1,
+          "title": "Requests",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requests",
+        "per"
+      ],
+      "title": "RateLimit",
+      "type": "object"
+    },
+    "RestJsonFetch": {
+      "additionalProperties": false,
+      "properties": {
+        "auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Auth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "query": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Query",
+          "type": "object"
+        },
+        "rate_limit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RateLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "url_template": {
+          "title": "Url Template",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url_template"
+      ],
+      "title": "RestJsonFetch",
+      "type": "object"
+    },
+    "RestXmlFetch": {
+      "additionalProperties": false,
+      "properties": {
+        "auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Auth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Headers",
+          "type": "object"
+        },
+        "query": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Query",
+          "type": "object"
+        },
+        "rate_limit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RateLimit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "url_template": {
+          "title": "Url Template",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url_template"
+      ],
+      "title": "RestXmlFetch",
+      "type": "object"
+    },
+    "SecretRef": {
+      "additionalProperties": false,
+      "description": "Reference to a platform-resolved secret; the manifest never carries the value.",
+      "properties": {
+        "key": {
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "name": {
+          "description": "Kubernetes Secret name (env name in `local`)",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "key"
+      ],
+      "title": "SecretRef",
+      "type": "object"
+    },
+    "SoapXmlFetch": {
+      "additionalProperties": false,
+      "properties": {
+        "body_template": {
+          "description": "SOAP body; `{name}` placeholders",
+          "minLength": 1,
+          "title": "Body Template",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "placeholder \u2192 expression",
+          "title": "Params",
+          "type": "object"
+        },
+        "soap_action": {
+          "minLength": 1,
+          "title": "Soap Action",
+          "type": "string"
+        },
+        "soap_version": {
+          "default": "1.1",
+          "enum": [
+            "1.1",
+            "1.2"
+          ],
+          "title": "Soap Version",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "soap_action",
+        "body_template"
+      ],
+      "title": "SoapXmlFetch",
+      "type": "object"
+    },
+    "TimeMapping": {
+      "additionalProperties": false,
+      "description": "01 \u00a77: period index \u2192 local interval \u2192 UTC, or an offset-aware timestamp plus a label.",
+      "properties": {
+        "date": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FieldRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "index": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FieldRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "interval_label": {
+          "default": "start",
+          "enum": [
+            "start",
+            "end"
+          ],
+          "title": "Interval Label",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "period_index",
+            "timestamp"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "resolution": {
+          "$ref": "#/$defs/FieldRef"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FieldRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timezone": {
+          "default": "Europe/Prague",
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "resolution"
+      ],
+      "title": "TimeMapping",
+      "type": "object"
+    }
+  },
+  "$id": "https://energy-platform.invalid/schemas/manifest.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allow_insecure": {
+      "default": false,
+      "title": "Allow Insecure",
+      "type": "boolean"
+    },
+    "allowed_hosts": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Allowed Hosts",
+      "type": "array"
+    },
+    "cadence": {
+      "$ref": "#/$defs/Cadence"
+    },
+    "contract": {
+      "$ref": "#/$defs/Contract"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "fetch": {
+      "$ref": "#/$defs/FetchBlock"
+    },
+    "history": {
+      "$ref": "#/$defs/History"
+    },
+    "license": {
+      "description": "licence / terms under which data is reused",
+      "minLength": 1,
+      "title": "License",
+      "type": "string"
+    },
+    "mapping": {
+      "$ref": "#/$defs/MappingBlock"
+    },
+    "modality": {
+      "enum": [
+        "soap-xml",
+        "dated-file",
+        "html-table",
+        "rest-json",
+        "rest-xml"
+      ],
+      "title": "Modality",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "target_id": {
+      "pattern": "^[a-z][a-z0-9_]{2,63}$",
+      "title": "Target Id",
+      "type": "string"
+    },
+    "terms_url": {
+      "title": "Terms Url",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "target_id",
+    "license",
+    "terms_url",
+    "allowed_hosts",
+    "modality",
+    "cadence",
+    "history",
+    "fetch",
+    "contract",
+    "mapping"
+  ],
+  "title": "Manifest",
+  "type": "object"
+}
