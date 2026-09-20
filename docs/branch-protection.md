@@ -8,7 +8,7 @@ authority model; CODEOWNERS is the other half.
 | Require a pull request before merging | on, 1 approval | no direct pushes to `main` for anyone, agent or human |
 | Require review from Code Owners | on | `energy_platform/`, `deployment/`, ADRs, allowlist and CI need a human owner |
 | Dismiss stale approvals on new commits | on | an agent cannot append to an approved PR |
-| Require status checks | `lint`, `lock-check`, `type`, `test`, `deps-allowlist`, `secret-scan`, `helm-lint`, `terraform-validate` | the `make` targets, one job each (ADR-015) |
+| Require status checks | `lint`, `lock-check`, `type`, `test`, `db-test`, `demo`, `harness-check`, `pr-surface`, `deps-allowlist`, `secret-scan`, `helm-lint`, `terraform-validate` | the `make` targets, one job each (ADR-015); `harness-check` and `pr-surface` are the Phase 3 gates of `docs/05-constraint-matrix.md` §2 |
 | Require branches to be up to date | on | gates run on the merge result |
 | Require conversation resolution | on | — |
 | Require signed commits | recommended | provenance for the supply-chain threat model (ADR-008) |

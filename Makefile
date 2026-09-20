@@ -14,13 +14,14 @@ TF_DIR    := deployment/own-cluster/terraform
 KIND_NAME := energy-platform
 
 .PHONY: help check lint lock-check format type test db-test schema fixtures deps-allowlist secret-scan helm-lint terraform-validate \
-        ci-bootstrap sync local-up local-down smoke-test demo new-target
+        ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
+        harness-check pr-surface
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
 
 # ---------------------------------------------------------------- core gates
-check: lint lock-check type test ## lint + lock-check + type + test — must be green before every commit (03 §0)
+check: lint lock-check type test harness-check ## lint + lock-check + type + test + harness-check — green before every commit (03 §0)
 
 sync: ## Create/refresh the locked virtualenv (dev group included)
 	$(UV) sync --frozen --group dev
@@ -66,6 +67,7 @@ helm-lint: ## helm lint + render with tenant values + restricted-PSS check (A-14
 	else \
 	  helm lint $(CHART_DIR) -f deployment/tenant/values-tenant.yaml && \
 	  helm template ep $(CHART_DIR) -f deployment/tenant/values-tenant.yaml > /tmp/ep-rendered.yaml && \
+	  $(RUN) python -m scripts.check_workloads /tmp/ep-rendered.yaml && \
 	  $(RUN) python scripts/check_restricted_pss.py /tmp/ep-rendered.yaml; \
 	fi
 
@@ -108,3 +110,14 @@ new-target: sync ## energyctl new-target ID=<id> MODALITY=<m> [DATASET=<dataset_
 
 validate-targets: sync ## energyctl validate --all: admission + surface for every target (05 B-rows)
 	$(RUN) python -m energy_platform.cli validate --all
+
+migration-check: sync ## every migration has a real downgrade; linear chain (ADR-016 §3, 05 C-45)
+	$(RUN) python -m scripts.check_migrations
+
+workload-check: sync ## action pins, image digests, requests/limits on everything under deployment/ (A-8, ADR-016, 05 C-42…C-44)
+	$(RUN) python -m scripts.check_workloads
+
+harness-check: validate-targets migration-check workload-check ## the Phase 3 static gates (docs/05 §2)
+
+pr-surface: sync ## a PR touching targets/<id>/ touches nothing else (ADR-022; 05 C-39…C-41). BASE=<ref> or PR_BASE env; no base → nothing to classify
+	$(RUN) python -m scripts.check_pr_surface $(if $(BASE),--base $(BASE),)
