@@ -1,0 +1,608 @@
+"""``Store`` over plain PostgreSQL >= 16 with psycopg 3 (ADR-030).
+
+Every method is one transaction. ``commit`` locks the run row with ``FOR UPDATE`` under the
+fence predicate (ADR-024 §4): a stale holder finds zero rows, rolls back and is recorded as
+``lost_lease``; a concurrent claimer blocks until the holder's transaction ends and then sees
+the new state. The current view is ``observations_current`` from migration 0002.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from datetime import datetime, timedelta
+from typing import Any, cast
+
+import psycopg
+from psycopg import sql
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
+
+from energy_platform.contracts.intervals import DeliveryInterval
+from energy_platform.contracts.observation import EnergyObservation
+from energy_platform.contracts.registry import Transport
+from energy_platform.mapping.quality import QualityEvent
+from energy_platform.store.protocol import (
+    AttemptKind,
+    AttemptOutcome,
+    Claim,
+    CommitResult,
+    CurrentRow,
+    Derivation,
+    Run,
+    RunAttempt,
+    RunOrigin,
+    RunState,
+    StoredEvent,
+    StoredObservation,
+    StoreUnavailable,
+)
+
+MIN_SERVER_VERSION = 160000  # ADR-030
+
+_OBS_COLUMNS = (
+    "source_id, dataset_id, source_transport, contract_version, derivation_id, raw_ref, "
+    "payload_sha256, fetched_at, source_published_at, source_version, processed_at, "
+    "delivery_interval, resolution, local_date, period_index, kind, dimensions, metric, value, "
+    "unit, sign_convention, run_attempt_id"
+)
+_INSERT_OBSERVATION = sql.SQL(
+    "INSERT INTO observations ({cols}) VALUES ("
+    "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, tstzrange(%s, %s, '[)'), "
+    "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+).format(cols=sql.SQL(_OBS_COLUMNS))
+_OBS_SELECT = (
+    "id, run_attempt_id, source_id, dataset_id, source_transport, contract_version, "
+    "derivation_id, raw_ref, payload_sha256, fetched_at, source_published_at, source_version, "
+    "processed_at, lower(delivery_interval) AS delivery_start, upper(delivery_interval) AS "
+    "delivery_end, resolution, local_date, period_index, kind, dimensions, metric, value, unit, "
+    "sign_convention"
+)
+
+
+class PostgresStore:
+    def __init__(self, dsn: str) -> None:
+        self._dsn = dsn
+        try:
+            self._conn = psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+        except psycopg.OperationalError as exc:
+            raise StoreUnavailable(f"cannot connect: {exc}") from exc
+        with self._conn.cursor() as cur:
+            cur.execute("SELECT current_setting('server_version_num')::int AS v")
+            row = cur.fetchone()
+        self._conn.rollback()
+        version = int(row["v"]) if row else 0
+        if version < MIN_SERVER_VERSION:
+            self._conn.close()
+            raise StoreUnavailable(
+                f"PostgreSQL server_version_num {version} < {MIN_SERVER_VERSION} (ADR-030)"
+            )
+
+    def close(self) -> None:
+        self._conn.close()
+
+    # ---------------------------------------------------------------- helpers
+
+    def _one(self, query: str | sql.Composed, params: tuple[Any, ...]) -> dict[str, Any] | None:
+        with self._conn.cursor() as cur:
+            cur.execute(query, params)
+            row = cur.fetchone()
+        return None if row is None else dict(row)
+
+    def _all(self, query: str | sql.Composed, params: tuple[Any, ...]) -> list[dict[str, Any]]:
+        with self._conn.cursor() as cur:
+            cur.execute(query, params)
+            return [dict(r) for r in cur.fetchall()]
+
+    @staticmethod
+    def _run(r: dict[str, Any]) -> Run:
+        return Run(
+            id=r["id"],
+            target_id=r["target_id"],
+            scheduled_for=r["scheduled_for"],
+            state=r["state"],
+            fence=r["fence"],
+            origin=r["origin"],
+            lease_owner=r["lease_owner"],
+            lease_until=r["lease_until"],
+            capture_id=r["capture_id"],
+            created_at=r["created_at"],
+            updated_at=r["updated_at"],
+        )
+
+    @staticmethod
+    def _attempt(r: dict[str, Any]) -> RunAttempt:
+        return RunAttempt(
+            id=r["id"],
+            run_id=r["run_id"],
+            kind=r["kind"],
+            lease_owner=r["lease_owner"],
+            lease_until=r["lease_until"],
+            fence=r["fence"],
+            capture_id=r["capture_id"],
+            derivation_id=r["derivation_id"],
+            outcome=r["outcome"],
+            error=r["error"],
+            started_at=r["started_at"],
+            finished_at=r["finished_at"],
+        )
+
+    @staticmethod
+    def _observation(r: dict[str, Any]) -> EnergyObservation:
+        return EnergyObservation(
+            source_id=r["source_id"],
+            dataset_id=r["dataset_id"],
+            source_transport=r["source_transport"],
+            contract_version=r["contract_version"],
+            derivation_id=r["derivation_id"],
+            raw_ref=r["raw_ref"],
+            payload_sha256=r["payload_sha256"],
+            fetched_at=r["fetched_at"],
+            source_published_at=r["source_published_at"],
+            source_version=r["source_version"],
+            processed_at=r["processed_at"],
+            delivery_interval=DeliveryInterval(r["delivery_start"], r["delivery_end"]),
+            resolution=r["resolution"],
+            local_date=r["local_date"],
+            period_index=r["period_index"],
+            kind=r["kind"],
+            dimensions=dict(r["dimensions"]),
+            metric=r["metric"],
+            value=r["value"],
+            unit=r["unit"],
+            sign_convention=r["sign_convention"],
+        )
+
+    @staticmethod
+    def _event(r: dict[str, Any]) -> StoredEvent:
+        return StoredEvent(
+            r["id"],
+            r["target_id"],
+            r["run_attempt_id"],
+            r["kind"],
+            r["severity"],
+            r["message"],
+            r["locator"],
+            r["metric"],
+            r["created_at"],
+        )
+
+    # ---------------------------------------------------------------- runs
+
+    def ensure_run(
+        self,
+        target_id: str,
+        scheduled_for: datetime,
+        *,
+        state: RunState,
+        origin: RunOrigin,
+        capture_id: str | None = None,
+        now: datetime,
+    ) -> Run:
+        try:
+            row = self._one(
+                """
+                INSERT INTO runs (target_id, scheduled_for, state, origin, capture_id,
+                                  created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (target_id, scheduled_for) DO UPDATE SET
+                    state = CASE WHEN EXCLUDED.state = 'captured' AND runs.state <> 'processed'
+                                      AND runs.capture_id IS NULL
+                                 THEN 'captured' ELSE runs.state END,
+                    capture_id = CASE WHEN EXCLUDED.state = 'captured' AND runs.state <> 'processed'
+                                           AND runs.capture_id IS NULL
+                                      THEN EXCLUDED.capture_id ELSE runs.capture_id END,
+                    updated_at = CASE WHEN EXCLUDED.state = 'captured' AND runs.state <> 'processed'
+                                           AND runs.capture_id IS NULL
+                                      THEN EXCLUDED.updated_at ELSE runs.updated_at END
+                RETURNING *
+                """,
+                (target_id, scheduled_for, state, origin, capture_id, now, now),
+            )
+            self._conn.commit()
+        except psycopg.OperationalError as exc:
+            self._conn.rollback()
+            raise StoreUnavailable(str(exc)) from exc
+        if row is None:
+            raise StoreUnavailable("ensure_run returned no row")
+        return self._run(row)
+
+    def get_run(self, target_id: str, scheduled_for: datetime) -> Run | None:
+        row = self._one(
+            "SELECT * FROM runs WHERE target_id = %s AND scheduled_for = %s",
+            (target_id, scheduled_for),
+        )
+        self._conn.rollback()
+        return None if row is None else self._run(row)
+
+    def runs(
+        self, target_id: str, since: datetime | None = None, until: datetime | None = None
+    ) -> tuple[Run, ...]:
+        rows = self._all(
+            """
+            SELECT * FROM runs
+            WHERE target_id = %s
+              AND (%s::timestamptz IS NULL OR scheduled_for >= %s)
+              AND (%s::timestamptz IS NULL OR scheduled_for < %s)
+            ORDER BY scheduled_for
+            """,
+            (target_id, since, since, until, until),
+        )
+        self._conn.rollback()
+        return tuple(self._run(r) for r in rows)
+
+    def set_state(self, run_id: int, state: RunState, *, now: datetime) -> Run:
+        row = self._one(
+            "UPDATE runs SET state = %s, updated_at = %s WHERE id = %s RETURNING *",
+            (state, now, run_id),
+        )
+        self._conn.commit()
+        if row is None:
+            raise KeyError(f"run {run_id} does not exist")
+        return self._run(row)
+
+    # ---------------------------------------------------------------- attempts
+
+    def claim(self, run_id: int, owner: str, ttl: timedelta, *, now: datetime) -> Claim | None:
+        row = self._one(
+            """
+            UPDATE runs SET fence = fence + 1, lease_owner = %s, lease_until = %s, updated_at = %s
+            WHERE id = %s AND (lease_until IS NULL OR lease_until < %s)
+            RETURNING *
+            """,
+            (owner, now + ttl, now, run_id, now),
+        )
+        if row is None:
+            self._conn.rollback()
+            return None
+        run = self._run(row)
+        pending = self._one(
+            """
+            UPDATE run_attempts SET lease_owner = %s, lease_until = %s, fence = %s,
+                                    capture_id = %s, started_at = %s
+            WHERE id = (SELECT id FROM run_attempts
+                        WHERE run_id = %s AND kind = 'replay' AND outcome IS NULL
+                          AND lease_owner IS NULL
+                        ORDER BY id LIMIT 1)
+            RETURNING *
+            """,
+            (owner, run.lease_until, run.fence, run.capture_id, now, run_id),
+        )
+        if pending is None:
+            pending = self._one(
+                """
+                INSERT INTO run_attempts (run_id, kind, lease_owner, lease_until, fence,
+                                          capture_id, started_at)
+                VALUES (%s, 'process', %s, %s, %s, %s, %s) RETURNING *
+                """,
+                (run_id, owner, run.lease_until, run.fence, run.capture_id, now),
+            )
+        self._conn.commit()
+        if pending is None:
+            raise StoreUnavailable("claim: attempt row missing")
+        return Claim(run=run, fence=run.fence, attempt=self._attempt(pending))
+
+    def renew(self, claim: Claim, ttl: timedelta, *, now: datetime) -> bool:
+        row = self._one(
+            "UPDATE runs SET lease_until = %s, updated_at = %s WHERE id = %s AND fence = %s "
+            "RETURNING id",
+            (now + ttl, now, claim.run.id, claim.fence),
+        )
+        self._conn.commit()
+        return row is not None
+
+    def commit(
+        self,
+        claim: Claim,
+        *,
+        state: RunState,
+        outcome: AttemptOutcome,
+        error: str | None = None,
+        derivation: Derivation | None = None,
+        observations: Iterable[EnergyObservation] = (),
+        events: Iterable[QualityEvent] = (),
+        now: datetime,
+    ) -> CommitResult:
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM runs WHERE id = %s AND fence = %s FOR UPDATE",
+                (claim.run.id, claim.fence),
+            )
+            if cur.fetchone() is None:
+                self._conn.rollback()
+                cur.execute(
+                    "UPDATE run_attempts SET outcome = 'lost_lease', finished_at = %s "
+                    "WHERE id = %s AND outcome IS NULL",
+                    (now, claim.attempt.id),
+                )
+                self._conn.commit()
+                return CommitResult(inserted=0, lost_lease=True)
+            if derivation is not None:
+                self._insert_derivation(cur, derivation, now)
+            inserted = 0
+            for o in observations:
+                cur.execute(
+                    _INSERT_OBSERVATION,
+                    (
+                        o.source_id,
+                        o.dataset_id,
+                        o.source_transport,
+                        o.contract_version,
+                        o.derivation_id,
+                        o.raw_ref,
+                        o.payload_sha256,
+                        o.fetched_at,
+                        o.source_published_at,
+                        o.source_version,
+                        o.processed_at,
+                        o.delivery_start_utc,
+                        o.delivery_end_utc,
+                        o.resolution,
+                        o.local_date,
+                        o.period_index,
+                        o.kind,
+                        Jsonb(dict(o.dimensions)),
+                        o.metric,
+                        o.value,
+                        o.unit,
+                        o.sign_convention,
+                        claim.attempt.id,
+                    ),
+                )
+                inserted += cur.rowcount
+            self._insert_events(cur, claim.run.target_id, events, claim.attempt.id, now)
+            cur.execute(
+                "UPDATE run_attempts SET outcome = %s, error = %s, finished_at = %s, "
+                "derivation_id = %s WHERE id = %s",
+                (
+                    outcome,
+                    error,
+                    now,
+                    None if derivation is None else derivation.derivation_id,
+                    claim.attempt.id,
+                ),
+            )
+            cur.execute(
+                "UPDATE runs SET state = %s, lease_owner = NULL, lease_until = NULL, "
+                "updated_at = %s WHERE id = %s AND fence = %s",
+                (state, now, claim.run.id, claim.fence),
+            )
+        self._conn.commit()
+        return CommitResult(inserted=inserted, lost_lease=False)
+
+    def record_attempt(
+        self,
+        run_id: int,
+        kind: AttemptKind,
+        *,
+        outcome: AttemptOutcome,
+        capture_id: str | None = None,
+        error: str | None = None,
+        now: datetime,
+    ) -> RunAttempt:
+        row = self._one(
+            """
+            INSERT INTO run_attempts (run_id, kind, capture_id, outcome, error, started_at,
+                                      finished_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING *
+            """,
+            (run_id, kind, capture_id, outcome, error, now, now),
+        )
+        self._conn.commit()
+        if row is None:
+            raise StoreUnavailable("record_attempt returned no row")
+        return self._attempt(row)
+
+    def enqueue_replay(self, run_id: int, *, now: datetime) -> RunAttempt | None:
+        row = self._one(
+            """
+            INSERT INTO run_attempts (run_id, kind, capture_id, started_at)
+            SELECT r.id, 'replay', r.capture_id, %s FROM runs r
+            WHERE r.id = %s AND NOT EXISTS (
+                SELECT 1 FROM run_attempts a
+                WHERE a.run_id = r.id AND a.kind = 'replay' AND a.outcome IS NULL
+                  AND a.lease_owner IS NULL)
+            RETURNING *
+            """,
+            (now, run_id),
+        )
+        self._conn.commit()
+        return None if row is None else self._attempt(row)
+
+    def attempts(self, run_id: int) -> tuple[RunAttempt, ...]:
+        rows = self._all("SELECT * FROM run_attempts WHERE run_id = %s ORDER BY id", (run_id,))
+        self._conn.rollback()
+        return tuple(self._attempt(r) for r in rows)
+
+    def pending_runs(self, target_id: str) -> tuple[Run, ...]:
+        rows = self._all(
+            """
+            SELECT r.* FROM runs r
+            WHERE r.target_id = %s AND (
+                r.state = 'captured' OR EXISTS (
+                    SELECT 1 FROM run_attempts a
+                    WHERE a.run_id = r.id AND a.kind = 'replay' AND a.outcome IS NULL
+                      AND a.lease_owner IS NULL))
+            ORDER BY r.scheduled_for
+            """,
+            (target_id,),
+        )
+        self._conn.rollback()
+        return tuple(self._run(r) for r in rows)
+
+    def runs_with_derivation(self, derivation_id: str) -> tuple[Run, ...]:
+        rows = self._all(
+            """
+            SELECT DISTINCT r.* FROM runs r
+            JOIN run_attempts a ON a.run_id = r.id
+            JOIN observations o ON o.run_attempt_id = a.id
+            WHERE o.derivation_id = %s
+            ORDER BY r.scheduled_for
+            """,
+            (derivation_id,),
+        )
+        self._conn.rollback()
+        return tuple(self._run(r) for r in rows)
+
+    # ---------------------------------------------------------------- derivations
+
+    def _insert_derivation(self, cur: psycopg.Cursor[Any], d: Derivation, now: datetime) -> None:
+        cur.execute(
+            """
+            INSERT INTO derivations (derivation_id, platform_version, contract_version,
+                                     mapping_block, parser_ref, registered_at)
+            VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (derivation_id) DO NOTHING
+            """,
+            (
+                d.derivation_id,
+                d.platform_version,
+                d.contract_version,
+                Jsonb(json.loads(json.dumps(d.mapping_block))),
+                d.parser_ref,
+                now,
+            ),
+        )
+
+    def register_derivation(self, d: Derivation, *, now: datetime) -> Derivation:
+        with self._conn.cursor() as cur:
+            self._insert_derivation(cur, d, now)
+        self._conn.commit()
+        stored = self.derivation(d.derivation_id)
+        if stored is None:
+            raise StoreUnavailable("derivation vanished after insert")
+        return stored
+
+    def derivation(self, derivation_id: str) -> Derivation | None:
+        row = self._one("SELECT * FROM derivations WHERE derivation_id = %s", (derivation_id,))
+        self._conn.rollback()
+        if row is None:
+            return None
+        return Derivation(
+            derivation_id=row["derivation_id"],
+            platform_version=row["platform_version"],
+            contract_version=row["contract_version"],
+            mapping_block=dict(row["mapping_block"]),
+            parser_ref=row["parser_ref"],
+            registered_at=row["registered_at"],
+        )
+
+    # ---------------------------------------------------------------- silver
+
+    def current_rows(
+        self,
+        dataset_id: str,
+        *,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        metric: str | None = None,
+        transport: Transport | None = None,
+    ) -> tuple[CurrentRow, ...]:
+        rows = self._all(
+            sql.SQL(
+                """
+            SELECT {cols}, ordering_basis FROM observations_current
+            WHERE dataset_id = %s
+              AND (%s::timestamptz IS NULL OR lower(delivery_interval) >= %s)
+              AND (%s::timestamptz IS NULL OR lower(delivery_interval) < %s)
+              AND (%s::text IS NULL OR metric = %s)
+              AND (%s::text IS NULL OR source_transport = %s)
+            ORDER BY lower(delivery_interval), metric
+            """
+            ).format(cols=sql.SQL(_OBS_SELECT)),
+            (dataset_id, start, start, end, end, metric, metric, transport, transport),
+        )
+        self._conn.rollback()
+        return tuple(
+            CurrentRow(self._observation(r), r["run_attempt_id"], r["ordering_basis"]) for r in rows
+        )
+
+    def all_rows(
+        self, dataset_id: str, *, start: datetime | None = None, end: datetime | None = None
+    ) -> tuple[StoredObservation, ...]:
+        rows = self._all(
+            sql.SQL(
+                """
+            SELECT {cols} FROM observations
+            WHERE dataset_id = %s
+              AND (%s::timestamptz IS NULL OR lower(delivery_interval) >= %s)
+              AND (%s::timestamptz IS NULL OR lower(delivery_interval) < %s)
+            ORDER BY id
+            """
+            ).format(cols=sql.SQL(_OBS_SELECT)),
+            (dataset_id, start, start, end, end),
+        )
+        self._conn.rollback()
+        return tuple(
+            StoredObservation(r["id"], r["run_attempt_id"], self._observation(r)) for r in rows
+        )
+
+    def _insert_events(
+        self,
+        cur: psycopg.Cursor[Any],
+        target_id: str,
+        events: Iterable[QualityEvent],
+        run_attempt_id: int | None,
+        now: datetime,
+    ) -> int:
+        n = 0
+        for e in events:
+            cur.execute(
+                "INSERT INTO quality_events (target_id, run_attempt_id, kind, severity, message, "
+                "locator, metric, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    target_id,
+                    run_attempt_id,
+                    e.kind,
+                    e.severity,
+                    e.message,
+                    e.locator,
+                    e.metric,
+                    now,
+                ),
+            )
+            n += 1
+        return n
+
+    def add_events(
+        self,
+        target_id: str,
+        events: Iterable[QualityEvent],
+        *,
+        run_attempt_id: int | None,
+        now: datetime,
+    ) -> int:
+        with self._conn.cursor() as cur:
+            n = self._insert_events(cur, target_id, events, run_attempt_id, now)
+        self._conn.commit()
+        return n
+
+    def quality_events(
+        self, target_id: str | None = None, *, kind: str | None = None
+    ) -> tuple[StoredEvent, ...]:
+        rows = self._all(
+            "SELECT * FROM quality_events WHERE (%s::text IS NULL OR target_id = %s) "
+            "AND (%s::text IS NULL OR kind = %s) ORDER BY id",
+            (target_id, target_id, kind, kind),
+        )
+        self._conn.rollback()
+        return tuple(self._event(r) for r in rows)
+
+    # ---------------------------------------------------------------- test support
+
+    def truncate_all(self) -> None:
+        """Empty every table (tests only). Sequences restart."""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "TRUNCATE quality_events, observations, run_attempts, runs, derivations "
+                "RESTART IDENTITY CASCADE"
+            )
+        self._conn.commit()
+
+    def table_names(self) -> tuple[str, ...]:
+        rows = self._all(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' "
+            "AND table_type = 'BASE TABLE' ORDER BY table_name",
+            (),
+        )
+        self._conn.rollback()
+        return tuple(cast(str, r["table_name"]) for r in rows)

@@ -13,7 +13,7 @@ CHART_DIR := deployment/helm/energy-platform
 TF_DIR    := deployment/own-cluster/terraform
 KIND_NAME := energy-platform
 
-.PHONY: help check lint lock-check format type test schema deps-allowlist secret-scan helm-lint terraform-validate \
+.PHONY: help check lint lock-check format type test db-test schema deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target
 
 help: ## List targets
@@ -41,8 +41,11 @@ format: sync ## Apply ruff formatting and safe fixes
 type: sync ## mypy --strict
 	$(RUN) mypy
 
-test: sync ## pytest (unit only; live tests are never selected here — ADR-010)
+test: sync ## pytest (unit only; live tests are never selected here — ADR-010; db tests skip without a DSN)
 	$(RUN) pytest -m "not live"
+
+db-test: sync ## Store suite + migration up/down round trip on an ephemeral local PostgreSQL (ADR-016 §3, ADR-030)
+	scripts/with_postgres.sh $(RUN) pytest -m "db" -p no:cacheprovider
 
 schema: sync ## Export schemas/manifest.v1.json from the Pydantic model (ADR-017); a test fails when it is stale
 	$(RUN) python -m scripts.export_manifest_schema > schemas/manifest.v1.json
