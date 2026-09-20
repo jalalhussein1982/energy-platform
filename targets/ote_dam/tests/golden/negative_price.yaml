@@ -1,0 +1,12 @@
+# Item 3 (00:30 CEST) carries Price -0.05 and EmergencyState 1: negative prices are allowed (01 §9),
+# the dimensionless flag maps to emergency_state with unit "1".
+fixture: negative_price
+checked_by: "Claude, Phase 4 session 2026-09-20 (through the MCP server): each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 384
+  quality_events: [partition_status]
+  rows:
+    - {delivery_start_utc: 2026-09-19T00:30:00+02:00, resolution: PT15M, period_index: 3, metric: price, value: "-0.05"}
+    - {delivery_start_utc: 2026-09-19T00:30:00+02:00, resolution: PT15M, period_index: 3, metric: emergency_state, value: "1"}
+    - {delivery_start_utc: 2026-09-19T00:30:00+02:00, resolution: PT15M, period_index: 3, metric: price_hourly, value: "83.00"}
+    - {delivery_start_utc: 2026-09-19T00:45:00+02:00, resolution: PT15M, period_index: 4, metric: emergency_state, value: null}

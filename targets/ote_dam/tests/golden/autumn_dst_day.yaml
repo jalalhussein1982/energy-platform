@@ -1,0 +1,14 @@
+# 25-hour day 2025-10-26: 100 items; period 12 is the last 02:45 CEST (00:45Z), period 13 the first
+# 02:00 CET (01:00Z); period 100 = 23:45 CET = 22:45Z.
+fixture: autumn_dst_day
+checked_by: "Claude, Phase 4 session 2026-09-20 (through the MCP server): each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 400
+  quality_events: [partition_status]     # "2025-10-26: complete 100/100"
+  rows:
+    - {delivery_start_utc: 2025-10-25T22:00:00Z, resolution: PT15M, period_index: 1, metric: price, value: "79.00"}
+    - {delivery_start_utc: 2025-10-26T00:45:00Z, resolution: PT15M, period_index: 12, metric: price, value: "117.00"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, period_index: 13, metric: price, value: "78.00"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, period_index: 13, metric: price_hourly, value: "82.00"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, period_index: 100, metric: price, value: "63.00"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, period_index: 100, metric: volume_total, value: "2600.500"}

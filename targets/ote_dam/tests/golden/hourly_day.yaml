@@ -1,0 +1,11 @@
+# PT60M document (2026-09-20): 24 items, PeriodInterval "00-01", Price = HourlyPrice (docs/06 §5, row 11).
+fixture: hourly_day
+checked_by: "Claude, Phase 4 session 2026-09-20 (through the MCP server): each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 96
+  quality_events: [partition_status]     # "2026-09-20: complete 24/24"
+  rows:
+    - {delivery_start_utc: 2026-09-20T00:00:00+02:00, resolution: PT60M, period_index: 1, metric: price, value: "83.00"}
+    - {delivery_start_utc: 2026-09-20T00:00:00+02:00, resolution: PT60M, period_index: 1, metric: price_hourly, value: "83.00"}
+    - {delivery_start_utc: 2026-09-20T00:00:00+02:00, resolution: PT60M, period_index: 1, metric: volume_total, value: "2517.125"}
+    - {delivery_start_utc: 2026-09-20T23:00:00+02:00, resolution: PT60M, period_index: 24, metric: price, value: "122.00"}

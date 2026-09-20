@@ -1,0 +1,61 @@
+# E1 — OTE day-ahead market, SOAP GetDamPricePeriodE (docs/01-data-scope.md §3 E1): the
+# adapter-addition demo, added last through the MCP contributor workflow (ADR-007; plan P4-D5).
+# Same endpoint as T1; the request needs PeriodResolution; the response adds PeriodInterval,
+# HourlyPrice, VolumeTotal, EmergencyState (WSDL + live reads 2026-09-20, docs/06 §5, rows 1, 10, 11).
+schema_version: 1
+target_id: ote_dam
+description: OTE day-ahead market results per delivery period (SOAP, PT15M with the hourly price alongside; PT60M also served)
+license: "OTE Terms of Use (docs/06 §1.4, read 2026-09-20): no reproduction without written consent; fixtures synthetic until confirmed (01 §10)"
+terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
+allowed_hosts:
+  - www.ote-cr.cz
+modality: soap-xml
+cadence:
+  cron: "0 12-23 * * *"       # 01 §5: hourly from 12:00 on D-1; the request asks for the next civil day (ADR-033 §4)
+  timezone: Europe/Prague
+  correction:                 # 01 §5 correction window 1 day (ADR-033 §3; runtime verb in Phase 5)
+    cron: "13 * * * *"
+    days: 1
+history:
+  max_age: P1Y                # [UNVERIFIED] beyond the two days read live (06 §5)
+fetch:
+  soap_xml:
+    url: https://www.ote-cr.cz/pw-data/services/PublicDataService
+    soap_action: http://www.ote-cr.cz/schema/service/public/GetDamPricePeriodE
+    soap_version: "1.1"
+    body_template: |
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:pub="http://www.ote-cr.cz/schema/service/public">
+        <soapenv:Body>
+          <pub:GetDamPricePeriodE>
+            <pub:StartDate>{start_date}</pub:StartDate>
+            <pub:EndDate>{end_date}</pub:EndDate>
+            <pub:PeriodResolution>PT15M</pub:PeriodResolution>
+          </pub:GetDamPricePeriodE>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    params:                     # day-ahead: the run on D-1 asks for D (docs/06 §5: D+1 complete by 14:24 on D)
+      start_date: "{next_delivery_day:%Y-%m-%d}"
+      end_date: "{next_delivery_day:%Y-%m-%d}"
+contract:
+  dataset_id: ote.dam
+  source_transport: soap
+  decode: soap
+  metrics: [price, price_hourly, volume_total, emergency_state]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: period_index          # 01 §7: index → local interval → UTC; the document carries its own Date
+    timezone: Europe/Prague
+    date: {source: Date}
+    index: {source: PeriodIndex}
+    resolution: {source: PeriodResolution}   # PT15M as requested; PT60M documents map at PT60M (06 §5)
+  source_version: null          # no revision marker (01 §3)
+  source_published_at: null     # no publication timestamp in the response
+  ignore_fields: [PeriodInterval]   # display-only label "HH:MM-HH:MM" / "HH-HH" (ADR-034)
+  metrics:
+    price: {source: Price, unit: EUR/MWh, sign: as_published, decimal_separator: dot}
+    price_hourly: {source: HourlyPrice, unit: EUR/MWh, sign: as_published, decimal_separator: dot}   # constant across the hour's four quarters
+    volume_total: {source: VolumeTotal, unit: MWh, sign: as_published, decimal_separator: dot}
+    emergency_state: {source: EmergencyState, unit: "1", sign: as_published, decimal_separator: dot}  # absent = no result → NULL

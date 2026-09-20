@@ -1,0 +1,1 @@
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><GetDamPricePeriodEResponse xmlns="http://www.ote-cr.cz/schema/service/public"><Result></Result></GetDamPricePeriodEResponse></soap:Body></soap:Envelope>

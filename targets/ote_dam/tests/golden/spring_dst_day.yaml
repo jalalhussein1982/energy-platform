@@ -1,0 +1,11 @@
+# 23-hour day 2026-03-29: 92 items; period 9 is labelled 03:00-03:15 (= 2026-03-29T01:00Z), period 92 = 23:45 CEST.
+fixture: spring_dst_day
+checked_by: "Claude, Phase 4 session 2026-09-20 (through the MCP server): each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 368
+  quality_events: [partition_status]     # "2026-03-29: complete 92/92"
+  rows:
+    - {delivery_start_utc: 2026-03-28T23:00:00Z, resolution: PT15M, period_index: 1, metric: price, value: "79.00"}
+    - {delivery_start_utc: 2026-03-29T01:00:00Z, resolution: PT15M, period_index: 9, metric: price, value: "125.00"}
+    - {delivery_start_utc: 2026-03-29T01:00:00Z, resolution: PT15M, period_index: 9, metric: price_hourly, value: "129.00"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, period_index: 92, metric: price, value: "87.00"}
