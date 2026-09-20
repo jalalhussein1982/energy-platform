@@ -303,3 +303,10 @@ def test_admission_gaps_and_errors_are_reported_together() -> None:
     assert result.status == "ADMISSION_REQUIRED"
     assert result.missing.hosts == ("mirror.example.org",)
     assert result.errors  # the unit error is not hidden behind the admission gap
+
+
+def test_numeric_source_is_positional_parsing() -> None:
+    """05 C-04: a column position is not a field name."""
+    data = t1_manifest()
+    data["mapping"]["metrics"]["price_vwap"]["source"] = "3"
+    _rejects(data, "column position")

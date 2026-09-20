@@ -59,3 +59,61 @@ def test_passing_target_test_is_collected(pytester: pytest.Pytester) -> None:
     (target_tests / "test_control.py").write_text("def test_ok() -> None:\n    assert True\n")
     result = pytester.runpytest_subprocess("-p", "no:cacheprovider")
     result.assert_outcomes(passed=1)
+
+
+# ---------------------------------------------- ADR-020: incomplete target fails collection
+
+
+def _copy_root_conftest(pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The editable install is not visible from a foreign cwd on every interpreter; the
+    # repository root is what `make test` runs from.
+    monkeypatch.setenv("PYTHONPATH", str(REPO))
+    pytester.makefile(".toml", pyproject=_pytest_ini_block())
+    pytester.makeconftest((REPO / "conftest.py").read_text(encoding="utf-8"))
+    pytester.mkpydir("tests")
+    (pytester.path / "tests" / "test_control.py").write_text(
+        "def test_ok() -> None:\n    assert True\n"
+    )
+
+
+def test_target_without_fixture_fails_collection(
+    pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _copy_root_conftest(pytester, monkeypatch)
+    target = _mkpydirs(pytester, "targets/probe_target/tests")
+    (target.parent / "manifest.yaml").write_text("schema_version: 1\ntarget_id: probe_target\n")
+    (target / "test_probe.py").write_text("def test_ok() -> None:\n    assert True\n")
+    (target / "golden").mkdir()
+    (target / "golden" / "day.yaml").write_text(
+        "fixture: day\nchecked_by: x\nexpect: {quarantine: y}\n"
+    )
+    result = pytester.runpytest_subprocess("-p", "no:cacheprovider")
+    assert result.ret != 0
+    result.stderr.fnmatch_lines(
+        ["*incomplete target(s) fail collection (ADR-020)*", "*no fixture*"]
+    )
+
+
+def test_target_without_golden_fails_collection(
+    pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _copy_root_conftest(pytester, monkeypatch)
+    target = _mkpydirs(pytester, "targets/probe_target/tests")
+    (target.parent / "manifest.yaml").write_text("schema_version: 1\ntarget_id: probe_target\n")
+    (target / "test_probe.py").write_text("def test_ok() -> None:\n    assert True\n")
+    result = pytester.runpytest_subprocess("-p", "no:cacheprovider")
+    assert result.ret != 0
+    result.stderr.fnmatch_lines(["*no golden*"])
+
+
+def test_complete_target_is_collected(
+    pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.harness.targets_builder import make_target
+
+    _copy_root_conftest(pytester, monkeypatch)
+    (pytester.path / "targets").mkdir()
+    (pytester.path / "targets" / "__init__.py").write_text("")
+    make_target(pytester.path / "targets", "probe_target")
+    result = pytester.runpytest_subprocess("-p", "no:cacheprovider")
+    result.assert_outcomes(passed=2)

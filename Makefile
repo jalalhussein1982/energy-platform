@@ -29,7 +29,7 @@ lint: sync ## ruff (rules incl. egress ban, naive datetime, swallowed except) + 
 	$(RUN) ruff check .
 	$(RUN) ruff format --check .
 	$(RUN) lint-imports
-	$(RUN) python scripts/check_target_surface.py targets
+	$(RUN) python -m scripts.check_target_surface targets
 
 lock-check: ## uv.lock must be consistent with pyproject.toml; --frozen alone does not check this (F11)
 	$(UV) lock --check

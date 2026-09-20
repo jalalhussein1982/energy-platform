@@ -264,6 +264,8 @@ class FieldRef(_Model):
         set_ = [k for k in ("source", "constant", "context") if getattr(self, k) is not None]
         if len(set_) != 1:
             raise ValueError(f"exactly one of source/constant/context, got {set_}")
+        if self.source is not None:
+            _not_positional(self.source)
         return self
 
 
@@ -305,6 +307,21 @@ class MetricMapping(_Model):
     unit: str = Field(min_length=1, description="must equal the registry unit; no conversion")
     sign: Sign = "as_published"
     decimal_separator: Separator = "dot"
+
+    @field_validator("source")
+    @classmethod
+    def _named(cls, v: str) -> str:
+        return _not_positional(v)
+
+
+def _not_positional(source: str) -> str:
+    """A column position is not a field name (05 C-04; 04 §2.8 keys on header text)."""
+    if source.strip().isdigit():
+        raise ValueError(
+            f"source {source!r} is a column position; name the header or element "
+            "(positional parsing, 05 C-04)"
+        )
+    return source
 
 
 class MappingBlock(_Model):
