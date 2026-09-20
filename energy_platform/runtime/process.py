@@ -14,6 +14,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from energy_platform.bronze import BronzeError
+from energy_platform.contracts.manifest import Manifest
 from energy_platform.contracts.observation import EnergyObservation
 from energy_platform.contracts.parser import DecodedDocument
 from energy_platform.contracts.registry import dataset
@@ -86,7 +87,7 @@ def process_one(rt: Runtime, claim: Claim, derivation: Derivation) -> ProcessRep
         derivation_id=derivation.derivation_id,
     )
     try:
-        result = _map(rt, payload, ctx)
+        result = map_payload(rt.manifest, payload, ctx)
     except Quarantined as q:
         log.warning("%s %s: quarantined: %s", rt.target_id, run.scheduled_for, q)
         commit = rt.store.commit(
@@ -102,7 +103,7 @@ def process_one(rt: Runtime, claim: Claim, derivation: Derivation) -> ProcessRep
         return ProcessReport(run.id, run.scheduled_for, claim.attempt.kind, outcome, 0, 1, q.reason)
 
     events = list(result.events)
-    events.extend(_completeness(rt, result.observations))
+    events.extend(completeness_events(result.observations, rt.timezone))
     events.extend(
         reconcile_transports(result.observations, _other_transport_rows(rt, result.observations))
     )
@@ -140,8 +141,12 @@ def _fail(rt: Runtime, claim: Claim, derivation: Derivation, error: str) -> Proc
     )
 
 
-def _map(rt: Runtime, payload: bytes, ctx: MappingContext) -> MappingResult:
-    m = rt.manifest
+def map_payload(m: Manifest, payload: bytes, ctx: MappingContext) -> MappingResult:
+    """Decode → generic parser → mapping for one payload; raises ``Quarantined`` (01 §9).
+
+    Shared by ``process`` and by the golden runner (``energy_platform.harness.goldens``), so a
+    golden proves exactly what production would write.
+    """
     try:
         doc: DecodedDocument
         if m.contract.decode == "html-table" and m.fetch.html_table is not None:
@@ -154,11 +159,14 @@ def _map(rt: Runtime, payload: bytes, ctx: MappingContext) -> MappingResult:
     return map_records(m, records, ctx)
 
 
-def _completeness(rt: Runtime, observations: tuple[EnergyObservation, ...]) -> list[QualityEvent]:
+def completeness_events(
+    observations: tuple[EnergyObservation, ...], timezone: str
+) -> list[QualityEvent]:
+    """01 §5 ``partition_status`` per resolution present in the document."""
     out: list[QualityEvent] = []
     for resolution in sorted({o.resolution for o in observations}):
         subset = [o for o in observations if o.resolution == resolution]
-        out.extend(partition_status(subset, resolution, rt.timezone))
+        out.extend(partition_status(subset, resolution, timezone))
     return out
 
 
