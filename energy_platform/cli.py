@@ -1,9 +1,13 @@
-"""``energyctl``: a thin client of the library (ADR-000). Phase 2 verbs take ``--manifest``.
+"""``energyctl``: a thin client of the library (ADR-000).
 
-Persistence is PostgreSQL through ``--dsn`` / ``ENERGY_PLATFORM_DSN``; Bronze is a directory
-through ``--bronze-dir`` / ``ENERGY_PLATFORM_BRONZE_DIR``. ``capture`` works without a database
-(ADR-024 §1). Live fetching is opt-in (``--live``); ``--fixture`` replays a Bronze fixture
-through the real fetch path with an offline transport (ADR-010).
+Phase 2 verbs take ``--manifest``; Phase 3 verbs take a target id resolved against ``targets/``
+(``--targets-root``). Persistence is PostgreSQL through ``--dsn`` / ``ENERGY_PLATFORM_DSN``;
+Bronze is a directory through ``--bronze-dir`` / ``ENERGY_PLATFORM_BRONZE_DIR``. ``capture``
+works without a database (ADR-024 §1). Live fetching is opt-in (``--live``); ``--fixture``
+replays a Bronze fixture through the real fetch path with an offline transport (ADR-010).
+The harness verbs (``new-target``, ``validate <id>``, ``record-fixture``, ``run-target-tests``,
+``admission-request``, ``pr-bundle``, ``mcp-serve``) are wrappers over ``energy_platform.harness``
+and ``energy_platform.mcp`` — the same code CI and the MCP server run (ADR-007).
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import typer
 from pydantic import ValidationError
@@ -25,10 +29,16 @@ from energy_platform.bronze import Bronze, FileBlobStore, FileCaptureLog, load_f
 from energy_platform.contracts.manifest import (
     Manifest,
     ManifestSyntaxError,
+    Modality,
     load_manifest,
     validate_manifest,
 )
 from energy_platform.fetch import EnvSecretResolver, Fetcher, FixtureTransport
+from energy_platform.harness.admission import write_request
+from energy_platform.harness.fixtures import FixtureError, record_from_file, record_live
+from energy_platform.harness.runner import run_target_tests
+from energy_platform.harness.scaffold import ScaffoldError, scaffold_target
+from energy_platform.harness.surface import check_target, target_dirs
 from energy_platform.runtime import (
     Runtime,
     backfill,
@@ -45,12 +55,20 @@ from energy_platform.store.unavailable import UnavailableStore
 
 app = typer.Typer(
     name="energyctl",
-    help="energy-platform command line (Phase 2: validate, capture, process, replay, gaps, demo)",
+    help=(
+        "energy-platform command line: validate, capture, process, replay, gaps, demo; "
+        "new-target, record-fixture, run-target-tests, admission-request, pr-bundle, mcp-serve"
+    ),
     no_args_is_help=True,
     pretty_exceptions_enable=False,
 )
 
 ManifestOpt = Annotated[Path, typer.Option("--manifest", "-m", help="path to a manifest.yaml")]
+TargetsRootOpt = Annotated[
+    Path,
+    typer.Option("--targets-root", envvar="ENERGY_PLATFORM_TARGETS", help="the targets/ directory"),
+]
+TargetArg = Annotated[str, typer.Argument(help="target id (directory under targets/)")]
 DsnOpt = Annotated[
     str | None,
     typer.Option("--dsn", envvar="ENERGY_PLATFORM_DSN", help="PostgreSQL DSN (>= 16, ADR-030)"),
@@ -65,6 +83,7 @@ BronzeOpt = Annotated[
 ]
 
 EXAMPLES = Path("examples")
+TARGETS = Path("targets")
 DEMO_TARGETS = ("ote_idm_soap", "ote_idm_xlsx", "ceps_load_soap")
 
 
@@ -88,6 +107,26 @@ def _manifest(path: Path) -> Manifest:
     except (ManifestSyntaxError, ValidationError, OSError) as exc:
         typer.echo(f"manifest: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+
+
+def _target_dir(root: Path, target_id: str) -> Path:
+    target = root / target_id
+    if not (target / "manifest.yaml").is_file():
+        typer.echo(f"{target}/manifest.yaml not found (energyctl new-target {target_id})", err=True)
+        raise typer.Exit(code=1)
+    return target
+
+
+def _target_manifest(root: Path, target_id: str) -> tuple[Path, Manifest]:
+    target = _target_dir(root, target_id)
+    m = _manifest(target / "manifest.yaml")
+    if m.target_id != target_id:
+        typer.echo(
+            f"manifest target_id {m.target_id!r} must equal the directory name {target_id!r}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    return target, m
 
 
 def _store(dsn: str | None, *, required: bool) -> Store:
@@ -147,12 +186,46 @@ def _instant(text: str) -> datetime:
 # ---------------------------------------------------------------------------- commands
 
 
+_EXIT = {"OK": 0, "INVALID": 1, "ADMISSION_REQUIRED": 2}
+
+
 @app.command()
-def validate(manifest: ManifestOpt) -> None:
-    """Structural + admission validation; exit 0 OK, 1 INVALID, 2 ADMISSION_REQUIRED."""
-    result = validate_manifest(_manifest(manifest))
-    _echo(result)
-    raise typer.Exit(code={"OK": 0, "INVALID": 1, "ADMISSION_REQUIRED": 2}[result.status])
+def validate(
+    target_id: Annotated[str | None, typer.Argument(help="target id under targets/")] = None,
+    manifest: Annotated[
+        Path | None, typer.Option("--manifest", "-m", help="path to a manifest.yaml")
+    ] = None,
+    all_targets: Annotated[bool, typer.Option("--all", help="every target under targets/")] = False,
+    targets_root: TargetsRootOpt = TARGETS,
+) -> None:
+    """Structural + admission validation; exit 0 OK, 1 INVALID, 2 ADMISSION_REQUIRED.
+
+    With a target id the surface rules (ADR-027, 05 A-rows) run too; `--all` is the CI gate.
+    """
+    if all_targets:
+        worst = 0
+        for target in target_dirs(targets_root):
+            worst = max(worst, _validate_target(targets_root, target.name))
+        if not target_dirs(targets_root):
+            typer.echo("validate: no targets yet — nothing to check")
+        raise typer.Exit(code=worst)
+    if (target_id is None) == (manifest is None):
+        typer.echo("give a target id or --manifest PATH (or --all)", err=True)
+        raise typer.Exit(code=1)
+    if manifest is not None:
+        result = validate_manifest(_manifest(manifest))
+        _echo(result)
+        raise typer.Exit(code=_EXIT[result.status])
+    assert target_id is not None
+    raise typer.Exit(code=_validate_target(targets_root, target_id))
+
+
+def _validate_target(root: Path, target_id: str) -> int:
+    target, m = _target_manifest(root, target_id)
+    result = validate_manifest(m)
+    surface = check_target(target)
+    _echo({"target_id": target_id, "validation": _plain(result), "surface": surface})
+    return max(_EXIT[result.status], 1 if surface else 0)
 
 
 @app.command()
@@ -272,6 +345,110 @@ def gaps_cmd(
     )
     for gap in detect_gaps(rt, lookback=timedelta(hours=lookback_hours)):
         _echo(gap)
+
+
+# ---------------------------------------------------------------------------- harness (Phase 3)
+
+
+@app.command("new-target")
+def new_target(
+    target_id: TargetArg,
+    modality: Annotated[
+        str,
+        typer.Option(
+            "--modality", help="soap-xml | dated-file | html-table | rest-json | rest-xml"
+        ),
+    ],
+    dataset: Annotated[
+        str | None, typer.Option("--dataset", help="registered dataset_id to fill from")
+    ] = None,
+    host: Annotated[str, typer.Option("--host", help="the source hostname")] = "replace-me.example",
+    with_parser: Annotated[bool, typer.Option("--with-parser", help="add a parser.py")] = False,
+    targets_root: TargetsRootOpt = TARGETS,
+) -> None:
+    """Scaffold exactly the ADR-027 surface; it is not a target until the placeholders are gone."""
+    if modality not in ("soap-xml", "dated-file", "html-table", "rest-json", "rest-xml"):
+        typer.echo(f"unknown modality {modality!r}", err=True)
+        raise typer.Exit(code=1)
+    mod = cast(Modality, modality)
+    try:
+        result = scaffold_target(
+            targets_root, target_id, mod, dataset_id=dataset, host=host, with_parser=with_parser
+        )
+    except ScaffoldError as exc:
+        typer.echo(f"new-target: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    for path in result.files:
+        typer.echo(f"wrote {path}")
+    typer.echo(f"next: fill REPLACE_ME in {result.target / 'manifest.yaml'}, then")
+    typer.echo(f"      energyctl validate {target_id}")
+    if result.admission_required:
+        typer.echo(
+            "      the dataset is not registered: energyctl admission-request "
+            f"{target_id} (ADR-022 Route B)"
+        )
+
+
+@app.command("record-fixture")
+def record_fixture(
+    target_id: TargetArg,
+    name: Annotated[str, typer.Option("--name", help="fixture name, e.g. ordinary_day")],
+    live: Annotated[bool, typer.Option("--live", help="fetch from the source (opt-in)")] = False,
+    from_file: Annotated[
+        Path | None, typer.Option("--from-file", help="wrap a saved payload offline")
+    ] = None,
+    scheduled_for: Annotated[
+        str | None, typer.Option("--scheduled-for", help="ISO 8601 instant with offset")
+    ] = None,
+    content_type: Annotated[str | None, typer.Option("--content-type")] = None,
+    targets_root: TargetsRootOpt = TARGETS,
+) -> None:
+    """Write targets/<id>/fixtures/<name>/ as a Bronze object (blob + entry.json; ADR-020)."""
+    if live == (from_file is not None):
+        typer.echo("choose exactly one of --live or --from-file PATH", err=True)
+        raise typer.Exit(code=1)
+    target, m = _target_manifest(targets_root, target_id)
+    when = _instant(scheduled_for) if scheduled_for else None
+    try:
+        if from_file is not None:
+            entry = record_from_file(
+                target, m, name, from_file, scheduled_for=when, content_type=content_type
+            )
+        else:
+            entry = record_live(target, m, name, scheduled_for=when)
+    except (FixtureError, OSError, FileNotFoundError) as exc:
+        typer.echo(f"record-fixture: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    _echo(entry)
+
+
+@app.command("run-target-tests")
+def run_target_tests_cmd(target_id: TargetArg, targets_root: TargetsRootOpt = TARGETS) -> None:
+    """Surface rules, every golden through the platform, then the target's own pytest module."""
+    target, _ = _target_manifest(targets_root, target_id)
+    report = run_target_tests(target)
+    for line in report.lines():
+        typer.echo(line)
+    if report.pytest_output:
+        typer.echo(report.pytest_output.rstrip())
+    raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command("admission-request")
+def admission_request(
+    target_id: TargetArg,
+    out_dir: Annotated[Path, typer.Option("--out", help="docs/admissions/")] = Path(
+        "docs/admissions"
+    ),
+    targets_root: TargetsRootOpt = TARGETS,
+) -> None:
+    """Route B (ADR-022): write docs/admissions/<id>.md listing exactly what is unregistered."""
+    _, m = _target_manifest(targets_root, target_id)
+    result = validate_manifest(m)
+    path = write_request(m, out_dir)
+    typer.echo(f"wrote {path} ({result.status})")
+    if result.status == "OK":
+        typer.echo("nothing is missing: this target can go Route A", err=True)
 
 
 # ---------------------------------------------------------------------------- demo

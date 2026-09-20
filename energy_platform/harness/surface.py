@@ -66,7 +66,7 @@ FORBIDDEN_TOKENS: dict[str, re.Pattern[str]] = {
 }
 
 # A scaffold is not a target (05 C-13). Applied to manifest, parser, tests and goldens.
-PLACEHOLDER = re.compile(r"\b(REPLACE_ME|TODO|FIXME)\b")
+PLACEHOLDER = re.compile(r"\b(REPLACE_ME|replace-me|TODO|FIXME)\b")
 PLACEHOLDER_FILES = re.compile(r"^(manifest\.yaml|parser\.py|tests/.*)$")
 
 # Names a parser may not define again: the platform already has them (05 C-06).

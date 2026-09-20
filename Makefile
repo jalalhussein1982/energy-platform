@@ -102,5 +102,9 @@ demo: sync ## fixture → capture → Bronze → parse → map → Postgres → 
 fixtures: sync ## Regenerate examples/fixtures (synthetic Bronze objects, deterministic)
 	$(RUN) python -m scripts.make_example_fixtures
 
-new-target: ## energyctl new-target <id> --modality <m>
-	@echo "new-target: not implemented until Phase 3 (energyctl new-target)"; exit 1
+new-target: sync ## energyctl new-target ID=<id> MODALITY=<m> [DATASET=<dataset_id>]
+	@test -n "$(ID)" -a -n "$(MODALITY)" || { echo "usage: make new-target ID=<id> MODALITY=<modality> [DATASET=<dataset_id>]"; exit 2; }
+	$(RUN) python -m energy_platform.cli new-target $(ID) --modality $(MODALITY) $(if $(DATASET),--dataset $(DATASET),)
+
+validate-targets: sync ## energyctl validate --all: admission + surface for every target (05 B-rows)
+	$(RUN) python -m energy_platform.cli validate --all
