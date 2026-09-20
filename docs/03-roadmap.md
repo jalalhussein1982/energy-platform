@@ -27,7 +27,7 @@
 | Phase | Name | Step in §3 of 02 | Sessions (est.) | Gate |
 |---|---|---|---|---|
 | 0 | Repository bootstrap | 3 | 1 | `make check` green on empty package — **done 2026-09-19** |
-| 1 | Contracts (ADR-011, ADR-013 → `docs/04-contracts.md`) | 3 | 1–2 | six example manifests validate; DST property tests pass |
+| 1 | Contracts (ADR-011, ADR-013 → `docs/04-contracts.md`) | 3 | 1–2 | six example manifests validate; DST property tests pass — **done 2026-09-20** |
 | 2 | Platform core library | 3 | 3–4 | `make demo` runs on fixtures end-to-end into Postgres |
 | 3 | Harness: CLI, MCP, CI gates | 3 | 2–3 | one bad PR per failure mode is rejected |
 | 4 | Committed-target verification through the harness (01 §3) | 4 | 1–2 | T1, T2, T3, E1 green on fixtures; nightly live smoke defined |
@@ -62,19 +62,19 @@
 
 ## Phase 1 — Contracts
 
-**Goal.** The two sides of the one contract: what a source looks like (manifest) and what the destination looks like (canonical schema). Everything later is mapping between them.
+**Goal.** The two sides of the one contract: what a source looks like (manifest) and what the destination looks like (canonical schema). Everything later is mapping between them. **Done 2026-09-20** (`docs/plans/phase-1.md`, `docs/04-contracts.md`, `docs/progress.md`).
 
 **Deliverables.**
-- [ ] ADRs resolving B-1, B-2, B-3, B-6 — *filed 2026-09-19 as ADR-017, ADR-018, ADR-019, ADR-020*, amended the same day by ADR-022 (registries), ADR-023 (derivation identity), ADR-026 (host registry, `allow_insecure`), ADR-027 (decoded parser input, import allowlist); this phase implements them and may amend by a new ADR only.
-- [ ] `docs/04-contracts.md` = ADR-011 (canonical schema) + ADR-013 (manifest schema), written together.
-- [ ] `energy_platform/contracts/observation.py` — `EnergyObservation` (bitemporal: `delivery_interval` as `tstzrange`-equivalent; `source_published_at` (nullable), `fetched_at`, `processed_at`; `source_version`, `contract_version`, `derivation_id`; `unit`, `sign_convention`), plus the version identity / upsert key per ADR-023 *(2026-09-19: field names corrected to ADR-018/ADR-023; `published_at`/`observed_at` were wrong)*.
-- [ ] `energy_platform/contracts/registry.py` — dataset registry (`dataset_id`, identity key, metric set with unit/sign/null meaning, `contract_version`) seeded from `01` §6.3/§9 for T1, T2, T3, E1; `energy_platform/contracts/hosts.py` — host registry (host, allowed ports, `allow_insecure`) seeded with the `01` §3 hosts. Both under CODEOWNERS (ADR-022, ADR-026).
-- [ ] `energy_platform/contracts/manifest.py` — Pydantic model + exported JSON Schema (`schemas/manifest.v1.json`), mandatory `license`, `terms_url`, `allowed_hosts` (each ⊆ host registry), modality-specific `fetch` block, `contract` block (`dataset_id` ∈ registry, `metrics` ⊆ registered set, `decode`), `mapping` block, `cadence`, `history.max_age` (ADR-024), `allow_insecure` (ADR-026).
-- [ ] `energy_platform/contracts/parser.py` — `Parser` protocol (input: `DecodedDocument`, produced by the platform per `contract.decode`; output: `Iterable[SourceRecord]`), nothing else (ADR-027 §2).
-- [ ] **Six** example manifests validating against the schema: three real committed contracts from `01-data-scope.md` §3 (soap-xml = T1 `GetImPricePeriodE`; dated-file with HTML discovery step = T2; a second soap-xml = T3 ČEPS `Load`) and three **shape-only** (html-table; rest-json-keyed = ENTSO-E's shape, class B, optional; rest-xml-ratelimited). Every modality of the matrix appears at least once. Nothing is fetched in this phase. *(2026-09-19: count fixed after review F14 — "five" undercounted because T1 and T3 share a modality.)*
-- [ ] `docs/04-contracts.md` takes 01 §6–§9 as its source: envelope fields, `dataset_id` registry with identity keys, metric registry with units/sign/null meaning, revision and ordering rules. No field invented, none dropped.
-- [ ] Property tests: DST spring (92 intervals) and autumn (100 intervals) days; interval-start vs interval-end mapping; sign inversion; decimal-comma parsing.
-- [ ] Negative validation tests: unregistered `dataset_id`, unregistered metric, host not in registry, `http` without `allow_insecure`, `ADMISSION_REQUIRED` result shape (ADR-022 §2).
+- [x] ADRs resolving B-1, B-2, B-3, B-6 — *filed 2026-09-19 as ADR-017, ADR-018, ADR-019, ADR-020*, amended the same day by ADR-022 (registries), ADR-023 (derivation identity), ADR-026 (host registry, `allow_insecure`), ADR-027 (decoded parser input, import allowlist); this phase implements them and may amend by a new ADR only.
+- [x] `docs/04-contracts.md` = ADR-011 (canonical schema) + ADR-013 (manifest schema), written together.
+- [x] `energy_platform/contracts/observation.py` — `EnergyObservation` (bitemporal: `delivery_interval` as `tstzrange`-equivalent; `source_published_at` (nullable), `fetched_at`, `processed_at`; `source_version`, `contract_version`, `derivation_id`; `unit`, `sign_convention`), plus the version identity / upsert key per ADR-023 *(2026-09-19: field names corrected to ADR-018/ADR-023; `published_at`/`observed_at` were wrong)*.
+- [x] `energy_platform/contracts/registry.py` — dataset registry (`dataset_id`, identity key, metric set with unit/sign/null meaning, `contract_version`) seeded from `01` §6.3/§9 for T1, T2, T3, E1; `energy_platform/contracts/hosts.py` — host registry (host, allowed ports, `allow_insecure`) seeded with the `01` §3 hosts. Both under CODEOWNERS (ADR-022, ADR-026).
+- [x] `energy_platform/contracts/manifest.py` — Pydantic model + exported JSON Schema (`schemas/manifest.v1.json`), mandatory `license`, `terms_url`, `allowed_hosts` (each ⊆ host registry), modality-specific `fetch` block, `contract` block (`dataset_id` ∈ registry, `metrics` ⊆ registered set, `decode`), `mapping` block, `cadence`, `history.max_age` (ADR-024), `allow_insecure` (ADR-026).
+- [x] `energy_platform/contracts/parser.py` — `Parser` protocol (input: `DecodedDocument`, produced by the platform per `contract.decode`; output: `Iterable[SourceRecord]`), nothing else (ADR-027 §2).
+- [x] **Six** example manifests validating against the schema: three real committed contracts from `01-data-scope.md` §3 (soap-xml = T1 `GetImPricePeriodE`; dated-file with HTML discovery step = T2; a second soap-xml = T3 ČEPS `Load`) and three **shape-only** (html-table; rest-json-keyed = a token-keyed JSON API via `secretRef`; rest-xml-ratelimited = ENTSO-E's shape, class B, optional — *2026-09-20: ENTSO-E serves XML, so it is the rest-xml example, plan P1-D5*). Every modality of the matrix appears at least once. Nothing is fetched in this phase. *(2026-09-19: count fixed after review F14 — "five" undercounted because T1 and T3 share a modality.)*
+- [x] `docs/04-contracts.md` takes 01 §6–§9 as its source: envelope fields, `dataset_id` registry with identity keys, metric registry with units/sign/null meaning, revision and ordering rules. No field invented, none dropped.
+- [x] Property tests: DST spring (92 intervals) and autumn (100 intervals) days; interval-start vs interval-end mapping; sign inversion; decimal-comma parsing.
+- [x] Negative validation tests: unregistered `dataset_id`, unregistered metric, host not in registry, `http` without `allow_insecure`, `ADMISSION_REQUIRED` result shape (ADR-022 §2).
 
 **Do not.** Write fetch or persistence code. Do not fetch from the network.
 

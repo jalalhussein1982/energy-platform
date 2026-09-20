@@ -4,6 +4,30 @@ One dated entry per session. Newest first.
 
 ---
 
+## 2026-09-20 — Phase 1: contracts (package, schema, six example manifests)
+
+**Done** (`docs/plans/phase-1.md`, 11 commits, `make check` green at each): ADR-029 (typing stubs for allowlisted packages are dev deps); runtime deps `pydantic`, `pyyaml`, `tzdata` locked and allowlisted (ADR-019); `energy_platform/contracts/` — `intervals.py` (DST-safe local-day tiling, 92/96/100 by construction; index → interval; timestamp + `interval_label`), `decimals.py` (explicit dot/comma, quarantine on ambiguity, sign inversion), `registry.py` (`ote.idm_continuous`, `ote.dam`, `ceps.load` with identity keys, fixed/constrained dimensions, metric unit/currency/sign/NULL-meaning/owner transport), `hosts.py` (`www.ote-cr.cz`, `www.ceps.cz`), `observation.py` (`EnergyObservation` validated against the registry; `observation_identity`, `version_identity`, `derivation_id`), `parser.py` (`DecodedDocument` shapes, `SourceRecord`, `Parser`), `manifest.py` (model, YAML-subset loader, structural + admission validation with `ADMISSION_REQUIRED` gaps); `schemas/manifest.v1.json` exported by `make schema` with a staleness test; `examples/manifests/` — T1, T2, T3 admitted, html-table admitted, rest-json and ENTSO-E rest-xml return `ADMISSION_REQUIRED`; `docs/04-contracts.md`. 151 new tests (property tests with Hypothesis).
+
+**Formalisations recorded in the plan (P1-D1 … P1-D7):** Silver rows are metric-long (identity = 01 §6.3 key ⊕ `metric` ⊕ `source_version`); the ceps.load `version` dimension is bound to `source_version`; `fetch` is keyed by modality; example manifests live in `examples/`, not `targets/`; ENTSO-E is the rest-xml example (roadmap wording fixed); `decimal_separator` is explicit; stubs via ADR-029. None adds a field 01 does not name.
+
+**Learned.** ruff 0.16 formats Python blocks inside Markdown (`make check` covers docs; pseudo-code blocks are tagged `text`). On this path the editable install is not visible to `python scripts/x.py` but is to `python -m scripts.x`; the `schema` Make target uses `-m`. Task 1.2 (04-contracts) was written after the code modules so it documents the shipped field names rather than a draft.
+
+**Open / carried.** F13 (ČEPS `interval_label: start` `[UNVERIFIED]`) stays a Phase 4 task; the T3 example carries the note. The transport check in `validate_manifest` accepts a non-owning transport delivering an owned metric (01 §3 rule 2: stored and reconciled) — the reconciliation itself is Phase 2. `ValidationResult` is what Phase 3 `energyctl validate` prints. No new open decision.
+
+**Next prompt** (03 Phase 2 starter, verbatim):
+
+```text
+Read CLAUDE.md, docs/02-architecture-decisions.md, docs/adr/ADR-003-rev-orchestration-without-crds.md,
+ADR-016, ADR-023, ADR-024, ADR-026 (fetch layer), docs/04-contracts.md and docs/03-roadmap.md Phase 2.
+Plan into docs/plans/phase-2.md. Implement the library in the order fetch → bronze → parse → mapping →
+silver → ledger → replay/gaps → CLI, committing per module with tests. Every migration has a downgrade
+script. `make demo` must run offline. Stop when it does.
+```
+
+The D-2 ADR (Postgres engine: plain vs TimescaleDB) is written before the Phase 2 schema is created.
+
+---
+
 ## 2026-09-19 — ADR-028: demo environment (docs only, no platform code)
 
 **Why.** Roadmap Phase 5 had the tenant profile running for real on the e-INFRA Rancher cluster. e-INFRA CZ terms cover research and education; this is a commercial deliverable, so a scheduled workload there is out of policy. One-off probes (V-4 … V-10) stay.
