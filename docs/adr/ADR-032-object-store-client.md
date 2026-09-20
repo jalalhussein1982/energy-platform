@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ACCEPTED — Option B (2026-09-20, author's decision); implementation is the first task of the next session |
+| Status | ACCEPTED — Option B (2026-09-20, author's decision); **implemented 2026-09-20** (`energy_platform/fetch/objectstore.py`, `energy_platform/bronze/s3.py`; plan `docs/plans/phase-2.md` Task 2.10, P2-D15 … P2-D20) |
 | Date | 2026-09-20 |
 | Resolves | amends ADR-019 (dependency allowlist) and ADR-027 §3 (outbound HTTP only in `fetch/`) for the Bronze S3 backend of `03` Phase 2 |
 | Supersedes | — |

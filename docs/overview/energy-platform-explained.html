@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Energy Data Platform, explained simply</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color: #1d2a33; font-size: 11.2pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 26pt; margin: 0 0 6pt 0; letter-spacing: -0.3pt; }
+  h2 { font-size: 17pt; margin: 0 0 8pt 0; color: #0f3d5c; border-bottom: 2px solid #d7e3ea; padding-bottom: 4pt; }
+  h3 { font-size: 12.5pt; margin: 12pt 0 4pt 0; color: #0f3d5c; }
+  p { margin: 0 0 7pt 0; }
+  .sub { color: #5b6b76; font-size: 12pt; margin-bottom: 14pt; }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  .lead { background: #eef5f9; border-left: 4px solid #2b7bb9; padding: 9pt 12pt; margin: 10pt 0 12pt 0; }
+  ul { margin: 4pt 0 8pt 0; padding-left: 18pt; }
+  li { margin-bottom: 3pt; }
+  .two { display: flex; gap: 14pt; }
+  .two > div { flex: 1; }
+  .card { border: 1px solid #d7e3ea; border-radius: 6pt; padding: 8pt 10pt; margin-bottom: 8pt; background: #fbfdfe; }
+  .card b { color: #0f3d5c; }
+  table { border-collapse: collapse; width: 100%; font-size: 10.3pt; margin: 6pt 0 10pt 0; }
+  th, td { border: 1px solid #d7e3ea; padding: 5pt 7pt; text-align: left; vertical-align: top; }
+  th { background: #eef5f9; }
+  .done { color: #1a7f4b; font-weight: 600; }
+  .next { color: #a35a00; font-weight: 600; }
+  .fig { margin: 8pt 0 6pt 0; }
+  .fig svg { width: 100%; height: auto; display: block; }
+  .cap { font-size: 9.6pt; color: #5b6b76; margin: 2pt 0 10pt 0; }
+  .small { font-size: 9.8pt; color: #5b6b76; }
+  .kicker { font-size: 9.5pt; text-transform: uppercase; letter-spacing: 1pt; color: #2b7bb9; font-weight: 600; margin-bottom: 4pt; }
+  .toc li { margin-bottom: 2pt; }
+  /* svg shared styles */
+  .box { fill: #ffffff; stroke: #2b7bb9; stroke-width: 1.6; rx: 8; }
+  .box2 { fill: #eef5f9; stroke: #2b7bb9; stroke-width: 1.6; rx: 8; }
+  .store { fill: #fff7e6; stroke: #c98a1e; stroke-width: 1.6; rx: 8; }
+  .warn { fill: #fdecec; stroke: #c0392b; stroke-width: 1.6; rx: 8; }
+  .ok { fill: #e8f6ee; stroke: #1a7f4b; stroke-width: 1.6; rx: 8; }
+  .grey { fill: #f2f4f6; stroke: #8a99a5; stroke-width: 1.4; rx: 8; }
+  .t { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 12px; fill: #1d2a33; }
+  .tb { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 13px; font-weight: 700; fill: #0f3d5c; }
+  .ts { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 10.5px; fill: #5b6b76; }
+  .tw { font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 11px; fill: #c0392b; font-weight: 700; }
+  .arrow { stroke: #2b7bb9; stroke-width: 1.8; fill: none; marker-end: url(#ah); }
+  .arrowr { stroke: #c0392b; stroke-width: 1.6; fill: none; marker-end: url(#ahr); stroke-dasharray: 5 4; }
+  .arrowg { stroke: #1a7f4b; stroke-width: 1.8; fill: none; marker-end: url(#ahg); }
+  .line { stroke: #8a99a5; stroke-width: 1.2; stroke-dasharray: 4 4; fill: none; }
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER / SUMMARY ============================ -->
+<section class="page">
+  <div class="kicker">Energy data platform</div>
+  <h1>Collecting Czech intraday energy data, reliably, so anyone can add a new source</h1>
+  <div class="sub">A plain-language explanation of what we built, how it works, and how we got there. 19 September 2026.</div>
+
+  <div class="lead">
+    <b>In one minute.</b> Electricity is traded and consumed in 15-minute blocks. Public websites publish prices and grid load for each block, but each site does it differently. We designed a system that downloads that data every few minutes, keeps the original files forever, converts everything into one clean table, and keeps working when a website, a server or a database fails. The part we care about most: a new person, or an AI assistant, can add a new data source by filling in a short "recipe", and automatic checks stop the common mistakes before a human even looks at it.
+  </div>
+
+  <h3>What this document covers</h3>
+  <ul class="toc">
+    <li><b>1. The task</b> in plain words, and what data we chose.</li>
+    <li><b>2. How the data flows</b> from a website to a clean table (diagram).</li>
+    <li><b>3. How it keeps working when things break</b> (diagram).</li>
+    <li><b>4. How someone new adds a data source</b> (diagram).</li>
+    <li><b>5. The guardrails</b>: what an automatic check stops, and why (diagram).</li>
+    <li><b>6. Where it runs and how updates are made safe</b> (diagram).</li>
+    <li><b>7. How we worked</b>, including an independent review that found real gaps (diagram).</li>
+    <li><b>8. Where we are now</b> and what comes next. Honest status.</li>
+    <li><b>9. Five words we could not avoid</b>, explained.</li>
+  </ul>
+
+  <h3>Three ideas that shape everything</h3>
+  <div class="two">
+    <div class="card"><b>Keep the original.</b> Every file we download is stored exactly as received, in two places. If we ever misread a file, we fix the reader and re-run from the archive. Nothing is lost.</div>
+    <div class="card"><b>The recipe is data, not code.</b> Adding a source means describing it (where, how often, what the columns mean) in a short file. The platform does the fetching and the converting. Newcomers cannot break the core because they never touch it.</div>
+    <div class="card"><b>Make the wrong thing fail.</b> Rules that live only in a document get ignored. Every rule we care about has an automatic check, and a test that proves the check actually rejects a bad change.</div>
+  </div>
+</section>
+
+<!-- ============================ 1. THE TASK ============================ -->
+<section class="page">
+  <h2>1. The task, in plain words</h2>
+  <p>The assignment asked for a system that <b>collects public intraday energy data</b>, keeps running even when parts of it fail ("high availability"), can be <b>set up from code</b> on a fresh environment, and, most importantly, is built so that <b>someone else can add a new data source easily</b>, whether that someone is a junior engineer or an AI coding assistant, without introducing sloppy engineering. The brief was deliberately vague about which data. Finding that out was part of the job.</p>
+
+  <h3>What data we chose, and why</h3>
+  <table>
+    <tr><th style="width:26%">Source</th><th>What it gives us</th><th style="width:30%">Why it is a good first target</th></tr>
+    <tr><td><b>OTE</b>, the Czech electricity market operator (web service)</td><td>For every 15-minute block of the day: the average traded price and the traded volume on the continuous intraday market.</td><td>Public, no login, documented by OTE itself. The core of "intraday energy data".</td></tr>
+    <tr><td><b>OTE</b>, same market, daily spreadsheet</td><td>The same blocks plus extra detail: buy and sell volumes, lowest, highest and last price.</td><td>Richer numbers; also a good test that two feeds of the same thing agree.</td></tr>
+    <tr><td><b>ČEPS</b>, the Czech grid operator (web service)</td><td>Electricity consumption ("load") of the whole country, per 15 minutes.</td><td>Physical reality to compare against market prices. Public and documented.</td></tr>
+    <tr><td><b>OTE</b> day-ahead market (web service)</td><td>Yesterday's auction prices for today.</td><td>Not built by us directly: it is the demo of "someone else adds a source".</td></tr>
+  </table>
+
+  <h3>What we deliberately left out</h3>
+  <ul>
+    <li><b>Exchanges that require a paid licence</b> (for example EPEX). The system refuses any source whose licence field is missing or marked "restricted".</li>
+    <li><b>Scraping web pages that forbid it.</b> ČEPS's website asks robots not to crawl it, so we use only its official data service.</li>
+    <li><b>Anything behind a login, captcha or rate limit</b> we would have to work around.</li>
+    <li><b>Redistributing the downloaded files</b> until the publishers confirm it is allowed. Our test files are look-alikes with the same shape, not copies.</li>
+  </ul>
+
+  <h3>A few things about this data that are easy to get wrong</h3>
+  <ul>
+    <li><b>Clock changes.</b> Twice a year a day has 23 or 25 hours, so 92 or 100 blocks instead of 96. The spreadsheet even repeats the label "02:00" in autumn. We count blocks from the calendar, never from the label.</li>
+    <li><b>Decimal commas.</b> Czech pages write 170,13 where a computer expects 170.13. We convert explicitly and never guess.</li>
+    <li><b>Empty is not zero.</b> A blank price means "no trade" or "not published yet", never 0 EUR.</li>
+    <li><b>Late corrections.</b> Publishers revise numbers. We keep every version and mark which one is current, instead of overwriting.</li>
+  </ul>
+</section>
+
+<!-- ============================ 2. DATA FLOW ============================ -->
+<section class="page">
+  <h2>2. How the data flows</h2>
+  <p>Five steps, always in this order. The key rule: <b>save the original before doing anything clever with it.</b></p>
+
+  <div class="fig">
+  <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="ah" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#2b7bb9"/></marker>
+      <marker id="ahr" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#c0392b"/></marker>
+      <marker id="ahg" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#1a7f4b"/></marker>
+    </defs>
+    <!-- sources -->
+    <rect class="grey" x="10" y="40" width="120" height="110"/>
+    <text class="tb" x="70" y="62" text-anchor="middle">Public websites</text>
+    <text class="t" x="70" y="84" text-anchor="middle">OTE market</text>
+    <text class="t" x="70" y="102" text-anchor="middle">ČEPS grid</text>
+    <text class="ts" x="70" y="126" text-anchor="middle">new ones added</text>
+    <text class="ts" x="70" y="140" text-anchor="middle">by a recipe file</text>
+    <!-- 1 fetch -->
+    <path class="arrow" d="M130 95 L160 95"/>
+    <rect class="box" x="162" y="55" width="110" height="80"/>
+    <text class="tb" x="217" y="80" text-anchor="middle">1. Fetch</text>
+    <text class="t" x="217" y="100" text-anchor="middle">every 15 min</text>
+    <text class="ts" x="217" y="118" text-anchor="middle">polite, with timeouts</text>
+    <!-- 2 archive -->
+    <path class="arrow" d="M272 95 L302 95"/>
+    <rect class="store" x="304" y="40" width="130" height="110"/>
+    <text class="tb" x="369" y="64" text-anchor="middle">2. Raw archive</text>
+    <text class="t" x="369" y="84" text-anchor="middle">file kept exactly</text>
+    <text class="t" x="369" y="100" text-anchor="middle">as received, forever</text>
+    <text class="ts" x="369" y="122" text-anchor="middle">two copies, in two</text>
+    <text class="ts" x="369" y="136" text-anchor="middle">separate places</text>
+    <!-- 3 process -->
+    <path class="arrow" d="M434 95 L464 95"/>
+    <rect class="box" x="466" y="55" width="120" height="80"/>
+    <text class="tb" x="526" y="78" text-anchor="middle">3. Process</text>
+    <text class="t" x="526" y="97" text-anchor="middle">read, check units,</text>
+    <text class="t" x="526" y="113" text-anchor="middle">fix time zones</text>
+    <!-- 4 database -->
+    <path class="arrow" d="M586 95 L616 95"/>
+    <rect class="store" x="618" y="40" width="130" height="110"/>
+    <text class="tb" x="683" y="64" text-anchor="middle">4. Clean table</text>
+    <text class="t" x="683" y="84" text-anchor="middle">one format for</text>
+    <text class="t" x="683" y="100" text-anchor="middle">every source</text>
+    <text class="ts" x="683" y="122" text-anchor="middle">database, backed up,</text>
+    <text class="ts" x="683" y="136" text-anchor="middle">every version kept</text>
+    <!-- 5 users -->
+    <path class="arrow" d="M683 150 L683 190"/>
+    <rect class="box2" x="608" y="192" width="142" height="60"/>
+    <text class="tb" x="679" y="214" text-anchor="middle">5. People and tools</text>
+    <text class="t" x="679" y="232" text-anchor="middle">dashboards, analysis,</text>
+    <text class="t" x="679" y="246" text-anchor="middle">queries</text>
+    <!-- replay loop -->
+    <path class="arrowg" d="M369 150 L369 230 L466 230"/>
+    <rect class="ok" x="468" y="200" width="118" height="60"/>
+    <text class="tb" x="527" y="222" text-anchor="middle">Re-run</text>
+    <text class="t" x="527" y="240" text-anchor="middle">from the archive</text>
+    <text class="t" x="527" y="254" text-anchor="middle">after a fix</text>
+    <path class="arrowg" d="M527 200 L527 137"/>
+    <!-- notes -->
+    <text class="ts" x="10" y="290">Step 2 is what makes everything else safe: if step 3 has a bug, we fix the reader and re-run. The original files never change.</text>
+    <text class="ts" x="10" y="308">Step 4 never overwrites: a corrected number is added as a new version, and the old one stays visible for audit.</text>
+  </svg>
+  </div>
+  <div class="cap">Diagram 1. From a public website to a clean, queryable table. Green: the repair path that the archive makes possible.</div>
+
+  <h3>What "one format for every source" means</h3>
+  <p>Every row in the clean table answers the same questions: which 15-minute block (in universal time, with the local date and block number kept alongside), which source, which measurement, which unit, when the publisher said it was valid, when we fetched it, and which version of our reader produced it. Because every source lands in this shape, a dashboard built for OTE prices works unchanged for any source added later.</p>
+</section>
+
+<!-- ============================ 3. RESILIENCE ============================ -->
+<section class="page">
+  <h2>3. How it keeps working when things break</h2>
+  <p>"High availability" here does not mean a big cluster that never goes down. It means: <b>no single failure loses data, and no manual step is needed to recover.</b> Each 15-minute run is a small job with checkpoints. Whatever fails, the next run knows where to pick up.</p>
+
+  <div class="fig">
+  <svg viewBox="0 0 760 360" xmlns="http://www.w3.org/2000/svg">
+    <!-- checkpoint chain -->
+    <rect class="box" x="10" y="30" width="120" height="56"/>
+    <text class="tb" x="70" y="53" text-anchor="middle">Fetch</text>
+    <text class="ts" x="70" y="72" text-anchor="middle">from the website</text>
+    <path class="arrow" d="M130 58 L165 58"/>
+    <rect class="store" x="167" y="30" width="130" height="56"/>
+    <text class="tb" x="232" y="53" text-anchor="middle">Save the original</text>
+    <text class="ts" x="232" y="72" text-anchor="middle">checkpoint ✓ safe</text>
+    <path class="arrow" d="M297 58 L332 58"/>
+    <rect class="box" x="334" y="30" width="120" height="56"/>
+    <text class="tb" x="394" y="53" text-anchor="middle">Note it down</text>
+    <text class="ts" x="394" y="72" text-anchor="middle">in the run log</text>
+    <path class="arrow" d="M454 58 L489 58"/>
+    <rect class="box" x="491" y="30" width="120" height="56"/>
+    <text class="tb" x="551" y="53" text-anchor="middle">Process</text>
+    <text class="ts" x="551" y="72" text-anchor="middle">read and convert</text>
+    <path class="arrow" d="M611 58 L646 58"/>
+    <rect class="store" x="648" y="30" width="102" height="56"/>
+    <text class="tb" x="699" y="53" text-anchor="middle">Store results</text>
+    <text class="ts" x="699" y="72" text-anchor="middle">all-or-nothing</text>
+
+    <!-- failure cards -->
+    <rect class="warn" x="10" y="120" width="175" height="100"/>
+    <text class="tw" x="97" y="140" text-anchor="middle">Website is down</text>
+    <text class="t" x="20" y="160">Logged as "source</text>
+    <text class="t" x="20" y="176">unavailable", not as our</text>
+    <text class="t" x="20" y="192">failure. Next run retries.</text>
+    <text class="ts" x="20" y="210">Alerts say which it was.</text>
+
+    <rect class="warn" x="200" y="120" width="175" height="100"/>
+    <text class="tw" x="287" y="140" text-anchor="middle">Our job crashes mid-way</text>
+    <text class="t" x="210" y="160">If the original was saved,</text>
+    <text class="t" x="210" y="176">the next run finds it and</text>
+    <text class="t" x="210" y="192">finishes the work.</text>
+    <text class="ts" x="210" y="210">If not, it simply fetches again.</text>
+
+    <rect class="warn" x="390" y="120" width="175" height="100"/>
+    <text class="tw" x="477" y="140" text-anchor="middle">Database is down</text>
+    <text class="t" x="400" y="160">Fetching and saving the</text>
+    <text class="t" x="400" y="176">original do not need it.</text>
+    <text class="t" x="400" y="192">Processing catches up later.</text>
+    <text class="ts" x="400" y="210">No observation is lost.</text>
+
+    <rect class="warn" x="580" y="120" width="170" height="100"/>
+    <text class="tw" x="665" y="140" text-anchor="middle">Two jobs run at once</text>
+    <text class="t" x="590" y="160">Only one holds the "ticket"</text>
+    <text class="t" x="590" y="176">for that run. The other's</text>
+    <text class="t" x="590" y="192">results are discarded.</text>
+    <text class="ts" x="590" y="210">No duplicates.</text>
+
+    <!-- gap detector -->
+    <rect class="box2" x="10" y="250" width="740" height="95"/>
+    <text class="tb" x="20" y="272">A watchdog checks the calendar every cycle: "do we have every 15-minute block we expect?"</text>
+    <text class="t" x="20" y="294">• Block was never fetched  →  fetch it now, if the publisher still offers it; otherwise raise a clear alert ("unrecoverable").</text>
+    <text class="t" x="20" y="312">• Block was fetched but never processed  →  process it from the archive. No new download.</text>
+    <text class="t" x="20" y="330">• Our reader had a bug  →  re-run the affected blocks from the archive with the fixed reader; corrected rows are added, old ones kept.</text>
+  </svg>
+  </div>
+  <div class="cap">Diagram 2. Checkpoints in every run, and what happens at each kind of failure. Nothing here needs a person at 3 a.m.</div>
+
+  <h3>How we know it works, rather than hope</h3>
+  <ul>
+    <li><b>Freshness is the measure.</b> The dashboard does not show "is the server up"; it shows "how old is the newest data for each source, compared with when the publisher should have released it". That is the number an operator cares about.</li>
+    <li><b>Drills, on a schedule.</b> A restore from backup and a rollback of a bad release are run automatically and checked. A backup that has never been restored is a guess.</li>
+    <li><b>Each failure above becomes a test</b> that is run on every code change, with the network and database simulated.</li>
+  </ul>
+</section>
+
+<!-- ============================ 4. ADDING A SOURCE ============================ -->
+<section class="page">
+  <h2>4. How someone new adds a data source</h2>
+  <p>This is the heart of the assignment. The newcomer, human or AI, never writes downloading or conversion code. They fill in a <b>recipe</b> (a short text file), record a <b>sample</b>, and write down the <b>expected values</b> they checked by hand. Everything else is the platform's job.</p>
+
+  <div class="fig">
+  <svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg">
+    <rect class="box2" x="10" y="20" width="140" height="60"/>
+    <text class="tb" x="80" y="45" text-anchor="middle">Newcomer</text>
+    <text class="ts" x="80" y="64" text-anchor="middle">junior or AI assistant</text>
+    <path class="arrow" d="M150 50 L185 50"/>
+    <rect class="box" x="187" y="20" width="150" height="60"/>
+    <text class="tb" x="262" y="42" text-anchor="middle">One command</text>
+    <text class="t" x="262" y="60" text-anchor="middle">creates a folder</text>
+    <text class="ts" x="262" y="74" text-anchor="middle">with templates inside</text>
+    <path class="arrow" d="M337 50 L372 50"/>
+    <rect class="box" x="374" y="20" width="170" height="60"/>
+    <text class="tb" x="459" y="42" text-anchor="middle">Fill in the recipe</text>
+    <text class="t" x="459" y="60" text-anchor="middle">where, how often, licence,</text>
+    <text class="ts" x="459" y="74" text-anchor="middle">what each column means</text>
+    <path class="arrow" d="M544 50 L579 50"/>
+    <rect class="box" x="581" y="20" width="170" height="60"/>
+    <text class="tb" x="666" y="42" text-anchor="middle">Record a sample</text>
+    <text class="t" x="666" y="60" text-anchor="middle">+ write expected values</text>
+    <text class="ts" x="666" y="74" text-anchor="middle">checked by hand</text>
+
+    <!-- down to PR -->
+    <path class="arrow" d="M666 80 L666 115"/>
+    <rect class="box" x="581" y="117" width="170" height="50"/>
+    <text class="tb" x="666" y="138" text-anchor="middle">Propose the change</text>
+    <text class="ts" x="666" y="156" text-anchor="middle">a "pull request"</text>
+    <path class="arrow" d="M581 142 L546 142"/>
+    <rect class="box" x="374" y="117" width="170" height="50"/>
+    <text class="tb" x="459" y="138" text-anchor="middle">Automatic checks</text>
+    <text class="ts" x="459" y="156" text-anchor="middle">see section 5</text>
+    <!-- fail branch -->
+    <path class="arrowr" d="M459 167 L459 200"/>
+    <rect class="warn" x="374" y="202" width="170" height="44"/>
+    <text class="tw" x="459" y="220" text-anchor="middle">Something is wrong</text>
+    <text class="t" x="459" y="237" text-anchor="middle">clear message, fix and retry</text>
+    <!-- pass -->
+    <path class="arrowg" d="M374 142 L339 142"/>
+    <rect class="box" x="187" y="117" width="150" height="50"/>
+    <text class="tb" x="262" y="138" text-anchor="middle">Human review</text>
+    <text class="ts" x="262" y="156" text-anchor="middle">looks at the expected values</text>
+    <path class="arrowg" d="M187 142 L152 142"/>
+    <rect class="ok" x="10" y="117" width="140" height="50"/>
+    <text class="tb" x="80" y="138" text-anchor="middle">Live</text>
+    <text class="ts" x="80" y="156" text-anchor="middle">scheduler picks it up</text>
+
+    <!-- escalation lane -->
+    <line class="line" x1="10" y1="275" x2="750" y2="275"/>
+    <text class="ts" x="10" y="292">If the source is entirely new to the platform (a kind of data or a website nobody approved yet):</text>
+    <rect class="box2" x="10" y="305" width="220" height="70"/>
+    <text class="tb" x="120" y="327" text-anchor="middle">The checks say "needs approval"</text>
+    <text class="t" x="120" y="346" text-anchor="middle">and list exactly what is missing</text>
+    <text class="ts" x="120" y="363" text-anchor="middle">(licence, units, website)</text>
+    <path class="arrow" d="M230 340 L265 340"/>
+    <rect class="box" x="267" y="305" width="220" height="70"/>
+    <text class="tb" x="377" y="327" text-anchor="middle">Newcomer writes a short</text>
+    <text class="tb" x="377" y="345" text-anchor="middle">approval request</text>
+    <text class="ts" x="377" y="363" text-anchor="middle">and stops. That is the right answer.</text>
+    <path class="arrow" d="M487 340 L522 340"/>
+    <rect class="ok" x="524" y="305" width="226" height="70"/>
+    <text class="tb" x="637" y="327" text-anchor="middle">Maintainer approves the source</text>
+    <text class="t" x="637" y="346" text-anchor="middle">(licence checked, units registered)</text>
+    <text class="ts" x="637" y="363" text-anchor="middle">then the top lane applies</text>
+  </svg>
+  </div>
+  <div class="cap">Diagram 3. Top: adding a source the platform already approved. Bottom: what happens when the source is genuinely new. Guessing a unit to "make it pass" is the failure we designed against.</div>
+
+  <h3>Why the newcomer cannot break the core</h3>
+  <ul>
+    <li>Their change may only touch <b>their own folder</b>. Anything else is rejected automatically.</li>
+    <li>Their folder may contain only <b>known kinds of files</b>: the recipe, a sample, expected values, and, rarely, a small reader for unusual file layouts. That reader receives data already opened by the platform, so it needs no network and no outside libraries.</li>
+    <li>Approved units, measurement names and websites live in a <b>central list</b> that only maintainers can change. A recipe can pick from the list; it cannot invent.</li>
+  </ul>
+</section>
+
+<!-- ============================ 5. GUARDRAILS ============================ -->
+<section class="page">
+  <h2>5. The guardrails: what the automatic checks stop</h2>
+  <p>We started from a list of the mistakes juniors and AI assistants typically make, and gave each one a <b>gate</b>. A gate is only real if there is a <b>test that proves it rejects the bad change</b>. Every row below has one.</p>
+
+  <div class="fig">
+  <svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+    <rect class="box2" x="10" y="115" width="90" height="70"/>
+    <text class="tb" x="55" y="140" text-anchor="middle">Proposed</text>
+    <text class="tb" x="55" y="158" text-anchor="middle">change</text>
+    <g>
+      <rect class="box" x="112" y="20" width="128" height="260"/>
+      <text class="tb" x="176" y="45" text-anchor="middle">Gate 1</text>
+      <text class="t" x="176" y="66" text-anchor="middle">Right folder only</text>
+      <text class="ts" x="176" y="92" text-anchor="middle">stops:</text>
+      <text class="ts" x="176" y="106" text-anchor="middle">edits to the core,</text>
+      <text class="ts" x="176" y="120" text-anchor="middle">to the rules,</text>
+      <text class="ts" x="176" y="134" text-anchor="middle">or to the tests</text>
+    </g>
+    <path class="arrow" d="M100 150 L110 150"/>
+    <g>
+      <rect class="box" x="248" y="20" width="128" height="260"/>
+      <text class="tb" x="312" y="45" text-anchor="middle">Gate 2</text>
+      <text class="t" x="312" y="66" text-anchor="middle">No network,</text>
+      <text class="t" x="312" y="82" text-anchor="middle">no escape hatches</text>
+      <text class="ts" x="312" y="108" text-anchor="middle">stops:</text>
+      <text class="ts" x="312" y="122" text-anchor="middle">hidden downloads,</text>
+      <text class="ts" x="312" y="136" text-anchor="middle">shell commands,</text>
+      <text class="ts" x="312" y="150" text-anchor="middle">"ignore this warning"</text>
+      <text class="ts" x="312" y="164" text-anchor="middle">comments; tests run</text>
+      <text class="ts" x="312" y="178" text-anchor="middle">with the network off</text>
+    </g>
+    <path class="arrow" d="M240 150 L246 150"/>
+    <g>
+      <rect class="box" x="384" y="20" width="128" height="260"/>
+      <text class="tb" x="448" y="45" text-anchor="middle">Gate 3</text>
+      <text class="t" x="448" y="66" text-anchor="middle">Sample and</text>
+      <text class="t" x="448" y="82" text-anchor="middle">expected values</text>
+      <text class="ts" x="448" y="108" text-anchor="middle">stops:</text>
+      <text class="ts" x="448" y="122" text-anchor="middle">"it parses" with</text>
+      <text class="ts" x="448" y="136" text-anchor="middle">nobody checking</text>
+      <text class="ts" x="448" y="150" text-anchor="middle">the numbers; a sign</text>
+      <text class="ts" x="448" y="164" text-anchor="middle">or unit flipped</text>
+      <text class="ts" x="448" y="178" text-anchor="middle">silently</text>
+    </g>
+    <path class="arrow" d="M376 150 L382 150"/>
+    <g>
+      <rect class="box" x="520" y="20" width="128" height="260"/>
+      <text class="tb" x="584" y="45" text-anchor="middle">Gate 4</text>
+      <text class="t" x="584" y="66" text-anchor="middle">Nothing invented,</text>
+      <text class="t" x="584" y="82" text-anchor="middle">nothing leaked</text>
+      <text class="ts" x="584" y="108" text-anchor="middle">stops:</text>
+      <text class="ts" x="584" y="122" text-anchor="middle">made-up units or</text>
+      <text class="ts" x="584" y="136" text-anchor="middle">websites, new libraries</text>
+      <text class="ts" x="584" y="150" text-anchor="middle">without sign-off,</text>
+      <text class="ts" x="584" y="164" text-anchor="middle">passwords in files,</text>
+      <text class="ts" x="584" y="178" text-anchor="middle">time without a zone</text>
+    </g>
+    <path class="arrow" d="M512 150 L518 150"/>
+    <path class="arrowg" d="M648 150 L660 150"/>
+    <rect class="ok" x="662" y="105" width="88" height="90"/>
+    <text class="tb" x="706" y="132" text-anchor="middle">Human</text>
+    <text class="tb" x="706" y="150" text-anchor="middle">sign-off</text>
+    <text class="ts" x="706" y="172" text-anchor="middle">on what is left</text>
+    <path class="arrowr" d="M176 280 L176 292"/>
+    <path class="arrowr" d="M312 280 L312 292"/>
+    <path class="arrowr" d="M448 280 L448 292"/>
+    <path class="arrowr" d="M584 280 L584 292"/>
+    <text class="tw" x="380" y="299" text-anchor="middle">rejected with a message that names the rule</text>
+  </svg>
+  </div>
+  <div class="cap">Diagram 4. A change must pass every gate before a person spends time on it. The person then reviews the one thing a machine cannot: whether the expected values are right.</div>
+
+  <h3>Two rules about the rules</h3>
+  <ul>
+    <li><b>A gate can never be loosened to make a change pass.</b> The files that define the gates are owned by maintainers, and a newcomer's change cannot touch them (that is Gate 1 protecting the others).</li>
+    <li><b>Gates are guardrails, not a prison.</b> They catch accidents and make deliberate bypasses visible in review. For AI assistants working unattended, there is a separate locked-down mode with no shell and no network except the code repository. We say "guardrail" and "boundary" deliberately, and never confuse the two.</li>
+  </ul>
+
+  <h3>What the AI assistant is, and is not, allowed to do</h3>
+  <table>
+    <tr><th style="width:22%">Level</th><th>Allowed</th></tr>
+    <tr><td><b>Read</b></td><td>Documentation, existing recipes, samples, logs.</td></tr>
+    <tr><td><b>Generate</b></td><td>A new recipe folder: recipe, sample, expected values, small reader, notes.</td></tr>
+    <tr><td><b>Propose</b></td><td>Open a pull request for a human to review.</td></tr>
+    <tr><td><b>Never</b></td><td>Merge its own change, see production passwords, change infrastructure, write to the production database, delete archives.</td></tr>
+  </table>
+</section>
+
+<!-- ============================ 6. DEPLOYMENT ============================ -->
+<section class="page">
+  <h2>6. Where it runs, and how updates are made safe</h2>
+  <p>Everything needed to run the system is written as code, so a fresh environment can be built from scratch and rebuilt identically. The same package runs in three places, differing only in a settings file.</p>
+
+  <div class="fig">
+  <svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+    <rect class="box" x="10" y="20" width="235" height="110"/>
+    <text class="tb" x="127" y="45" text-anchor="middle">A laptop</text>
+    <text class="t" x="127" y="66" text-anchor="middle">one command starts everything</text>
+    <text class="t" x="127" y="84" text-anchor="middle">on sample data, no accounts,</text>
+    <text class="t" x="127" y="102" text-anchor="middle">no passwords</text>
+    <text class="ts" x="127" y="122" text-anchor="middle">this is how an evaluator reproduces it</text>
+
+    <rect class="box" x="262" y="20" width="235" height="110"/>
+    <text class="tb" x="379" y="45" text-anchor="middle">A shared company cluster</text>
+    <text class="t" x="379" y="66" text-anchor="middle">runs as a well-behaved tenant:</text>
+    <text class="t" x="379" y="84" text-anchor="middle">needs no special permissions,</text>
+    <text class="t" x="379" y="102" text-anchor="middle">respects quotas and security rules</text>
+    <text class="ts" x="379" y="122" text-anchor="middle">tested on a real academic cluster</text>
+
+    <rect class="box" x="514" y="20" width="236" height="110"/>
+    <text class="tb" x="632" y="45" text-anchor="middle">Our own cluster</text>
+    <text class="t" x="632" y="66" text-anchor="middle">built from code on a cloud,</text>
+    <text class="t" x="632" y="84" text-anchor="middle">including network, servers</text>
+    <text class="t" x="632" y="102" text-anchor="middle">and storage</text>
+    <text class="ts" x="632" y="122" text-anchor="middle">for when there is no shared cluster</text>
+
+    <!-- upgrade flow -->
+    <line class="line" x1="10" y1="155" x2="750" y2="155"/>
+    <text class="tb" x="10" y="180">Releasing a new version</text>
+    <rect class="box" x="10" y="195" width="150" height="60"/>
+    <text class="tb" x="85" y="220" text-anchor="middle">New version</text>
+    <text class="ts" x="85" y="240" text-anchor="middle">pinned, never "latest"</text>
+    <path class="arrow" d="M160 225 L195 225"/>
+    <rect class="box" x="197" y="195" width="160" height="60"/>
+    <text class="tb" x="277" y="218" text-anchor="middle">Database prepared</text>
+    <text class="ts" x="277" y="236" text-anchor="middle">changes always work with</text>
+    <text class="ts" x="277" y="250" text-anchor="middle">the old version too</text>
+    <path class="arrow" d="M357 225 L392 225"/>
+    <rect class="box" x="394" y="195" width="160" height="60"/>
+    <text class="tb" x="474" y="218" text-anchor="middle">Self-test</text>
+    <text class="ts" x="474" y="236" text-anchor="middle">one real fetch-and-process</text>
+    <text class="ts" x="474" y="250" text-anchor="middle">on a sample, inside the release</text>
+    <path class="arrowg" d="M554 215 L595 215"/>
+    <rect class="ok" x="597" y="185" width="153" height="42"/>
+    <text class="tb" x="673" y="211" text-anchor="middle">Passed: it is live</text>
+    <path class="arrowr" d="M554 240 L595 240"/>
+    <rect class="warn" x="597" y="232" width="153" height="60"/>
+    <text class="tw" x="673" y="252" text-anchor="middle">Failed: previous version</text>
+    <text class="tw" x="673" y="268" text-anchor="middle">comes back automatically</text>
+    <text class="ts" x="673" y="284" text-anchor="middle">no manual step, no data lost</text>
+    <text class="ts" x="10" y="312">Rolling back the code does not un-write bad numbers. That repair is the green "re-run from the archive" path in Diagram 1,</text>
+    <text class="ts" x="10" y="326">which is why every row in the clean table remembers which version of the reader produced it.</text>
+  </svg>
+  </div>
+  <div class="cap">Diagram 5. Three places, one package. Below: the release sequence, with the self-test inside the release so that failure rolls back by itself.</div>
+
+  <h3>Other protections worth knowing about</h3>
+  <ul>
+    <li><b>Backups in two places.</b> The archive is copied to a second, independently run storage service. The database has point-in-time backups. Both are restored on a schedule to prove they work.</li>
+    <li><b>Limited internet access.</b> Only the fetching jobs may reach the internet, only over encrypted connections, only to approved websites, and never to internal or private addresses. Redirects are checked hop by hop.</li>
+    <li><b>Nothing runs as an administrator.</b> Every part runs under the strictest security profile the cluster offers, with declared limits on memory and CPU.</li>
+  </ul>
+</section>
+
+<!-- ============================ 7. HOW WE WORKED ============================ -->
+<section class="page">
+  <h2>7. How we worked</h2>
+  <p>The assignment expected AI assistants to do much of the work and asked how we would lead and constrain them. Our answer was to <b>write the rules down first, get them independently reviewed, and make each rule mechanical</b> before writing the data pipeline itself.</p>
+
+  <div class="fig">
+  <svg viewBox="0 0 760 350" xmlns="http://www.w3.org/2000/svg">
+    <!-- row 1 -->
+    <rect class="box" x="10" y="20" width="170" height="70"/>
+    <text class="tb" x="95" y="42" text-anchor="middle">1. Find the data</text>
+    <text class="ts" x="95" y="60" text-anchor="middle">read the publishers' own docs,</text>
+    <text class="ts" x="95" y="74" text-anchor="middle">fetch real samples, check licences</text>
+    <path class="arrow" d="M180 55 L200 55"/>
+    <rect class="box" x="202" y="20" width="170" height="70"/>
+    <text class="tb" x="287" y="42" text-anchor="middle">2. Write down assumptions</text>
+    <text class="ts" x="287" y="60" text-anchor="middle">and verify each one against</text>
+    <text class="ts" x="287" y="74" text-anchor="middle">a real cluster and cloud</text>
+    <path class="arrow" d="M372 55 L392 55"/>
+    <rect class="box" x="394" y="20" width="170" height="70"/>
+    <text class="tb" x="479" y="42" text-anchor="middle">3. Decide, in writing</text>
+    <text class="ts" x="479" y="60" text-anchor="middle">27 short decision records:</text>
+    <text class="ts" x="479" y="74" text-anchor="middle">what, why, what we rejected</text>
+    <path class="arrow" d="M564 55 L584 55"/>
+    <rect class="box" x="586" y="20" width="164" height="70"/>
+    <text class="tb" x="668" y="42" text-anchor="middle">4. Build the checks first</text>
+    <text class="ts" x="668" y="60" text-anchor="middle">an empty repository that</text>
+    <text class="ts" x="668" y="74" text-anchor="middle">already enforces the rules</text>
+    <!-- turn -->
+    <path class="arrow" d="M668 90 L668 118"/>
+    <!-- row 2 (right to left) -->
+    <rect class="box2" x="586" y="120" width="164" height="76"/>
+    <text class="tb" x="668" y="142" text-anchor="middle">5. Independent review</text>
+    <text class="ts" x="668" y="160" text-anchor="middle">a second AI tried to break it:</text>
+    <text class="ts" x="668" y="174" text-anchor="middle">14 findings, 9 serious,</text>
+    <text class="ts" x="668" y="188" text-anchor="middle">4 gates actually bypassed</text>
+    <path class="arrow" d="M586 158 L566 158"/>
+    <rect class="ok" x="394" y="120" width="170" height="76"/>
+    <text class="tb" x="479" y="142" text-anchor="middle">6. Fix, and prove the fix</text>
+    <text class="ts" x="479" y="160" text-anchor="middle">6 new decision records;</text>
+    <text class="ts" x="479" y="174" text-anchor="middle">every bypass became a test</text>
+    <text class="ts" x="479" y="188" text-anchor="middle">that now fails on purpose</text>
+    <path class="arrow" d="M394 158 L374 158"/>
+    <rect class="grey" x="202" y="120" width="170" height="76"/>
+    <text class="tb" x="287" y="142" text-anchor="middle">7. Build the pipeline</text>
+    <text class="ts" x="287" y="160" text-anchor="middle">contracts → core library →</text>
+    <text class="ts" x="287" y="174" text-anchor="middle">tooling for newcomers →</text>
+    <text class="ts" x="287" y="188" text-anchor="middle">the four sources (next)</text>
+    <path class="arrow" d="M202 158 L182 158"/>
+    <rect class="grey" x="10" y="120" width="170" height="76"/>
+    <text class="tb" x="95" y="142" text-anchor="middle">8. Deploy and drill</text>
+    <text class="ts" x="95" y="160" text-anchor="middle">laptop, shared cluster, own</text>
+    <text class="ts" x="95" y="174" text-anchor="middle">cluster; restore and rollback</text>
+    <text class="ts" x="95" y="188" text-anchor="middle">rehearsed automatically (next)</text>
+    <!-- turn -->
+    <path class="arrow" d="M95 196 L95 224"/>
+    <rect class="grey" x="10" y="226" width="362" height="60"/>
+    <text class="tb" x="191" y="248" text-anchor="middle">9. The blind test</text>
+    <text class="ts" x="191" y="266" text-anchor="middle">a fresh AI session and a junior, given only the README, add a source</text>
+    <text class="ts" x="191" y="280" text-anchor="middle">nobody prepared for them. Their result grades the design. (next)</text>
+    <text class="ts" x="10" y="318">Blue: done. Green: done this week. Grey: planned, in order. The loop from 4 to 6 is the part we would repeat before every phase.</text>
+  </svg>
+  </div>
+  <div class="cap">Diagram 6. Rules first, review second, code third. The independent review is a step, not an afterthought.</div>
+
+  <h3>How we lead the AI assistants day to day</h3>
+  <ul>
+    <li><b>One short instruction file</b> at the top of the repository states the hard rules and what the assistant may and may not do. It is identical for every assistant.</li>
+    <li><b>Plan before code.</b> Each work session starts by writing a numbered plan with an acceptance check per task; each task becomes one small, described change; the checks must be green before every change is saved.</li>
+    <li><b>Decisions are frozen.</b> An assistant that finds a decision wrong does not quietly work around it; it writes a one-page proposal and waits. This is how the six new decision records came about.</li>
+    <li><b>Assumptions are checked, not believed.</b> We had access to a real shared cluster and cloud; every claim about what such an environment allows was tested with a command and the output kept.</li>
+  </ul>
+</section>
+
+<!-- ============================ 8. STATUS ============================ -->
+<section>
+  <h2>8. Where we are now, honestly</h2>
+  <p>The design, the rules and the automatic checks exist and are proven by tests. The data pipeline itself is the next block of work. We prefer to say this plainly rather than let a green checkmark suggest more than it means.</p>
+
+  <table>
+    <tr><th style="width:34%">Piece</th><th style="width:14%">Status</th><th>What exists today</th></tr>
+    <tr><td>Data scope and source contracts</td><td class="done">Done</td><td>Which sources, exact operations, units, time rules, licences, what is deliberately excluded.</td></tr>
+    <tr><td>Assumptions, verified against a real environment</td><td class="done">Done</td><td>Shared cluster rights, cloud quotas, storage features, identity, internet access: each tested, output recorded.</td></tr>
+    <tr><td>Architecture decisions</td><td class="done">Done</td><td>27 written decision records, including the six that came out of the independent review.</td></tr>
+    <tr><td>Repository skeleton with enforced rules</td><td class="done">Done</td><td>Code style, strict typing, layer rules, no-network tests, folder and import limits for new sources, dependency allow-list, secret scan, lock consistency, pinned tooling. 36 tests, several of which exist only to prove a gate rejects a bad change.</td></tr>
+    <tr><td>Independent review answered</td><td class="done">Done</td><td>All 14 findings accepted and closed by a decision record, a gate with a test, or a dated task. Two need the author: a real code host, and the original research evidence files.</td></tr>
+    <tr><td>Contracts in code (recipe format, clean-table format)</td><td class="next">Next</td><td>Planned in detail; example recipes for six kinds of source.</td></tr>
+    <tr><td>Core library: fetch, archive, process, store, run log</td><td class="next">Next</td><td>Planned module by module, with the failure drills of Diagram 2 as tests.</td></tr>
+    <tr><td>Newcomer tooling and the full gate list</td><td class="next">Next</td><td>Scaffold command, sample recorder, "needs approval" result, one bad example per rule.</td></tr>
+    <tr><td>The four sources, added through that tooling</td><td class="next">Next</td><td>Three by us, the fourth strictly as a newcomer would.</td></tr>
+    <tr><td>Deployment code, backups, drills, dashboards</td><td class="next">Next</td><td>Laptop, shared cluster, own cluster; restore and rollback rehearsals.</td></tr>
+    <tr><td>Blind test and final packaging</td><td class="next">Next</td><td>Fresh AI session and a junior, given only the README.</td></tr>
+  </table>
+
+  <h3>What the independent review changed</h3>
+  <p>Before writing the pipeline, we handed the repository to a second AI system with the instruction to judge it against the original brief and to try to get bad changes past the checks. It succeeded four times: a hidden download slipped past the lint rules, a failing test in a new source folder was simply never run, a password-like string next to the word "example" was ignored, and an out-of-date dependency list went unnoticed. It also found five places where our written rules contradicted each other. Every one of these is now either a test that fails on purpose or a decision record that settles the contradiction. Finding this before the code existed was cheap; finding it after would not have been.</p>
+
+  <h3>Two things we need from the project owner</h3>
+  <ul>
+    <li>A code hosting account and the maintainer's name, so that "only a human can merge" becomes an enforced setting rather than a written intention.</li>
+    <li>The original folder of research evidence (saved website responses with checksums) that the data-scope document cites, or agreement that we regenerate it during the next phase.</li>
+  </ul>
+</section>
+
+<!-- ============================ 9. GLOSSARY ============================ -->
+<section style="margin-top:16pt">
+  <h2>9. Five words we could not avoid</h2>
+  <table>
+    <tr><th style="width:24%">Word</th><th>What we mean by it</th></tr>
+    <tr><td><b>Intraday market</b></td><td>The market where electricity for <i>today</i> is traded, right up to shortly before delivery, in 15-minute blocks. Prices change block by block. OTE runs it for the Czech Republic.</td></tr>
+    <tr><td><b>Recipe</b> (in the code: "manifest")</td><td>A short text file describing one data source: where to fetch, how often, the licence, which measurements it contains and in what units. The platform reads it; nobody writes fetching code.</td></tr>
+    <tr><td><b>Archive</b> (in the code: "Bronze")</td><td>The store of original downloaded files, kept unchanged and in two places. The clean table (in the code: "Silver") can always be rebuilt from it.</td></tr>
+    <tr><td><b>Pull request</b></td><td>A proposed change to the code that others can see, that automatic checks run on, and that a person approves before it takes effect.</td></tr>
+    <tr><td><b>Decision record</b></td><td>A one-page note saying what we decided, why, what we rejected and what it costs if we are wrong. Frozen once accepted; changed only by a new record. There are 27.</td></tr>
+  </table>
+
+  <h3>Where to look in the repository</h3>
+  <table>
+    <tr><th style="width:34%">You want to know…</th><th>Read</th></tr>
+    <tr><td>What data and why</td><td><code>docs/01-data-scope.md</code></td></tr>
+    <tr><td>What we assumed and what we verified</td><td><code>docs/00-assumptions.md</code></td></tr>
+    <tr><td>The design and the decisions</td><td><code>docs/02-architecture-decisions.md</code>, <code>docs/adr/</code></td></tr>
+    <tr><td>The plan, phase by phase</td><td><code>docs/03-roadmap.md</code>, <code>docs/progress.md</code></td></tr>
+    <tr><td>The independent review and our answer</td><td><code>codex-review/</code>, <code>docs/reviews/</code></td></tr>
+    <tr><td>The rules an assistant must follow</td><td><code>CLAUDE.md</code> (identical to <code>AGENTS.md</code>)</td></tr>
+    <tr><td>The tests that prove the gates work</td><td><code>tests/harness/</code></td></tr>
+  </table>
+  <p class="small">Generated 19 September 2026 from the repository at that date. Diagrams are simplified on purpose; the decision records carry the exact mechanisms.</p>
+</section>
+
+</body>
+</html>

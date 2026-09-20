@@ -330,3 +330,5 @@ a target.
 | every structural rule and every admission gap, `ADMISSION_REQUIRED` shape | `tests/contracts/test_manifest.py`, `test_manifest_negative.py` |
 | exported schema current and complete | `tests/contracts/test_schema_export.py` |
 | six example manifests (`examples/manifests/`) | `tests/contracts/test_examples.py` |
+| S3 client: SigV4 known-answer vector, path-style keys, object-lock headers, endpoint allowlist, pagination, `404 → None`, no socket (ADR-032) | `tests/fetch/test_objectstore.py` on the fake gateway `tests/fetch/fake_s3.py` |
+| Bronze on S3: ADR-002 key layout, idempotent `put` by content address, hot → cold read with `tier`, capture-log entry round trip incl. `tier`, listing windows (ADR-021, ADR-032) | `tests/bronze/test_s3.py` |

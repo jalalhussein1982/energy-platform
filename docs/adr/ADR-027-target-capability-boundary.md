@@ -3,6 +3,7 @@
 | | |
 |---|---|
 | Status | ACCEPTED |
+| Amended by | ADR-032 (2026-09-20): §3 names `fetch/objectstore.py` as the object-store client, inside `fetch/` |
 | Date | 2026-09-19 |
 | Resolves | Codex review F03; amends ADR-014 (egress lint rule) and ADR-017 (parser registration) |
 | Supersedes | ADR-014 "lint bans `httpx`/`requests`/`urllib` imports outside `fetch/`" as the statement of the egress guardrail |
@@ -43,7 +44,9 @@ tests.
    `ftplib`, `smtplib`, `telnetlib`, `xmlrpc`, `webbrowser`, `subprocess`, `os.system`,
    `os.popen`, `importlib`, `ctypes`, `multiprocessing`, `asyncio.open_connection`. Inside
    `targets/` the positive allowlist of (2) already excludes them; the ban is for the rest of the
-   platform, where a positive allowlist is impractical.
+   platform, where a positive allowlist is impractical. The object-store client of the Bronze S3
+   backend is `energy_platform/fetch/objectstore.py` (ADR-032, 2026-09-20): it lives inside
+   `fetch/` so this rule stays literal and there is still exactly one egress package.
 
 4. **Runtime block in unit tests.** `tests/conftest.py` installs an autouse fixture that replaces
    `socket.socket`, `socket.create_connection` and `socket.getaddrinfo` with functions raising
