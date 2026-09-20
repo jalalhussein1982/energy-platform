@@ -5,7 +5,11 @@ description = "High-availability ingestion of public intraday energy data (OTE, 
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "MIT"
-dependencies = []
+dependencies = [
+  "pydantic>=2.9,<3",   # ADR-019
+  "pyyaml>=6.0",        # ADR-019
+  "tzdata>=2024.1",     # ADR-019 (zoneinfo data on images without a system tz database)
+]
 
 [dependency-groups]
 dev = [
@@ -15,6 +19,7 @@ dev = [
   "mypy>=1.11",
   "import-linter>=2.0",
   "pre-commit>=3.8",
+  "types-pyyaml>=6.0",  # ADR-029
 ]
 
 [build-system]
