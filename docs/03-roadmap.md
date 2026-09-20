@@ -29,7 +29,7 @@
 | 0 | Repository bootstrap | 3 | 1 | `make check` green on empty package — **done 2026-09-19** |
 | 1 | Contracts (ADR-011, ADR-013 → `docs/04-contracts.md`) | 3 | 1–2 | six example manifests validate; DST property tests pass — **done 2026-09-20** |
 | 2 | Platform core library | 3 | 3–4 | `make demo` runs on fixtures end-to-end into Postgres — **done 2026-09-20** (S3 backend shipped the same day under ADR-032) |
-| 3 | Harness: CLI, MCP, CI gates | 3 | 2–3 | one bad PR per failure mode is rejected |
+| 3 | Harness: CLI, MCP, CI gates | 3 | 2–3 | one bad PR per failure mode is rejected — **done 2026-09-20** (54 rows, `make harness-check` + `pr-surface` in CI) |
 | 4 | Committed-target verification through the harness (01 §3) | 4 | 1–2 | T1, T2, T3, E1 green on fixtures; nightly live smoke defined |
 | 5 | Deployment, IaC, HA, DR, observability | 5 | 3–4 | clean-clone `make local-up && make smoke-test`; restore drill passes |
 | 6 | Threat model, triage pipeline, documentation | 5 | 1–2 | `docs/threat-model.md` complete; triage pipeline runs with stubbed LLM |
@@ -112,16 +112,18 @@
 **Goal.** Make the wrong thing impossible for both a junior and an agent. This is the deliverable the assignment is actually grading.
 
 **Deliverables.**
-- [ ] `docs/05-constraint-matrix.md`: table `failure mode → gate → test that proves the gate`. Minimum rows: hardcoded URL; naive datetime; swallowed exception; unbounded retry; positional parsing; duplicated utility; new dependency; PR touching outside `targets/<id>/`; missing fixture; missing golden; missing `license`; host not in allowlist; secret in code; fetch code inside a target; normalise code inside a target; **outbound HTTP outside `energy_platform.fetch`** (A-7); **workload without resource requests** (A-8); **mutable image tag** (ADR-016); **migration without downgrade** (ADR-016); **unregistered `dataset_id` / metric / host** and **registry edit inside a target PR** (ADR-022); **file outside the target surface**, **third-party import in `parser.py`**, **suppression comment in a target**, **network call in a unit test** (ADR-027 — gates already exist from the review-1 remediation; the matrix rows and negative PRs are added here); **redirect to private/unlisted host**, **`http` scheme**, **metadata address** (ADR-026 §4, offline with a fake transport).
-- [ ] `energyctl new-target <id> --modality <m>` scaffolder (manifest skeleton, fixture dir, golden test skeleton, README stub, empty `__init__.py` files — exactly the ADR-027 surface).
-- [ ] `energyctl validate <id>` returns `ADMISSION_REQUIRED` with the missing registry entries when the manifest names an unregistered dataset/metric/host; `docs/admissions/TEMPLATE.md` for the Route B request (ADR-022).
-- [ ] `energyctl record-fixture <id>` (captures into `targets/<id>/fixtures/` as Bronze objects; opt-in network).
-- [ ] MCP server (`energy_platform/mcp/`) exposing the ADR-007 tool set as thin wrappers over the library. Sandbox recipe (`deployment/sandbox/`): container with no shell tool access, egress limited to the Git remote.
-- [ ] CI gates for every row of the constraint matrix; a target-PR path check (`targets/<id>/**` only).
-- [ ] Contract-test harness auto-discovers every target and runs its goldens; a target without fixtures/goldens fails collection *(2026-09-19: default collection of `targets/**/tests` already holds — `tests/harness/test_target_collection.py`)*.
-- [ ] Negative tests: `tests/harness/` contains one intentionally bad target per failure mode and asserts the correct gate rejects it.
+- [x] `docs/05-constraint-matrix.md`: table `failure mode → gate → test that proves the gate`. Minimum rows: hardcoded URL; naive datetime; swallowed exception; unbounded retry; positional parsing; duplicated utility; new dependency; PR touching outside `targets/<id>/`; missing fixture; missing golden; missing `license`; host not in allowlist; secret in code; fetch code inside a target; normalise code inside a target; **outbound HTTP outside `energy_platform.fetch`** (A-7); **workload without resource requests** (A-8); **mutable image tag** (ADR-016); **migration without downgrade** (ADR-016); **unregistered `dataset_id` / metric / host** and **registry edit inside a target PR** (ADR-022); **file outside the target surface**, **third-party import in `parser.py`**, **suppression comment in a target**, **network call in a unit test** (ADR-027 — gates already exist from the review-1 remediation; the matrix rows and negative PRs are added here); **redirect to private/unlisted host**, **`http` scheme**, **metadata address** (ADR-026 §4, offline with a fake transport).
+- [x] `energyctl new-target <id> --modality <m>` scaffolder (manifest skeleton, fixture dir, golden test skeleton, README stub, empty `__init__.py` files — exactly the ADR-027 surface).
+- [x] `energyctl validate <id>` returns `ADMISSION_REQUIRED` with the missing registry entries when the manifest names an unregistered dataset/metric/host; `docs/admissions/TEMPLATE.md` for the Route B request (ADR-022).
+- [x] `energyctl record-fixture <id>` (captures into `targets/<id>/fixtures/` as Bronze objects; opt-in network).
+- [x] MCP server (`energy_platform/mcp/`) exposing the ADR-007 tool set as thin wrappers over the library. Sandbox recipe (`deployment/sandbox/`): container with no shell tool access, egress limited to the Git remote. *(2026-09-20: JSON-RPC 2.0 over stdio on the standard library, P3-D1; `open_pr` prepares a bundle that `scripts/apply_pr_bundle.py` turns into a branch outside the sandbox, P3-D2.)*
+- [x] CI gates for every row of the constraint matrix; a target-PR path check (`targets/<id>/**` only).
+- [x] Contract-test harness auto-discovers every target and runs its goldens; a target without fixtures/goldens fails collection *(2026-09-19: default collection of `targets/**/tests` already holds — `tests/harness/test_target_collection.py`)*.
+- [x] Negative tests: `tests/harness/` contains one intentionally bad target per failure mode and asserts the correct gate rejects it.
 
 **Do not.** Weaken a gate to make a negative test easier. Do not implement the drift-triage LLM step here.
+
+*(2026-09-20: Phase 3 closed — `docs/plans/phase-3.md`, 05 rows C-01…C-54 each with a gate and a negative test; `tests/harness/test_matrix.py` keeps the table honest. Deferred with a reason in 05 §5: custom `parser.py` execution (loader needs an ADR amending ADR-027), layer-1 NetworkPolicy verification and the restricted-PSS check (Phase 5).)*
 
 **Starter prompt.**
 > Read CLAUDE.md, docs/02-architecture-decisions.md (ADR-005 to ADR-008), docs/04-contracts.md and docs/03-roadmap.md Phase 3. Write docs/05-constraint-matrix.md first. Then implement scaffolder, MCP server and CI gates so that every matrix row has a mechanical gate and a negative test. Stop when all negative tests are rejected by their mapped gate.

@@ -332,3 +332,6 @@ a target.
 | six example manifests (`examples/manifests/`) | `tests/contracts/test_examples.py` |
 | S3 client: SigV4 known-answer vector, path-style keys, object-lock headers, endpoint allowlist, pagination, `404 → None`, no socket (ADR-032) | `tests/fetch/test_objectstore.py` on the fake gateway `tests/fetch/fake_s3.py` |
 | Bronze on S3: ADR-002 key layout, idempotent `put` by content address, hot → cold read with `tier`, capture-log entry round trip incl. `tier`, listing windows (ADR-021, ADR-032) | `tests/bronze/test_s3.py` |
+| golden file model: rows or a quarantine, `checked_by`, no YAML floats (ADR-020; 05 C-16) | `tests/contracts/test_golden.py` |
+| a `source` that is a column position is refused (05 C-04) | `tests/contracts/test_manifest_negative.py::test_numeric_source_is_positional_parsing` |
+| every Phase 3 gate of `docs/05-constraint-matrix.md`: one negative test per row | `tests/harness/` (see 05 §1 for the row → test map; `tests/harness/test_matrix.py` checks the map itself) |
