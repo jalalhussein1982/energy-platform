@@ -131,8 +131,10 @@ def _mapping_block(contract: DatasetContract | None, metrics: tuple[str, ...]) -
     for m in metrics:
         spec = contract.metric(m) if contract is not None else None
         unit = spec.unit if spec is not None else PLACEHOLDER
+        # the unit is quoted: a dimensionless registry unit is the string "1", which YAML would
+        # otherwise read as an integer and the manifest model refuse (Phase 4 finding, E1)
         lines.append(
-            f"    {m}: {{source: {PLACEHOLDER}, unit: {unit}, sign: as_published, "
+            f'    {m}: {{source: {PLACEHOLDER}, unit: "{unit}", sign: as_published, '
             "decimal_separator: dot}"
         )
     return "\n".join(lines) + "\n"

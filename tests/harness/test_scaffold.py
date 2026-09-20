@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+import yaml
 
 from energy_platform.contracts.manifest import Modality, load_manifest, validate_manifest
 from energy_platform.harness.scaffold import ScaffoldError, scaffold_target
@@ -86,3 +87,11 @@ def test_placeholder_dataset_is_not_a_valid_id(tmp_path: Path) -> None:
     result = scaffold_target(tmp_path, "probe_target", "soap-xml")
     manifest = load_manifest(result.target / "manifest.yaml")
     assert list(validate_manifest(manifest).missing.datasets) == ["REPLACE_ME.dataset"]
+
+
+def test_scaffold_quotes_every_unit_so_a_dimensionless_flag_stays_a_string(tmp_path: Path) -> None:
+    """ote.dam's `emergency_state` has unit "1"; unquoted, YAML reads it as an int (Phase 4, E1)."""
+    scaffold_target(tmp_path, "ote_dam", "soap-xml", dataset_id="ote.dam", host="www.ote-cr.cz")
+    data = yaml.safe_load((tmp_path / "ote_dam" / "manifest.yaml").read_text(encoding="utf-8"))
+    units = {m: spec["unit"] for m, spec in data["mapping"]["metrics"].items()}
+    assert units["emergency_state"] == "1" and all(isinstance(u, str) for u in units.values())
