@@ -1,0 +1,10 @@
+# A negative load (item 4, 00:45:00+02:00, @value1 = -12.5): the registry says ">= 0 expected,
+# not enforced" (01 §9), so the row is kept and a negative_value warning is raised.
+fixture: negative_load
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep (item attributes @date, @value1, @value2), UTC instants derived by hand from the offset each item carries; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 192
+  quality_events: [negative_value, partition_status]
+  rows:
+    - {delivery_start_utc: 2026-09-17T00:45:00+02:00, resolution: PT15M, metric: load_incl_pumping, value: "-12.5"}
+    - {delivery_start_utc: 2026-09-17T00:45:00+02:00, resolution: PT15M, metric: load, value: "5387.375"}

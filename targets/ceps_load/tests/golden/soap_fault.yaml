@@ -1,0 +1,6 @@
+# A SOAP Fault over HTTP 200 (the ASP.NET service answers faults with 200 on client errors, WSDL):
+# quarantined with the fault text; the payload stays in Bronze.
+fixture: soap_fault
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep (item attributes @date, @value1, @value2), UTC instants derived by hand from the offset each item carries; human sign-off pending (Route A review, ADR-022)"
+expect:
+  quarantine: "SOAP Fault"

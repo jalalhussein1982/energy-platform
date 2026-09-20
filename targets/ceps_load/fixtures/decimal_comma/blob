@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <LoadResponse xmlns="https://www.ceps.cz/CepsData/">
+      <LoadResult>
+        <root xmlns="https://www.ceps.cz/CepsData/StructuredData/1.0">
+        <information>
+          <name>Load</name>
+          <date_from>2026-09-19T00:00:00+02:00</date_from>
+          <date_to>2026-09-19T23:59:59+02:00</date_to>
+          <version>RT</version>
+          <function>AVG</function>
+          <aggregation>QH</aggregation>
+        </information>
+        <series>
+          <serie id="value1" name="Load including pumping [MW]" />
+          <serie id="value2" name="Load [MW]" />
+        </series>
+        <data>
+        <item date="2026-09-19T00:00:00+02:00" value1="5951,667" value2="5951.667" />
+        </data>
+        </root>
+      </LoadResult>
+    </LoadResponse>
+  </soap:Body>
+</soap:Envelope>

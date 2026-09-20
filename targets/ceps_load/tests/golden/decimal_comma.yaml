@@ -1,0 +1,5 @@
+# @value1 = "5951,667" under decimal_separator: dot → the whole document is quarantined (01 §9).
+fixture: decimal_comma
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep (item attributes @date, @value1, @value2), UTC instants derived by hand from the offset each item carries; human sign-off pending (Route A review, ADR-022)"
+expect:
+  quarantine: "not a decimal under the dot rule"

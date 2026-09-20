@@ -1,0 +1,14 @@
+# 23-hour day (2026-03-29): 92 items; the 8th is 01:45:00+01:00 and the 9th is 03:00:00+02:00
+# (live pattern, docs/06 §4.3), both 15 minutes apart in UTC (00:45Z → 01:00Z). Item 13 = 04:00+02:00 = 02:00Z.
+fixture: spring_dst_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep (item attributes @date, @value1, @value2), UTC instants derived by hand from the offset each item carries; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 184
+  quality_events: [partition_status]     # "2026-03-29: complete 92/92"
+  rows:
+    - {delivery_start_utc: 2026-03-28T23:00:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5400"}
+    - {delivery_start_utc: 2026-03-29T00:45:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5687.1"}
+    - {delivery_start_utc: 2026-03-29T01:00:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5728.2"}
+    - {delivery_start_utc: 2026-03-29T01:00:00Z, resolution: PT15M, metric: load, value: "5532.000"}
+    - {delivery_start_utc: 2026-03-29T02:00:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5892"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, metric: load, value: "5539.375"}
