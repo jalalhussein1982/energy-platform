@@ -36,9 +36,11 @@ from energy_platform.contracts.manifest import (
 from energy_platform.fetch import EnvSecretResolver, Fetcher, FixtureTransport
 from energy_platform.harness.admission import write_request
 from energy_platform.harness.fixtures import FixtureError, record_from_file, record_live
+from energy_platform.harness.pr import BundleRefused, prepare_bundle
 from energy_platform.harness.runner import run_target_tests
 from energy_platform.harness.scaffold import ScaffoldError, scaffold_target
 from energy_platform.harness.surface import check_target, target_dirs
+from energy_platform.mcp import serve_stdio
 from energy_platform.runtime import (
     Runtime,
     backfill,
@@ -449,6 +451,37 @@ def admission_request(
     typer.echo(f"wrote {path} ({result.status})")
     if result.status == "OK":
         typer.echo("nothing is missing: this target can go Route A", err=True)
+
+
+@app.command("pr-bundle")
+def pr_bundle(
+    target_id: TargetArg,
+    outbox: Annotated[Path, typer.Option("--outbox", help="where bundles go")] = Path(
+        ".energy_platform/outbox"
+    ),
+    title: Annotated[str | None, typer.Option("--title")] = None,
+    repo: Annotated[Path, typer.Option("--repo", help="repository root")] = Path("."),
+) -> None:
+    """Prepare a Route A pull request bundle (all gates green, one target) — never pushes."""
+    try:
+        bundle = prepare_bundle(repo, target_id, outbox, title=title)
+    except BundleRefused as exc:
+        typer.echo(f"pr-bundle: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"wrote {bundle.path} ({len(bundle.files)} files, branch {bundle.branch})")
+    typer.echo(f"next: python -m scripts.apply_pr_bundle {bundle.path} && gh pr create")
+
+
+@app.command("mcp-serve")
+def mcp_serve(
+    repo: Annotated[Path, typer.Option("--root", help="repository root")] = Path("."),
+    outbox: Annotated[Path, typer.Option("--outbox")] = Path(".energy_platform/outbox"),
+    allow_network: Annotated[
+        bool, typer.Option("--allow-network", help="let record_fixture fetch (opt-in)")
+    ] = False,
+) -> None:
+    """Serve the ADR-007 tools over stdio (JSON-RPC 2.0); the CLI and CI share the library."""
+    raise typer.Exit(code=serve_stdio(repo, outbox, allow_network=allow_network))
 
 
 # ---------------------------------------------------------------------------- demo

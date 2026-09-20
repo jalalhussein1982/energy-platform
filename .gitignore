@@ -31,3 +31,6 @@ kubeconfig*
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+
+# MCP open_pr bundles (P3-D2) and other local harness state
+.energy_platform/
