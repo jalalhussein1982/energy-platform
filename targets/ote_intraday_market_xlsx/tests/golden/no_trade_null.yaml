@@ -1,0 +1,16 @@
+# Complete day with a legitimate no-trade period (review F13): row 19 (period 13) has volumes 0 and
+# blank price cells → three 0 volumes and four NULL prices; the day stays complete (a period counts
+# as present when any metric carries a value).
+fixture: no_trade_null
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 672
+  quality_events: [partition_status]     # "2026-09-18: complete 96/96"
+  rows:
+    - {delivery_start_utc: 2026-09-18T03:00:00+02:00, resolution: PT15M, period_index: 13, metric: volume_total, value: "0"}
+    - {delivery_start_utc: 2026-09-18T03:00:00+02:00, resolution: PT15M, period_index: 13, metric: volume_buy, value: "0"}
+    - {delivery_start_utc: 2026-09-18T03:00:00+02:00, resolution: PT15M, period_index: 13, metric: volume_sell, value: "0"}
+    - {delivery_start_utc: 2026-09-18T03:00:00+02:00, resolution: PT15M, period_index: 13, metric: price_vwap, value: null}
+    - {delivery_start_utc: 2026-09-18T03:00:00+02:00, resolution: PT15M, period_index: 13, metric: price_min, value: null}
+    - {delivery_start_utc: 2026-09-18T03:00:00+02:00, resolution: PT15M, period_index: 13, metric: price_max, value: null}
+    - {delivery_start_utc: 2026-09-18T03:00:00+02:00, resolution: PT15M, period_index: 13, metric: price_last, value: null}

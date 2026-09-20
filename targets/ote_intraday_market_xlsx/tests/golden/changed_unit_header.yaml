@@ -1,0 +1,6 @@
+# The Average price header reads "(CZK/MWh)": the mapped header text is not found, the document
+# is quarantined with the missing column named (01 §9: a unit-label change quarantines).
+fixture: changed_unit_header
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  quarantine: "no header row contains the mapped columns"

@@ -1,0 +1,18 @@
+# Ordinary day (2026-09-19): 96 data rows × 7 metrics. Row 7 of the sheet is period 1 (00:00 CEST =
+# 2026-09-18T22:00Z), row 102 is period 96 (23:45 CEST = 21:45Z). Shape of docs/06 evidence row 13.
+fixture: ordinary_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 672
+  quality_events: [partition_status]     # "2026-09-19: complete 96/96"; no unknown_field (Time interval is declared)
+  rows:
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: volume_total, value: "93.125"}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: volume_buy, value: "41.906"}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: volume_sell, value: "51.219"}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.1"}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_min, value: "87"}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_max, value: "137.15"}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_last, value: "118.21"}
+    - {delivery_start_utc: 2026-09-19T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: volume_total, value: "88"}
+    - {delivery_start_utc: 2026-09-19T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: price_vwap, value: "122.5"}
+    - {delivery_start_utc: 2026-09-19T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: price_last, value: "123.61"}

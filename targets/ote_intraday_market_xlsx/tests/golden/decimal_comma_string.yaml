@@ -1,0 +1,6 @@
+# A text cell "124,58" in the Average price column (the decimal comma of the HTML rendering, 01 §3)
+# under decimal_separator: dot: the whole document is quarantined, nothing is coerced (01 §9).
+fixture: decimal_comma_string
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  quarantine: "not a decimal under the dot rule"

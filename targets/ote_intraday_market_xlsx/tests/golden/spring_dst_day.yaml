@@ -1,0 +1,14 @@
+# 23-hour day (2026-03-29): 92 rows; row 14 of the sheet (period 8) is labelled 01:45-03:00, the
+# bridging label of the live file (docs/06 §3.4). Period 9 = 03:00 CEST = 2026-03-29T01:00Z; period 10
+# = 03:15 CEST = 01:15Z; period 92 = 23:45 CEST = 21:45Z. Labels are ignored; the index is the key.
+fixture: spring_dst_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 644
+  quality_events: [partition_status]     # "2026-03-29: complete 92/92"
+  rows:
+    - {delivery_start_utc: 2026-03-28T23:00:00Z, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.1"}
+    - {delivery_start_utc: 2026-03-29T01:15:00Z, resolution: PT15M, period_index: 10, metric: price_vwap, value: "190.3"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, period_index: 92, metric: volume_total, value: "56"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, period_index: 92, metric: price_vwap, value: "104.1"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, period_index: 92, metric: price_last, value: "105.21"}

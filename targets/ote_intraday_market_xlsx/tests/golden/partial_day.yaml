@@ -1,0 +1,14 @@
+# Rolling partial day: the daily file has all 96 rows from the start and fills them during the day;
+# unfilled rows are blank cells (live: 58 filled at 14:24, docs/06 §3.3; here 10). Blank → NULL
+# rows, never zero (01 §9); completeness says partial 10/96.
+fixture: partial_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 672
+  quality_events: [partition_status]     # "2026-09-20: partial 10/96"
+  rows:
+    - {delivery_start_utc: 2026-09-20T02:15:00+02:00, resolution: PT15M, period_index: 10, metric: price_vwap, value: "190.3"}
+    - {delivery_start_utc: 2026-09-20T02:15:00+02:00, resolution: PT15M, period_index: 10, metric: volume_total, value: "120.25"}
+    - {delivery_start_utc: 2026-09-20T02:30:00+02:00, resolution: PT15M, period_index: 11, metric: price_vwap, value: null}
+    - {delivery_start_utc: 2026-09-20T02:30:00+02:00, resolution: PT15M, period_index: 11, metric: volume_total, value: null}
+    - {delivery_start_utc: 2026-09-20T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: price_last, value: null}

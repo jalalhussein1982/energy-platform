@@ -1,0 +1,9 @@
+# An extra column "Note" that the mapping neither reads nor ignores: rows are produced and the
+# platform raises unknown_field (P2-D6, ADR-034 — only the listed "Time interval" is silenced).
+fixture: extra_column
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 672
+  quality_events: [partition_status, unknown_field]
+  rows:
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.1"}

@@ -1,0 +1,14 @@
+# 25-hour day (2025-10-26): 100 rows; the sheet labels periods 9–12 "02:00-02:15 … 02:45-02:00" and
+# periods 13–16 "02:00-02:15 …" again (docs/06 §3.4). Period 10 = 02:15 CEST = 2025-10-26T00:15Z;
+# period 13 = 02:00 CET = 01:00Z; period 100 = 23:45 CET = 22:45Z.
+fixture: autumn_dst_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 700
+  quality_events: [partition_status]     # "2025-10-26: complete 100/100"
+  rows:
+    - {delivery_start_utc: 2025-10-25T22:00:00Z, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.1"}
+    - {delivery_start_utc: 2025-10-26T00:15:00Z, resolution: PT15M, period_index: 10, metric: price_vwap, value: "190.3"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, period_index: 13, metric: price_vwap, value: "171.6"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, period_index: 100, metric: volume_total, value: "120"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, period_index: 100, metric: price_vwap, value: "140.2"}

@@ -1,0 +1,55 @@
+# T2 — OTE continuous intraday market, daily XLSX (docs/01-data-scope.md §3 T2). Supplies the
+# five XLSX-only metrics; its copies of price_vwap / volume_total are stored and reconciled against
+# T1 (ote_intraday_market), never merged (01 §3 rules 2–3). Discovery page, fallback URL, layout,
+# header texts and DST label patterns verified live on 2026-09-20 (docs/06 §3; evidence rows 7,
+# 12, 13, 20, 21). Fetch and normalise are declared here, never coded (ADR-005).
+schema_version: 1
+target_id: ote_intraday_market_xlsx
+description: OTE continuous intraday market daily results file (XLSX; 96/92/100 rows; blank cells while the day is running)
+license: "OTE Terms of Use (docs/06 §1.4, read 2026-09-20): no reproduction without written consent; fixtures synthetic until confirmed; 15-minute polling of the file not yet confirmed with OTE (01 §10)"
+terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
+allowed_hosts:
+  - www.ote-cr.cz
+modality: dated-file
+cadence:
+  cron: "*/15 * * * *"        # 01 §5; the file carries ETag/Last-Modified, so a stale poll is a 304 (06 §3.3)
+  timezone: Europe/Prague
+  correction:                 # 01 §5 "hourly for D-1..D-3" (ADR-033 §3; runtime verb in Phase 5)
+    cron: "9 * * * *"
+    days: 3
+history:
+  max_age: P1Y                # fallback URL served 2025-10-26 … 2026-09-20 (06 §3.1); depth beyond that [UNVERIFIED]
+fetch:
+  dated_file:
+    file_format: xlsx
+    discovery:                # ADR-005 discovery step: the results page links the day's file (06 §3.1)
+      url: https://www.ote-cr.cz/en/short-term-markets/electricity/intra-day-market
+      link_regex: 'IM_15MIN_\d{2}_\d{2}_\d{4}_EN\.xlsx'
+    # fallback when discovery finds no link; confirmed for four dates across 2025–2026 (06 §3.1)
+    url_template: "https://www.ote-cr.cz/pubweb/attachments/27/{delivery_day:%Y}/month{delivery_day:%m}/day{delivery_day:%d}/IM_15MIN_{delivery_day:%d}_{delivery_day:%m}_{delivery_day:%Y}_EN.xlsx"
+contract:
+  dataset_id: ote.idm_continuous
+  source_transport: xlsx
+  decode: xlsx
+  metrics: [volume_total, volume_buy, volume_sell, price_vwap, price_min, price_max, price_last]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: period_index          # the parser keys on `Period`; the label column is display only (01 §3, §7)
+    timezone: Europe/Prague
+    date: {context: delivery_day}   # the file is named by delivery day; rows carry no date
+    index: {source: Period}
+    resolution: {constant: PT15M}
+  source_version: null
+  source_published_at: null
+  ignore_fields: ["Time interval"]   # display-only label, incl. the DST bridging labels (ADR-034; 06 §3.4)
+  metrics:                      # header texts of row 6; the live cells carry a line break before the unit,
+                                # which the platform's whitespace normalisation folds (06 §3.2)
+    volume_total: {source: "Traded volume (MWh)", unit: MWh, sign: as_published, decimal_separator: dot}
+    volume_buy: {source: "Traded volume - purchase (MWh)", unit: MWh, sign: as_published, decimal_separator: dot}
+    volume_sell: {source: "Traded volume - sold (MWh)", unit: MWh, sign: as_published, decimal_separator: dot}
+    price_vwap: {source: "Average price (EUR/MWh)", unit: EUR/MWh, sign: as_published, decimal_separator: dot}
+    price_min: {source: "Minimal price (EUR/MWh)", unit: EUR/MWh, sign: as_published, decimal_separator: dot}
+    price_max: {source: "Maximal price (EUR/MWh)", unit: EUR/MWh, sign: as_published, decimal_separator: dot}
+    price_last: {source: "Last price (EUR/MWh)", unit: EUR/MWh, sign: as_published, decimal_separator: dot}
