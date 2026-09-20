@@ -120,6 +120,7 @@
 | `secret-scan` | credential-looking strings in tracked files | C-26 |
 | `db-test` | store suite and migration up/down round trip on ephemeral PostgreSQL | C-45 |
 | `helm-lint` (Phase 5) | chart render + `check_workloads` + restricted-PSS check | C-43, C-44 on the rendered chart |
+| `live-smoke` (nightly, **never PR CI**) | `pytest -m live tests/live`: one bounded live read per committed target, shape only (ADR-020; Phase 4 P4-D10); `.github/workflows/nightly-live-smoke.yml` has `schedule` and `workflow_dispatch` triggers only | C-37 (proved by `tests/harness/test_ci_wrappers.py::test_live_smoke_runs_only_on_a_schedule_never_on_pull_requests`) |
 
 Branch protection (`docs/branch-protection.md`) requires every one of these as a status check;
 CODEOWNERS makes the registries, the allowlist, the Makefile, the CI files and the ADRs human-only.

@@ -15,7 +15,7 @@ KIND_NAME := energy-platform
 
 .PHONY: help check lint lock-check format type test db-test schema fixtures deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
-        harness-check pr-surface
+        harness-check pr-surface live-smoke
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -44,6 +44,9 @@ type: sync ## mypy --strict
 
 test: sync ## pytest (unit only; live tests are never selected here — ADR-010; db tests skip without a DSN)
 	$(RUN) pytest -m "not live"
+
+live-smoke: sync ## Nightly: one bounded live read per committed target, shape only; never in PR CI (ADR-020, P4-D10)
+	$(RUN) pytest -m live tests/live
 
 db-test: sync ## Store suite + migration up/down round trip on an ephemeral local PostgreSQL (ADR-016 §3, ADR-030)
 	scripts/with_postgres.sh $(RUN) pytest -m "db" -p no:cacheprovider

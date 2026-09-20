@@ -342,5 +342,7 @@ a target.
 | golden file model: rows, a quarantine or `row_count: 0` (an empty document), `checked_by`, no YAML floats (ADR-020; 05 C-16; P4-D6) | `tests/contracts/test_golden.py`, `tests/harness/test_goldens.py::test_empty_document_golden_passes` |
 | `cadence.correction` shape; `mapping.ignore_fields` never names a mapped source, silences only the listed fields (ADR-033, ADR-034) | `tests/contracts/test_manifest.py`, `test_manifest_negative.py`, `tests/mapping/test_engine.py::test_ignore_fields_silences_only_the_listed_columns` |
 | `next_delivery_day` renders the following civil day (ADR-033 §4) | `tests/fetch/test_render.py::test_next_delivery_day_is_the_following_civil_day` |
+| every committed target's goldens (T1, T2, T3, E1 — 38 goldens on the four `target/*` branches) run through the production pipeline on `make test` | `tests/harness/test_goldens.py::test_committed_target_golden` (auto-discovered) |
+| nightly live smoke, shape only, never in PR CI (ADR-020) | `tests/live/test_smoke.py` (marked `live`, `make live-smoke`) |
 | a `source` that is a column position is refused (05 C-04) | `tests/contracts/test_manifest_negative.py::test_numeric_source_is_positional_parsing` |
 | every Phase 3 gate of `docs/05-constraint-matrix.md`: one negative test per row | `tests/harness/` (see 05 §1 for the row → test map; `tests/harness/test_matrix.py` checks the map itself) |

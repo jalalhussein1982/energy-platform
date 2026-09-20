@@ -7,6 +7,7 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
@@ -31,8 +32,12 @@ def test_make_check_includes_every_static_gate() -> None:
     assert {"lint", "lock-check", "type", "test", "harness-check"} <= deps
 
 
-def test_ci_workflow_only_calls_make() -> None:
-    wf = yaml.safe_load((REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+WORKFLOWS = sorted((REPO / ".github" / "workflows").glob("*.yml"))
+
+
+@pytest.mark.parametrize("workflow", WORKFLOWS, ids=[w.name for w in WORKFLOWS])
+def test_ci_workflow_only_calls_make(workflow: Path) -> None:
+    wf = yaml.safe_load(workflow.read_text(encoding="utf-8"))
     for name, job in wf["jobs"].items():
         for step in job["steps"]:
             if "run" in step:
@@ -40,6 +45,21 @@ def test_ci_workflow_only_calls_make() -> None:
                 assert "pytest" not in step["run"] and "--live" not in step["run"]
             else:
                 assert "uses" in step
+
+
+def test_live_smoke_runs_only_on_a_schedule_never_on_pull_requests() -> None:
+    """ADR-020: the nightly smoke is not PR CI; ci.yml never selects live tests (05 C-37)."""
+    nightly = yaml.safe_load(
+        (REPO / ".github" / "workflows" / "nightly-live-smoke.yml").read_text(encoding="utf-8")
+    )
+    triggers = nightly[True] if True in nightly else nightly["on"]  # YAML reads `on` as True
+    assert set(triggers) == {"schedule", "workflow_dispatch"}
+    runs = {s["run"] for job in nightly["jobs"].values() for s in job["steps"] if "run" in s}
+    assert "make live-smoke" in runs
+    ci = yaml.safe_load((REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    ci_runs = {s["run"] for job in ci["jobs"].values() for s in job["steps"] if "run" in s}
+    assert "make live-smoke" not in ci_runs
+    assert "-m live" in _makefile_recipe("live-smoke")
 
 
 def test_ci_has_a_job_per_phase_3_gate() -> None:
