@@ -1,0 +1,5 @@
+# A SOAP Fault carried over HTTP 200 (review F13 fixture list): quarantined with the fault text.
+fixture: soap_fault
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  quarantine: "SOAP Fault"

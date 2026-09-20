@@ -1,0 +1,12 @@
+# Ordinary day (2026-09-19, CEST +02:00): 96 items → 192 metric rows; period 1 starts at
+# 2026-09-18T22:00Z, period 96 at 2026-09-19T21:45Z. Shape of docs/06 evidence row 8.
+fixture: ordinary_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 192
+  quality_events: [partition_status]     # "2026-09-19: complete 96/96"
+  rows:
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.10"}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: volume_total, value: "93.125"}
+    - {delivery_start_utc: 2026-09-19T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: price_vwap, value: "122.50"}
+    - {delivery_start_utc: 2026-09-19T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: volume_total, value: "88.000"}

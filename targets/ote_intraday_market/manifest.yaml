@@ -1,0 +1,66 @@
+# T1 — OTE continuous intraday market, SOAP GetImPricePeriodE (docs/01-data-scope.md §3 T1).
+# System of record for price_vwap and volume_total (01 §3 reconciliation rule 2). Endpoint, request
+# and response shape verified live on 2026-09-20 (docs/06-source-verification.md §1–§2, evidence
+# rows 1, 8, 9, 17–19). Fetch and normalise are declared here, never coded (ADR-005).
+schema_version: 1
+target_id: ote_intraday_market
+description: OTE continuous intraday market results per delivery period (SOAP, PT15M; PT60M before 2024-07-01)
+license: "OTE Terms of Use (docs/06 §1.4, read 2026-09-20): no reproduction without written consent; fixtures synthetic until confirmed (01 §10)"
+terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
+allowed_hosts:
+  - www.ote-cr.cz
+modality: soap-xml
+cadence:
+  cron: "*/15 * * * *"        # 01 §5: every 15 minutes during the delivery day
+  timezone: Europe/Prague
+  correction:                 # 01 §5 "hourly for D-1..D-3" (ADR-033 §3; runtime verb in Phase 5)
+    cron: "7 * * * *"
+    days: 3
+history:
+  max_age: P2Y                # period-based operation serves 2024-06-30 at PT60M (06 §2); depth beyond that [UNVERIFIED]
+fetch:
+  soap_xml:
+    url: https://www.ote-cr.cz/pw-data/services/PublicDataService
+    soap_action: http://www.ote-cr.cz/schema/service/public/GetImPricePeriodE
+    soap_version: "1.1"
+    body_template: |
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:pub="http://www.ote-cr.cz/schema/service/public">
+        <soapenv:Body>
+          <pub:GetImPricePeriodE>
+            <pub:StartDate>{start_date}</pub:StartDate>
+            <pub:EndDate>{end_date}</pub:EndDate>
+          </pub:GetImPricePeriodE>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    params:
+      start_date: "{delivery_day:%Y-%m-%d}"
+      end_date: "{delivery_day:%Y-%m-%d}"     # one delivery day per capture; the API caps at 31
+contract:
+  dataset_id: ote.idm_continuous
+  source_transport: soap
+  decode: soap
+  metrics: [price_vwap, volume_total]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: period_index          # 01 §7: index → local interval → UTC; 92/96/100 by the calendar
+    timezone: Europe/Prague
+    date: {source: Date}
+    index: {source: PeriodIndex}
+    resolution: {source: PeriodResolution}   # PT15M, or PT60M for days before 2024-07-01 (06 §2)
+  source_version: null          # the service publishes no revision marker (01 §3)
+  source_published_at: null     # no publication timestamp in the response (01 §3)
+  ignore_fields: [Emerg]        # optional state-of-emergency flag; no registered metric (ADR-034)
+  metrics:
+    price_vwap:
+      source: Price             # absent element = no trade in the period → NULL, never zero (01 §9)
+      unit: EUR/MWh
+      sign: as_published
+      decimal_separator: dot    # a dot on every live item (06 §1.5)
+    volume_total:
+      source: Volume
+      unit: MWh
+      sign: as_published
+      decimal_separator: dot

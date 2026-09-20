@@ -1,0 +1,13 @@
+# 23-hour day (2026-03-29): 92 items (docs/06 row 17). Period 1 = 00:00 CET = 2026-03-28T23:00Z;
+# period 8 = 01:45 CET; period 9 = 03:00 CEST = 2026-03-29T01:00Z; period 92 = 23:45 CEST = 21:45Z.
+fixture: spring_dst_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 184
+  quality_events: [partition_status]     # "2026-03-29: complete 92/92"
+  rows:
+    - {delivery_start_utc: 2026-03-28T23:00:00Z, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.10"}
+    - {delivery_start_utc: 2026-03-29T00:45:00Z, resolution: PT15M, period_index: 8, metric: volume_total, value: "104.000"}
+    - {delivery_start_utc: 2026-03-29T01:00:00Z, resolution: PT15M, period_index: 9, metric: price_vwap, value: "153.20"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, period_index: 92, metric: price_vwap, value: "104.10"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, period_index: 92, metric: volume_total, value: "56.000"}

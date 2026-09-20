@@ -1,0 +1,10 @@
+# The optional Emerg element (state of emergency, WSDL minOccurs=0) is declared in
+# mapping.ignore_fields (ADR-034): rows are produced and no unknown_field warning is raised.
+fixture: emerg_flag
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 16
+  quality_events: [partition_status]     # "2026-09-19: partial 8/96"
+  rows:
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.10"}
+    - {delivery_start_utc: 2026-09-19T01:45:00+02:00, resolution: PT15M, period_index: 8, metric: volume_total, value: "104.000"}

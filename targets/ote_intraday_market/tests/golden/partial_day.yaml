@@ -1,0 +1,11 @@
+# Rolling partial day: the live service returns only published periods as items (docs/06 §2, row 9:
+# 58 items at 14:24 local). Absent periods are absent, not NULL; completeness says partial 58/96.
+fixture: partial_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 116
+  quality_events: [partition_status]     # "2026-09-20: partial 58/96"
+  rows:
+    - {delivery_start_utc: 2026-09-20T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_vwap, value: "117.10"}
+    - {delivery_start_utc: 2026-09-20T14:15:00+02:00, resolution: PT15M, period_index: 58, metric: price_vwap, value: "146.20"}
+    - {delivery_start_utc: 2026-09-20T14:15:00+02:00, resolution: PT15M, period_index: 58, metric: volume_total, value: "54.250"}
