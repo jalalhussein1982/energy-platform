@@ -2,6 +2,8 @@
 # Replace the placeholder with the maintainer's GitHub handle before enabling branch protection.
 *                        @REPLACE-WITH-GITHUB-HANDLE
 /energy_platform/        @REPLACE-WITH-GITHUB-HANDLE
+/energy_platform/contracts/registry.py @REPLACE-WITH-GITHUB-HANDLE   # dataset registry (ADR-022 Route B)
+/energy_platform/contracts/hosts.py    @REPLACE-WITH-GITHUB-HANDLE   # host registry (ADR-026)
 /deployment/             @REPLACE-WITH-GITHUB-HANDLE
 /docs/adr/               @REPLACE-WITH-GITHUB-HANDLE
 /docs/00-assumptions.md  @REPLACE-WITH-GITHUB-HANDLE
