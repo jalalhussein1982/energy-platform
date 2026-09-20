@@ -95,8 +95,8 @@ def t3_manifest() -> dict[str, Any]:
             },
             "source_version": {"constant": "RT"},
             "metrics": {
-                "load_incl_pumping": {"source": "value1", "unit": "MW"},
-                "load": {"source": "value2", "unit": "MW"},
+                "load_incl_pumping": {"source": "@value1", "unit": "MW"},
+                "load": {"source": "@value2", "unit": "MW"},
             },
         },
     }

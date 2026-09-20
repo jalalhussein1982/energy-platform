@@ -52,5 +52,5 @@ mapping:
   source_version: {constant: RT}  # bound to the `version` identity dimension (04-contracts §2.3)
   source_published_at: null     # not provided (01 §3)
   metrics:
-    load_incl_pumping: {source: value1, unit: MW}   # "Load including pumping [MW]"
-    load: {source: value2, unit: MW}                # "Load [MW]"
+    load_incl_pumping: {source: "@value1", unit: MW}   # attribute value1 = "Load including pumping [MW]"
+    load: {source: "@value2", unit: MW}                # attribute value2 = "Load [MW]"
