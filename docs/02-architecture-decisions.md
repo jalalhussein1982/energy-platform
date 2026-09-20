@@ -423,6 +423,11 @@ Direction fixed: declarative, versioned JSON Schema, one file per target, mandat
 | ADR-025-upgrade-hooks-and-install-ordering | review F07; amends ADR-016 §2–3, ADR-021 §3 | ACCEPTED |
 | ADR-026-egress-boundary | review F08; amends ADR-008 SSRF mechanism | ACCEPTED |
 | ADR-027-target-capability-boundary | review F03; amends ADR-014, ADR-017 | ACCEPTED |
+| ADR-028-demo-environment | demo environment; amends ADR-001, D-1, D-3 | ACCEPTED |
+| ADR-029-typing-stubs | amends ADR-019 (stub packages) | ACCEPTED *(2026-09-20)* |
+| ADR-030-postgres-engine-plain | D-2 engine: plain PostgreSQL ≥ 16 | ACCEPTED *(2026-09-20)* |
+| ADR-031-gap-detector-defaults | D-4 | ACCEPTED *(2026-09-20)* |
+| ADR-032-object-store-client | Bronze S3 client (amends ADR-019, ADR-027 §3) | PROPOSED *(2026-09-20)* |
 
 ---
 
@@ -457,9 +462,9 @@ Harness before code. Step 4 is the harness's own first test.
 | ID | Item | Options | Default |
 |---|---|---|---|
 | D-1 | Kubernetes bootstrap on an IaaS | Magnum vs Terraform VMs + cloud-init k3s/RKE2 | VMs + cloud-init k3s/RKE2 (Magnum not universal) *(2026-09-19, ADR-028: two Terraform roots over shared modules — `openstack` reference, `terraform test` with mocks; `hcloud` demo, applied by the author, never by the agent)* |
-| D-2 | Postgres as a **DSN contract** (changed 2026-09-19, `00` §6; was "engine and HA") | chart takes a DSN; profiles provide Postgres via `postgres.mode` = `statefulset` \| `cnpg` \| `external`; engine (plain vs TimescaleDB) still open | `statefulset` for local/tenant, `cnpg` for own-cluster (and for tenant where the operator pre-exists, `00` V-10), `external` for managed; engine decided by ADR before the Phase 2 schema |
+| D-2 | Postgres as a **DSN contract** (changed 2026-09-19, `00` §6; was "engine and HA") | chart takes a DSN; profiles provide Postgres via `postgres.mode` = `statefulset` \| `cnpg` \| `external`; engine (plain vs TimescaleDB) still open | `statefulset` for local/tenant, `cnpg` for own-cluster (and for tenant where the operator pre-exists, `00` V-10), `external` for managed; engine decided by ADR before the Phase 2 schema *(2026-09-20: resolved by ADR-030 — plain PostgreSQL ≥ 16, no extension)* |
 | D-3 | Object storage per profile | MinIO local; Ceph RGW / Swift on OpenStack; what is the "independent copy" in each profile | MinIO (2 instances local); RGW + Swift on the reference environment (V-6); **demo: A = Hetzner Object Storage, B = OCI Object Storage via the S3-compatible endpoint with a retention rule** (ADR-028, V-12/V-13) |
-| D-4 | Gap detector internals | expected-interval calendars per target; tolerance windows; where it runs | `CronJob` every cadence; tolerance = 2× cadence; emits `missing_capture` vs `unprocessed_capture` (ADR-024) *(2026-09-19: "CronWorkflow" was residual Argo wording)* |
+| D-4 | Gap detector internals | expected-interval calendars per target; tolerance windows; where it runs | `CronJob` every cadence; tolerance = 2× cadence; emits `missing_capture` vs `unprocessed_capture` (ADR-024) *(2026-09-19: "CronWorkflow" was residual Argo wording)* *(2026-09-20: resolved by ADR-031)* |
 | D-5 | Polling cadence and politeness | per-target intervals; jitter; backoff caps; conditional requests (ETag/If-Modified-Since) | intervals from 01 §5 (T1/T2: 15 min during the delivery day, hourly for D-1..D-3; T3: 15 min; E1: hourly from 12:00 CET on D-1); jitter ±10%; capped exponential backoff; conditional where supported; one-week observation campaign before any latency is quoted *(2026-09-19: "5 min OTE IM" replaced by the 01 v1.0 values)* |
 | D-6 | Observability stack (changed 2026-09-19, `00` §6) | metrics exposure: `/metrics` + annotations vs `PodMonitor`; stack in local profile | **annotations by default; `PodMonitor` behind `metrics.operator.enabled`** (core chart needs no CRD); full stack only in `own-cluster`, minimal in local |
 | D-7 | Secrets backend (changed 2026-09-19, `00` §6) | plain `Secret` vs External Secrets Operator; SOPS locally | **plain `Secret` by default (from CI/SOPS); ESO behind `secrets.eso.enabled`** (ESO absent on the reference cluster, `00` V-4); SOPS for local |

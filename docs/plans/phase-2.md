@@ -48,10 +48,10 @@
 
 **Files:** `docs/adr/ADR-030-postgres-engine-plain.md`, `docs/adr/ADR-031-gap-detector-defaults.md`, `docs/adr/ADR-032-object-store-client.md` (PROPOSED), this file, `pyproject.toml`, `uv.lock`, `deps-allowlist.txt`, `docs/02-architecture-decisions.md` ADR index rows only (dated note).
 
-- [ ] ADR-030, ADR-031 ACCEPTED; ADR-032 PROPOSED (S3 client) for the author.
-- [ ] Runtime deps `httpx`, `lxml`, `openpyxl`, `psycopg`, `alembic`, `sqlalchemy`, `typer`; dev `lxml-stubs`, `types-openpyxl`; `uv lock`; every locked package listed in `deps-allowlist.txt` with its parent; `make deps-allowlist` green.
-- [ ] `energy_platform.__version__ = "0.0.1"` with a test that it equals `pyproject.toml`.
-- [ ] Commit `build(deps): Phase 2 runtime dependencies locked and allowlisted (ADR-019, ADR-029); ADR-030, ADR-031; plan`.
+- [x] ADR-030, ADR-031 ACCEPTED; ADR-032 PROPOSED (S3 client) for the author.
+- [x] Runtime deps `httpx`, `lxml`, `openpyxl`, `psycopg`, `alembic`, `sqlalchemy`, `typer`; dev `lxml-stubs`, `types-openpyxl`; `uv lock`; every locked package listed in `deps-allowlist.txt` with its parent; `make deps-allowlist` green.
+- [x] `energy_platform.__version__ = "0.0.1"` with a test that it equals `pyproject.toml`.
+- [x] Commit `build(deps): Phase 2 runtime dependencies locked and allowlisted (ADR-019, ADR-029); ADR-030, ADR-031; plan`.
 
 ### Task 2.2 — `fetch/`
 
@@ -59,8 +59,8 @@
 
 Produces: `render(template, ctx)` for `{delivery_day:%Y-%m-%d}` / `{scheduled_for}`; `EgressPolicy.check_url(url, manifest)` (scheme, host in manifest and registry, port, no IP literal), `check_resolved(addresses)` (private, loopback, link-local, CGNAT, metadata), `check_peer`; `Fetcher(transport, resolver, sleep, clock, offline)` with `fetch(request) -> FetchResult(url, status, headers, body, content_type, fetched_at, etag, last_modified, not_modified)`; redirects followed by hand ≤ 3 with every hop checked; retries with capped jittered backoff; conditional headers; rate limiter; `plan_for(manifest, ctx, previous)` builds the request(s) per modality: `soap_xml` (POST, SOAPAction, rendered body), `dated_file` (discovery GET + regex → download GET, fallback `url_template`), `html_table` (GET), `rest_json`/`rest_xml` (GET with query/headers; `secretRef` resolved from env `NAME_KEY` in this phase; value never logged).
 
-- [ ] Tests (fake transport via `httpx.MockTransport`, fake resolver): host not in manifest → `host_not_allowed`; host in manifest but not registry → `host_not_registered`; `http` without both flags → `insecure_scheme`; port 8080 → `port_not_allowed`; resolves to `10.0.0.1` / `169.254.169.254` / `127.0.0.1` → `private_address`; redirect to unlisted host → `redirect_to_unlisted_host`; 4th redirect → `too_many_redirects`; 503 then 200 → one retry, backoff called with capped jitter; 404 → no retry; timeout → `fetch_error`; conditional headers sent, 304 → `not_modified`; SOAP body rendered from params; T2 discovery regex picks the link, fallback used when absent; secret resolved from env, absent from any repr/log; peer mismatch aborts; `offline=False` with no peer info aborts.
-- [ ] Commit `feat(fetch): declarative fetchers with host enforcement, hand-followed redirects, capped backoff, conditional requests (ADR-026 §2)`.
+- [x] Tests (fake transport via `httpx.MockTransport`, fake resolver): host not in manifest → `host_not_allowed`; host in manifest but not registry → `host_not_registered`; `http` without both flags → `insecure_scheme`; port 8080 → `port_not_allowed`; resolves to `10.0.0.1` / `169.254.169.254` / `127.0.0.1` → `private_address`; redirect to unlisted host → `redirect_to_unlisted_host`; 4th redirect → `too_many_redirects`; 503 then 200 → one retry, backoff called with capped jitter; 404 → no retry; timeout → `fetch_error`; conditional headers sent, 304 → `not_modified`; SOAP body rendered from params; T2 discovery regex picks the link, fallback used when absent; secret resolved from env, absent from any repr/log; peer mismatch aborts; `offline=False` with no peer info aborts.
+- [x] Commit `feat(fetch): declarative fetchers with host enforcement, hand-followed redirects, capped backoff, conditional requests (ADR-026 §2)`.
 
 ### Task 2.3 — `bronze/`
 
@@ -68,8 +68,8 @@ Produces: `render(template, ctx)` for `{delivery_day:%Y-%m-%d}` / `{scheduled_fo
 
 Produces: `BlobStore` protocol (`put(bytes)->sha`, `get(sha)`, `exists`) with `MemoryBlobStore`, `FileBlobStore(dir)`; `CaptureEntry` (Pydantic, 01 §6.1 names + `capture_id`, `target_id`, `scheduled_for`, `attempt`, `source_url`, `http_status`, `content_type`, `content_changed`, `tier`, `etag`, `last_modified`, `size`); `CaptureLog` protocol (`put`, `get`, `list(target_id, since, until)`, `latest(target_id)`) with memory and file backends; `Bronze(hot, cold, log)`: `capture(target_id, scheduled_for, result, transport, force=False) -> CaptureEntry | existing` writing blob **then** entry, attempt from listing, `content_changed` against `latest`; `read(raw_ref)` hot then cold; `write_fixture` / `load_fixture` (a fixture directory *is* a Bronze object: `blob` + `entry.json`, ADR-020).
 
-- [ ] Tests: blob then entry order (a failing log leaves a harmless orphan blob); second capture of the same `(target, scheduled_for)` is a no-op unless `force`; `force` → attempt 2; unchanged payload → new entry, `content_changed=False`, same `raw_ref`; `304` result reuses previous blob; entry key layout; `read` falls back to cold and reports `tier`; file backend round-trips through a tmp dir; entry `payload_sha256` equals blob hash.
-- [ ] Commit `feat(bronze): content-addressed blob store, capture log, hot/cold read path (ADR-002, ADR-021, ADR-024 §1)`.
+- [x] Tests: blob then entry order (a failing log leaves a harmless orphan blob); second capture of the same `(target, scheduled_for)` is a no-op unless `force`; `force` → attempt 2; unchanged payload → new entry, `content_changed=False`, same `raw_ref`; `304` result reuses previous blob; entry key layout; `read` falls back to cold and reports `tier`; file backend round-trips through a tmp dir; entry `payload_sha256` equals blob hash.
+- [x] Commit `feat(bronze): content-addressed blob store, capture log, hot/cold read path (ADR-002, ADR-021, ADR-024 §1)`.
 
 ### Task 2.4 — `parse/`
 
@@ -77,8 +77,8 @@ Produces: `BlobStore` protocol (`put(bytes)->sha`, `get(sha)`, `exists`) with `M
 
 Produces: `decode(payload, kind) -> DecodedDocument` (`xlsx` via openpyxl read-only, floats → `Decimal(repr)`, datetimes → ISO text; `xml`/`soap` via lxml with entities and network resolution off → `XmlElement` tree, SOAP `Fault` → `SoapFault`; `json`; `html-table` via lxml.html + a minimal CSS selector subset (tag, `#id`, `.class`, descendant); `csv`), `DecodeError`; generic parsers per P2-D5: `XmlRecordParser`, `SheetRecordParser` (header row = first row containing every required header, exact text after whitespace normalisation), `TableRecordParser`, `JsonRecordParser`, `CsvRecordParser`; `generic_parser(manifest) -> Parser` and `parser_ref(manifest)`.
 
-- [ ] Tests: OTE `GetImPricePeriodE` response → records with `Date`, `PeriodIndex`, `PeriodResolution`, optional `Price`/`Volume` (absent → missing key), `Emerg` carried; empty `<Result/>` → zero records, no error; SOAP fault → `SoapFault`; ČEPS `Load` → `@date`, `value1`, `value2`, `information` block ignored; XLSX with title row 3, header row 6, 96 rows, footer → 96 records, footer excluded, numbers as `Decimal`; changed header `(MW)` → header not found error; html table with decimal-comma text; CSV; JSON list of objects; XXE payload does not resolve; `parser_ref` shape.
-- [ ] Commit `feat(parse): platform decoders and generic record parsers for soap/xml, xlsx, html-table, csv, json (ADR-019, ADR-027 §2)`.
+- [x] Tests: OTE `GetImPricePeriodE` response → records with `Date`, `PeriodIndex`, `PeriodResolution`, optional `Price`/`Volume` (absent → missing key), `Emerg` carried; empty `<Result/>` → zero records, no error; SOAP fault → `SoapFault`; ČEPS `Load` → `@date`, `value1`, `value2`, `information` block ignored; XLSX with title row 3, header row 6, 96 rows, footer → 96 records, footer excluded, numbers as `Decimal`; changed header `(MW)` → header not found error; html table with decimal-comma text; CSV; JSON list of objects; XXE payload does not resolve; `parser_ref` shape.
+- [x] Commit `feat(parse): platform decoders and generic record parsers for soap/xml, xlsx, html-table, csv, json (ADR-019, ADR-027 §2)`.
 
 ### Task 2.5 — `mapping/`
 
@@ -86,8 +86,8 @@ Produces: `decode(payload, kind) -> DecodedDocument` (`xlsx` via openpyxl read-o
 
 Produces: `QualityEvent(kind, severity, message, locator)`; `Quarantined(reason, locator)`; `RunContext(target_id, scheduled_for, delivery_day, fetched_at, raw_ref, payload_sha256, processed_at)`; `map_records(manifest, records, ctx, derivation) -> MappingResult(observations, events)`: time by `period_index` (`interval_for_index`) or `timestamp` (`interval_from_timestamp` with `interval_label`), `local_date` from the interval start in the mapping timezone, `resolution` from source/constant, `source_version`/`source_published_at` from source/constant/null, metrics via `parse_decimal` + `apply_sign`, sign rules per P2-D7, P2-D6 quarantine/`unknown_field` rules; `reconcile_transports(current_rows) -> events` (P2-D7); `partition_status(observations, expected_count)`.
 
-- [ ] Tests (Hypothesis where cheap): T1 records → 2 rows per period, values `Decimal`, interval from index; DST 92/100-row XLSX days map without error and cover the day; ČEPS `@date +02:00` `start` vs `end`; NULL never zero; decimal comma under `comma` rule; dot text under comma rule → quarantine; `Emerg` present but unmapped → `unknown_field`; changed header → quarantine; negative `volume_total` → quarantine; negative `load` → `negative_value` event, row kept; T2 `price_vwap` differing from T1 by 0.02 → `reconciliation_mismatch`, by 0.005 → none; 8 of 96 periods → `partial`, 96 → `complete`; `sign: inverted` inverts.
-- [ ] Commit `feat(mapping): manifest mapping engine — intervals, decimals, sign rules, quarantine, quality events, T1/T2 reconciliation (ADR-005, 01 §3/§7/§9)`.
+- [x] Tests (Hypothesis where cheap): T1 records → 2 rows per period, values `Decimal`, interval from index; DST 92/100-row XLSX days map without error and cover the day; ČEPS `@date +02:00` `start` vs `end`; NULL never zero; decimal comma under `comma` rule; dot text under comma rule → quarantine; `Emerg` present but unmapped → `unknown_field`; changed header → quarantine; negative `volume_total` → quarantine; negative `load` → `negative_value` event, row kept; T2 `price_vwap` differing from T1 by 0.02 → `reconciliation_mismatch`, by 0.005 → none; 8 of 96 periods → `partial`, 96 → `complete`; `sign: inverted` inverts.
+- [x] Commit `feat(mapping): manifest mapping engine — intervals, decimals, sign rules, quarantine, quality events, T1/T2 reconciliation (ADR-005, 01 §3/§7/§9)`.
 
 ### Task 2.6 — `silver/` + `ledger/` store, migrations, ephemeral Postgres
 
@@ -95,8 +95,8 @@ Produces: `QualityEvent(kind, severity, message, locator)`; `Quarantined(reason,
 
 Produces: migrations with explicit DDL and downgrades — `derivations`, `runs`, `run_attempts`, `observations` (`tstzrange`, generated `delivery_start_utc`, `jsonb` dimensions, `UNIQUE … NULLS NOT DISTINCT` on the version identity, FK to `run_attempts`, `derivations`), `quality_events`, view `observations_current` (ADR-023 §3 ordering, `ordering_basis` column); `Store` protocol: `ensure_run`, `claim(run_id, owner, ttl) -> fence | None`, `renew`, `commit(run_id, fence, *, state, attempt_outcome, observations, events) -> CommitResult(inserted, lost_lease)` in one transaction, `start_attempt`, `pending_runs(target)`, `enqueue_replay`, `register_derivation`, `current_rows(dataset, dimensions?, start, end)`, `rows_by_derivation`, `missed_runs`; `MemoryStore` with the same semantics; `PostgresStore` with `server_version_num ≥ 160000` check; `upgrade(dsn)`, `downgrade(dsn, "base")`.
 
-- [ ] Tests, parametrised over `memory` and `postgres` (`db`, skipped without DSN): the six ADR-023 proofs (exact retry no-op; same payload + new derivation appends and is current; older capture replayed with newer derivation is not current over a newer capture; T1/T2 ownership holds across both; NULL `source_version` retry no-op; provider correction appends); claim twice → second `None`; expired lease reclaimable, stale commit → `lost_lease`, zero rows; `ordering_basis` recorded; migration `upgrade → downgrade base → upgrade` leaves no table behind (`db` only).
-- [ ] Commit `feat(store): ledger and Silver schema with downgrades, fenced commit, current view; memory and Postgres stores (ADR-018, ADR-023, ADR-024, ADR-030)`.
+- [x] Tests, parametrised over `memory` and `postgres` (`db`, skipped without DSN): the six ADR-023 proofs (exact retry no-op; same payload + new derivation appends and is current; older capture replayed with newer derivation is not current over a newer capture; T1/T2 ownership holds across both; NULL `source_version` retry no-op; provider correction appends); claim twice → second `None`; expired lease reclaimable, stale commit → `lost_lease`, zero rows; `ordering_basis` recorded; migration `upgrade → downgrade base → upgrade` leaves no table behind (`db` only).
+- [x] Commit `feat(store): ledger and Silver schema with downgrades, fenced commit, current view; memory and Postgres stores (ADR-018, ADR-023, ADR-024, ADR-030)`.
 
 ### Task 2.7 — `runtime/`: capture, process, reconcile, replay, backfill, gaps
 
@@ -104,8 +104,8 @@ Produces: migrations with explicit DDL and downgrades — `derivations`, `runs`,
 
 Produces: `capture(manifest, scheduled_for, *, fetcher, bronze, store)`: plan → fetch → `bronze.capture` → `store.ensure_run(captured)` best-effort (a `StoreUnavailable` is a warning, capture stays complete); `reconcile(manifest, bronze, store, window)`; `process(manifest, *, bronze, store, clock)`: reconcile → pending runs → claim → attempt → read blob → decode → parse → map → commit (rows + events + state) fenced; quarantine → `failed`/`quarantined`; `replay(range | derivation)`; `backfill`; `gaps` per ADR-031 with the cron evaluator.
 
-- [ ] Tests — the ADR-024 crash matrix, one each, memory backends: blob PUT then crash before entry → next run re-captures, orphan harmless; entry PUT then crash before ledger row → `reconcile` inserts `origin=reconciled`; store down during capture → capture complete, reconciled later; two workers claim → second fails; lease expires and old holder commits late → zero rows, `lost_lease`; never captured inside `max_age` → `missing_capture` + backfill run enqueued, backfill fetches and captures; outside → `unrecoverable` + alert event; replay of a capture already processed by the same derivation → no-op. Plus: cron evaluator (`*/15`, lists, ranges, DST day yields 92/100 instants for a `*/15` cadence), `max_age` calendar cutoff, `unprocessed_capture` emitted for a captured-not-processed run older than tolerance, `pending` inside tolerance.
-- [ ] Commit `feat(runtime): capture, reconcile, fenced process, replay, backfill and gap detector with the ADR-024 crash matrix (ADR-003 rev., ADR-024, ADR-031)`.
+- [x] Tests — the ADR-024 crash matrix, one each, memory backends: blob PUT then crash before entry → next run re-captures, orphan harmless; entry PUT then crash before ledger row → `reconcile` inserts `origin=reconciled`; store down during capture → capture complete, reconciled later; two workers claim → second fails; lease expires and old holder commits late → zero rows, `lost_lease`; never captured inside `max_age` → `missing_capture` + backfill run enqueued, backfill fetches and captures; outside → `unrecoverable` + alert event; replay of a capture already processed by the same derivation → no-op. Plus: cron evaluator (`*/15`, lists, ranges, DST day yields 92/100 instants for a `*/15` cadence), `max_age` calendar cutoff, `unprocessed_capture` emitted for a captured-not-processed run older than tolerance, `pending` inside tolerance.
+- [x] Commit `feat(runtime): capture, reconcile, fenced process, replay, backfill and gap detector with the ADR-024 crash matrix (ADR-003 rev., ADR-024, ADR-031)`.
 
 ### Task 2.8 — `energyctl`, fixtures, `make demo`, CI
 
@@ -113,16 +113,35 @@ Produces: `capture(manifest, scheduled_for, *, fetcher, bronze, store)`: plan �
 
 Produces: `energyctl validate --manifest`, `capture --manifest --scheduled-for [--fixture DIR]`, `process --manifest`, `replay --manifest (--from --to | --derivation)`, `gaps --manifest`, `backfill --manifest`, `migrate (upgrade|downgrade)`, `demo [--dsn] [--bronze-dir]`; `demo` = migrate → for T1, T2, T3: capture from fixture through the real fetch path with an offline transport → process → then a second process is a no-op, a replay with a new derivation appends → prints counts from `observations_current`, quality events, per-day completeness. `make demo` starts the ephemeral Postgres unless `ENERGY_PLATFORM_DSN` is set.
 
-- [ ] Tests: `validate` prints the `ValidationResult` JSON with exit code by status; `demo --dsn` against memory? (no: demo is Postgres by definition — a `db` test runs `demo` end-to-end and asserts counts: T1 2×96, T2 7×96, T3 2×96 rows, zero quarantines, `partition_status = complete` for each); `capture --fixture` round-trips.
-- [ ] `make demo` green here; `make check`, `make db-test`, `make deps-allowlist`, `make secret-scan` green.
-- [ ] Commit `feat(cli): energyctl validate/capture/process/replay/gaps/backfill/demo; make demo runs offline on fixtures into Postgres (ADR-000, ADR-010)`.
+- [x] Tests: `validate` prints the `ValidationResult` JSON with exit code by status; `demo --dsn` against memory? (no: demo is Postgres by definition — a `db` test runs `demo` end-to-end and asserts counts: T1 2×96, T2 7×96, T3 2×96 rows, zero quarantines, `partition_status = complete` for each); `capture --fixture` round-trips.
+- [x] `make demo` green here; `make check`, `make db-test`, `make deps-allowlist`, `make secret-scan` green.
+- [x] Commit `feat(cli): energyctl validate/capture/process/replay/gaps/backfill/demo; make demo runs offline on fixtures into Postgres (ADR-000, ADR-010)`.
 
 ### Task 2.9 — close the phase
 
-- [ ] `docs/04-contracts.md` §5: add the `unknown_field` / `mapping.ignore_fields` question (P2-D6) as a Route B item; §2.8 note that quarantine rules are now enforced (`mapping/`).
-- [ ] `docs/02-architecture-decisions.md`: ADR index rows for ADR-029 … ADR-032 (dated note; §4.2 D-2 / D-4 rows get a "resolved by" note). No other edit.
-- [ ] Tick Phase 2 boxes in `docs/03-roadmap.md` (S3 backend box stays open with the ADR-032 pointer); append the dated `docs/progress.md` entry with the Phase 3 starter prompt.
-- [ ] Commit `docs(roadmap): Phase 2 done — core library, migrations with downgrades, offline demo`.
+- [x] `docs/04-contracts.md` §5: add the `unknown_field` / `mapping.ignore_fields` question (P2-D6) as a Route B item; §2.8 note that quarantine rules are now enforced (`mapping/`).
+- [x] `docs/02-architecture-decisions.md`: ADR index rows for ADR-029 … ADR-032 (dated note; §4.2 D-2 / D-4 rows get a "resolved by" note). No other edit.
+- [x] Tick Phase 2 boxes in `docs/03-roadmap.md` (S3 backend box stays open with the ADR-032 pointer); append the dated `docs/progress.md` entry with the Phase 3 starter prompt.
+- [x] Commit `docs(roadmap): Phase 2 done — core library, migrations with downgrades, offline demo`.
+
+## Deviations from the plan as written (recorded at close, 2026-09-20)
+
+- **Package layout.** `silver/` and `ledger/` did not become two packages: the ledger, the
+  derivations, the Silver rows and the quality events sit behind one `Store` protocol in
+  `energy_platform/store/` (P2-D3), and `energy_platform/silver/` holds the migrations and the
+  Alembic entry points only. The `runs`/`run_attempts` semantics are unchanged.
+- **P2-D6, "no record at all".** An empty document (OTE `<Result/>`) is *not* quarantined: it
+  commits zero rows with `partition_status … empty 0/96`. Quarantining it would hide the
+  documented "not yet published" state; the fixture list in 01 §9 names it as a legitimate case.
+- **P2-D12 extended.** `history.max_age: none` is read as "the source serves no history":
+  every missing capture is `unrecoverable` (ADR-024 rejected silent refetching). Years, months,
+  weeks and days step the local wall clock (a calendar day across a DST change is still one day);
+  hours and minutes are exact.
+- **Event per attempt.** A no-op replay records its own `partition_status` (and, for T2, its own
+  `unknown_field`) event: quality events describe attempts, not rows.
+- **ČEPS attributes.** The Phase 1 example mapped `value1`/`value2`; the parser exposes XML
+  attributes as `@name` (as the example already did for `@date`), so the manifest now says
+  `@value1`/`@value2`. The in-memory Phase 1 fixture followed.
 
 ## Verification before each commit
 

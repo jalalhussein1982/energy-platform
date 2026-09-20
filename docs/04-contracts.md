@@ -144,6 +144,15 @@ document. Blank cells and absent elements become NULL, never zero. Unknown colum
 text, unit-label changes and currency mismatches quarantine the whole document with a reason. MW
 versus MWh is checked against the registry, not inferred.
 
+*(2026-09-20, Phase 2 — `energy_platform/mapping/`.)* Enforced as follows: a mapped header or
+field missing from the document, a cell that is not a decimal under the declared separator, a
+non-finite value, a `non_negative` violation, a SOAP `Fault`, an undecodable payload and one
+identity with two values **quarantine** the document (state `failed`, outcome `quarantined`, one
+`quarantine` event, no Silver row; the payload stays in Bronze for replay). A field present in the
+document but not referenced by the mapping raises the quality event `unknown_field` (warning)
+instead of a quarantine — see §5, plan P2-D6. `non_negative_expected` raises `negative_value`;
+01 §5 completeness is the `partition_status` event; 01 §3 rule 2 is `reconciliation_mismatch`.
+
 ## 3. ADR-013 — the manifest (`energy_platform/contracts/manifest.py`)
 
 ### 3.1 File conventions (ADR-017)
@@ -303,6 +312,11 @@ manifest's `allowed_hosts` **and** this registry on every request and every redi
 
 Open formalisation questions are recorded as Route B items, never resolved by adding a field in
 a target.
+
+| Open question (needs an ADR, not a target change) | Raised |
+|---|---|
+| **Display-only columns.** 01 §9 says an unknown column quarantines the document, but 01 §3 documents T2's `Time interval` column as display only and the manifest has no way to say so. Phase 2 (P2-D6) reports such fields as `unknown_field` warnings, so every T2 run carries one. Resolving it means a manifest field (`mapping.ignore_fields`), i.e. an ADR and a schema minor bump. | 2026-09-20, Phase 2 |
+| **Delivery-day offset.** 01 §5 polls T1/T2 "hourly for D-1..D-3"; the run context derives the delivery day from `scheduled_for` alone (`runtime.delivery_day_for`). A per-target offset needs a manifest field, decided with D-5 (Phase 4). | 2026-09-20, Phase 2 |
 
 ## 6. Where the tests are
 

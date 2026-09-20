@@ -28,7 +28,7 @@
 |---|---|---|---|---|
 | 0 | Repository bootstrap | 3 | 1 | `make check` green on empty package — **done 2026-09-19** |
 | 1 | Contracts (ADR-011, ADR-013 → `docs/04-contracts.md`) | 3 | 1–2 | six example manifests validate; DST property tests pass — **done 2026-09-20** |
-| 2 | Platform core library | 3 | 3–4 | `make demo` runs on fixtures end-to-end into Postgres |
+| 2 | Platform core library | 3 | 3–4 | `make demo` runs on fixtures end-to-end into Postgres — **done 2026-09-20** (S3 backend pending ADR-032) |
 | 3 | Harness: CLI, MCP, CI gates | 3 | 2–3 | one bad PR per failure mode is rejected |
 | 4 | Committed-target verification through the harness (01 §3) | 4 | 1–2 | T1, T2, T3, E1 green on fixtures; nightly live smoke defined |
 | 5 | Deployment, IaC, HA, DR, observability | 5 | 3–4 | clean-clone `make local-up && make smoke-test`; restore drill passes |
@@ -85,20 +85,20 @@
 
 ## Phase 2 — Platform core library
 
-**Goal.** The platform owns semantics end to end, runnable locally on fixtures.
+**Goal.** The platform owns semantics end to end, runnable locally on fixtures. **Done 2026-09-20** (`docs/plans/phase-2.md`, `docs/progress.md`) except the S3 Bronze backend, which waits on ADR-032 (PROPOSED).
 
 **Deliverables.**
-- [ ] `fetch/` — declarative fetchers per modality (httpx, timeouts, capped backoff with jitter, conditional requests, host-allowlist enforcement before any request).
-- [ ] `bronze/` — blob store (SHA-256 keyed) + capture log; `content_changed` detection; S3 backend (MinIO locally) and an in-memory backend for tests; read path tries hot then cold and the capture log carries `tier` (ADR-021).
-- [ ] `parse/` — generic parsers: html-table, xlsx, xml/soap, json-path, csv.
-- [ ] `mapping/` — executes the manifest `mapping` block: units, timezone, interval convention, sign convention → `EnergyObservation`.
-- [ ] `silver/` — Postgres schema and migrations (Alembic); bitemporal idempotent upsert per ADR-018; current-view. **Definition of done: every migration ships a downgrade script, exercised in CI (ADR-016 §3).**
-- [ ] `ledger/` — the run ledger (ADR-003 rev. as amended by ADR-024): `runs` (`target_id`, `scheduled_for`, `state`, `fence`, `origin`, latest lease) and `run_attempts` (`kind`, `lease_owner`, `lease_until`, `fence`, `capture_id`, `derivation_id`, `outcome`) migrations; `derivations` table (ADR-023); fenced claim/renew/commit; `reconcile(target, window)` from Bronze; missed-run query. Silver rows carry `run_attempt_id` and `derivation_id`.
-- [ ] `replay`, `backfill` and `gap_detector` modules (ADR-003 rev./ADR-004/ADR-024): gap detector emits `missing_capture` (→ backfill if within `history.max_age`, else `unrecoverable` + alert) and `unprocessed_capture` (→ replay); `replay --derivation <bad>` for ADR-016 §4 repair. Replay never fetches; backfill does.
-- [ ] Proofs (offline): the six ADR-023 replay/idempotency proofs and the ADR-024 crash matrix, one test each.
-- [ ] `energyctl` CLI: `validate`, `capture`, `process`, `replay`, `gaps`, `demo`.
-- [ ] `make demo`: fixture → capture → Bronze → parse → map → Postgres → query, offline. **Definition of done for the phase is this narrow complete path**; generic parsers beyond those the committed targets need (html-table, json-path, csv) may be stubs that fail loudly until Phase 4 needs them.
-- [ ] ADR for D-2 (Postgres *engine*: plain vs TimescaleDB) written before the schema is created. The DSN contract and `postgres.mode` are already decided (02 §4.2 D-2, 2026-09-19).
+- [x] `fetch/` — declarative fetchers per modality (httpx, timeouts, capped backoff with jitter, conditional requests, host-allowlist enforcement before any request).
+- [x] `bronze/` — blob store (SHA-256 keyed) + capture log; `content_changed` detection; ~~S3 backend (MinIO locally)~~ *(2026-09-20: memory and filesystem backends shipped; the S3 backend needs the client-library decision in ADR-032, PROPOSED — plan P2-D4)* and an in-memory backend for tests; read path tries hot then cold and the capture log carries `tier` (ADR-021).
+- [x] `parse/` — generic parsers: html-table, xlsx, xml/soap, json-path, csv.
+- [x] `mapping/` — executes the manifest `mapping` block: units, timezone, interval convention, sign convention → `EnergyObservation`.
+- [x] `silver/` — Postgres schema and migrations (Alembic); bitemporal idempotent upsert per ADR-018; current-view. **Definition of done: every migration ships a downgrade script, exercised in CI (ADR-016 §3).**
+- [x] `ledger/` — the run ledger (ADR-003 rev. as amended by ADR-024): `runs` (`target_id`, `scheduled_for`, `state`, `fence`, `origin`, latest lease) and `run_attempts` (`kind`, `lease_owner`, `lease_until`, `fence`, `capture_id`, `derivation_id`, `outcome`) migrations; `derivations` table (ADR-023); fenced claim/renew/commit; `reconcile(target, window)` from Bronze; missed-run query. Silver rows carry `run_attempt_id` and `derivation_id`.
+- [x] `replay`, `backfill` and `gap_detector` modules (ADR-003 rev./ADR-004/ADR-024): gap detector emits `missing_capture` (→ backfill if within `history.max_age`, else `unrecoverable` + alert) and `unprocessed_capture` (→ replay); `replay --derivation <bad>` for ADR-016 §4 repair. Replay never fetches; backfill does.
+- [x] Proofs (offline): the six ADR-023 replay/idempotency proofs and the ADR-024 crash matrix, one test each.
+- [x] `energyctl` CLI: `validate`, `capture`, `process`, `replay`, `gaps`, `demo` *(plus `backfill`, `migrate`; commands take `--manifest` until the Phase 3 scaffolder, P2-D9)*.
+- [x] `make demo`: fixture → capture → Bronze → parse → map → Postgres → query, offline. **Definition of done for the phase is this narrow complete path**; generic parsers beyond those the committed targets need (html-table, json-path, csv) may be stubs that fail loudly until Phase 4 needs them.
+- [x] ADR for D-2 (Postgres *engine*: plain vs TimescaleDB) written before the schema is created. The DSN contract and `postgres.mode` are already decided (02 §4.2 D-2, 2026-09-19). *(2026-09-20: ADR-030, plain PostgreSQL ≥ 16; ADR-031 records the D-4 default the gap detector implements.)*
 
 **Do not.** Add a target under `targets/` yet — use the Phase 1 example manifests with recorded fixtures only. No Kubernetes.
 
