@@ -1,0 +1,48 @@
+# Shape-only: rest-xml modality, rate-limited, token-keyed — the ENTSO-E Transparency Platform
+# shape (01 §4: class B, token after registration, untested, optional). ENTSO-E answers in XML,
+# not JSON, which is why it is the rest-xml example (docs/plans/phase-1.md P1-D5).
+# Not admitted: dataset, metric and host are absent from the registries → ADMISSION_REQUIRED.
+# Request parameters follow the public API description; none has been called ([UNVERIFIED]).
+schema_version: 1
+target_id: entsoe_dam_prices_rest_xml
+description: ENTSO-E Transparency day-ahead prices, CZ bidding zone (A44)
+license: "ENTSO-E Transparency terms not reviewed; registration and redistribution open (01 §10)"
+terms_url: https://transparencyplatform.zendesk.com/hc/en-us/articles/12845911031188-How-to-get-security-token
+allowed_hosts:
+  - web-api.tp.entsoe.eu
+modality: rest-xml
+cadence:
+  cron: "0 13-15 * * *"       # after the day-ahead auction [UNVERIFIED]
+  timezone: Europe/Prague
+history:
+  max_age: P5Y                # [UNVERIFIED]
+fetch:
+  rest_xml:
+    url_template: "https://web-api.tp.entsoe.eu/api"
+    query:
+      documentType: A44
+      in_Domain: 10YCZ-CEPS-----N
+      out_Domain: 10YCZ-CEPS-----N
+      periodStart: "{delivery_day:%Y%m%d}0000"
+      periodEnd: "{delivery_day:%Y%m%d}2300"
+    auth:
+      secretRef: {name: entsoe-token, key: securityToken}
+      location: query
+      param: securityToken
+    rate_limit: {requests: 400, per: PT1M}   # documented platform limit [UNVERIFIED]
+contract:
+  dataset_id: entsoe.day_ahead_prices
+  source_transport: rest
+  decode: xml
+  metrics: [price]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: timestamp
+    timezone: Europe/Prague
+    timestamp: {source: "Period/timeInterval/start"}   # position offsets are a decoder question (Phase 2 / Route B)
+    resolution: {source: "Period/resolution"}
+    interval_label: start
+  metrics:
+    price: {source: "Point/price.amount", unit: EUR/MWh}

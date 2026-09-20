@@ -1,0 +1,45 @@
+# Shape-only: rest-json modality with a token-keyed API (class B access, 01 §2).
+# The token is a secretRef; the manifest never carries a value (ADR-017).
+# Neither the dataset nor the host is admitted: validate_manifest returns ADMISSION_REQUIRED
+# listing exactly what a Route B request must add (ADR-022 §2). Nothing is invented to pass.
+schema_version: 1
+target_id: token_api_rest_json
+description: Illustrative token-keyed JSON time series (not a real source)
+license: "example — no licence reviewed"
+terms_url: https://api.example.invalid/terms
+allowed_hosts:
+  - api.example.invalid
+modality: rest-json
+cadence:
+  cron: "0 * * * *"
+  timezone: Europe/Prague
+history:
+  max_age: P7D
+fetch:
+  rest_json:
+    url_template: "https://api.example.invalid/v1/series/cz-load"
+    query:
+      from: "{scheduled_for}"
+      resolution: PT15M
+    headers:
+      Accept: application/json
+    auth:
+      secretRef: {name: example-api-token, key: token}
+      location: header
+      param: X-API-Key
+    rate_limit: {requests: 60, per: PT1M}
+contract:
+  dataset_id: example.rest_json
+  source_transport: rest
+  decode: json
+  metrics: [value]
+mapping:
+  dimensions: {}
+  time:
+    kind: timestamp
+    timezone: Europe/Prague
+    timestamp: {source: ts}
+    resolution: {constant: PT15M}
+    interval_label: start
+  metrics:
+    value: {source: v, unit: MW}

@@ -1,0 +1,48 @@
+# T2 — OTE continuous intraday market, daily XLSX (docs/01-data-scope.md §3).
+# Supplies the five XLSX-only metrics; price_vwap/volume_total are stored and reconciled
+# against T1 (0.01 EUR/MWh, 0.001 MWh tolerance), never merged (01 §3 rules 2-3).
+schema_version: 1
+target_id: ote_idm_xlsx
+description: OTE continuous intraday market daily results file (XLSX, 96/92/100 rows)
+license: "OTE Terms of Use (S09); reuse and 15-minute polling confirmation pending (01 §10)"
+terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
+allowed_hosts:
+  - www.ote-cr.cz
+modality: dated-file
+cadence:
+  cron: "*/15 * * * *"
+  timezone: Europe/Prague
+history:
+  max_age: P1Y                # fallback URL confirmed for four dates across 2025-2026 (S17); [UNVERIFIED] beyond
+fetch:
+  dated_file:
+    file_format: xlsx
+    discovery:                # ADR-005 discovery step: read the .xlsx link from the results page
+      url: https://www.ote-cr.cz/en/short-term-markets/electricity/intra-day-market
+      link_regex: 'IM_15MIN_\d{2}_\d{2}_\d{4}_EN\.xlsx'
+    # fallback when discovery finds no link (S13, S17)
+    url_template: "https://www.ote-cr.cz/pubweb/attachments/27/{delivery_day:%Y}/month{delivery_day:%m}/day{delivery_day:%d}/IM_15MIN_{delivery_day:%d}_{delivery_day:%m}_{delivery_day:%Y}_EN.xlsx"
+contract:
+  dataset_id: ote.idm_continuous
+  source_transport: xlsx
+  decode: xlsx
+  metrics: [volume_total, volume_buy, volume_sell, price_vwap, price_min, price_max, price_last]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: period_index          # the `Time interval` label is display only; key on `Period` (01 §3)
+    timezone: Europe/Prague
+    date: {context: delivery_day}   # the file is named by delivery day; rows carry no date
+    index: {source: Period}
+    resolution: {constant: PT15M}
+  source_version: null
+  source_published_at: null
+  metrics:                      # header texts of row 6 (S13); cells are numeric, comma rule unused
+    volume_total: {source: "Traded volume (MWh)", unit: MWh}
+    volume_buy: {source: "Traded volume - purchase (MWh)", unit: MWh}
+    volume_sell: {source: "Traded volume - sold (MWh)", unit: MWh}
+    price_vwap: {source: "Average price (EUR/MWh)", unit: EUR/MWh}
+    price_min: {source: "Minimal price (EUR/MWh)", unit: EUR/MWh}
+    price_max: {source: "Maximal price (EUR/MWh)", unit: EUR/MWh}
+    price_last: {source: "Last price (EUR/MWh)", unit: EUR/MWh}

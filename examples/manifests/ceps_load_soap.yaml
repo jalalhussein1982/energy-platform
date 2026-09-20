@@ -1,0 +1,56 @@
+# T3 — ČEPS transmission-system load, SOAP Load (docs/01-data-scope.md §3).
+# Only agregation=QH, function=AVG, version=RT are live-verified; everything else is [UNVERIFIED].
+schema_version: 1
+target_id: ceps_load_soap
+description: ČEPS system load, quarter-hour averages, real data (RT)
+license: "ČEPS web-service terms not yet reviewed; robots.txt disallows crawling, the documented service is used (01 §10)"
+terms_url: https://www.ceps.cz/en/web-services
+allowed_hosts:
+  - www.ceps.cz
+modality: soap-xml
+cadence:
+  cron: "*/15 * * * *"        # publication cadence [UNVERIFIED] (01 §5)
+  timezone: Europe/Prague
+history:
+  max_age: P1Y                # [UNVERIFIED]; the portal's 2010 range is a UI range, not proof (01 §3)
+fetch:
+  soap_xml:
+    url: https://www.ceps.cz/_layouts/CepsData.asmx
+    soap_action: https://www.ceps.cz/CepsData/Load
+    soap_version: "1.1"
+    body_template: |
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:ceps="https://www.ceps.cz/CepsData/">
+        <soapenv:Body>
+          <ceps:Load>
+            <ceps:dateFrom>{date_from}</ceps:dateFrom>
+            <ceps:dateTo>{date_to}</ceps:dateTo>
+            <ceps:agregation>QH</ceps:agregation>
+            <ceps:function>AVG</ceps:function>
+            <ceps:version>RT</ceps:version>
+          </ceps:Load>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    params:                     # local Prague clock, dateTo inclusive (S14)
+      date_from: "{delivery_day:%Y-%m-%d}T00:00:00"
+      date_to: "{delivery_day:%Y-%m-%d}T23:59:59"
+contract:
+  dataset_id: ceps.load
+  source_transport: soap
+  decode: soap
+  metrics: [load_incl_pumping, load]
+mapping:
+  dimensions:                   # identity key: (area, delivery_start_utc, resolution, aggregation_function, version)
+    area: CZ
+    aggregation_function: AVG
+  time:
+    kind: timestamp
+    timezone: Europe/Prague
+    timestamp: {source: "@date"}    # carries the local offset, e.g. 2026-09-17T00:00:00+02:00 (S14)
+    resolution: {constant: PT15M}
+    interval_label: start       # [UNVERIFIED] — verified in Phase 4 (review F13); a wrong guess is a one-line change
+  source_version: {constant: RT}  # bound to the `version` identity dimension (04-contracts §2.3)
+  source_published_at: null     # not provided (01 §3)
+  metrics:
+    load_incl_pumping: {source: value1, unit: MW}   # "Load including pumping [MW]"
+    load: {source: value2, unit: MW}                # "Load [MW]"

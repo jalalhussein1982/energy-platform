@@ -1,0 +1,38 @@
+# Shape-only: html-table modality. The OTE results page renders the same intraday table as T2
+# with a DECIMAL COMMA (S02, 01 §3 "Numeric storage"). Registered dataset and host, so it is
+# admitted; T1 stays the system of record for the two metrics it delivers (01 §3 rule 2).
+# The table selector is illustrative and [UNVERIFIED].
+schema_version: 1
+target_id: ote_idm_html_table
+description: OTE continuous intraday results page (HTML table, decimal comma)
+license: "OTE Terms of Use (S09); reuse confirmation pending (01 §10)"
+terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
+allowed_hosts:
+  - www.ote-cr.cz
+modality: html-table
+cadence:
+  cron: "*/15 * * * *"
+  timezone: Europe/Prague
+history:
+  max_age: P1D                # the page shows the selected day only
+fetch:
+  html_table:
+    url: https://www.ote-cr.cz/en/short-term-markets/electricity/intra-day-market
+    table_selector: "table.report_table"   # [UNVERIFIED]
+contract:
+  dataset_id: ote.idm_continuous
+  source_transport: html
+  decode: html-table
+  metrics: [price_vwap, volume_total]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: period_index
+    timezone: Europe/Prague
+    date: {context: delivery_day}
+    index: {source: Period}
+    resolution: {constant: PT15M}
+  metrics:
+    price_vwap: {source: "Average price (EUR/MWh)", unit: EUR/MWh, decimal_separator: comma}
+    volume_total: {source: "Traded volume (MWh)", unit: MWh, decimal_separator: comma}
