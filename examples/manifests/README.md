@@ -19,4 +19,4 @@ validation lists exactly the dataset, metrics and host a maintainer would have t
 is invented to make them pass.
 
 Values marked `[UNVERIFIED]` in comments follow `docs/01-data-scope.md`; the ČEPS `interval_label`
-is verified in Phase 4 (review F13).
+was verified in Phase 4 (review F13, `docs/06-source-verification.md` §4.4).

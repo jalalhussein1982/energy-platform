@@ -86,7 +86,10 @@ def ceps_load_response(
     *,
     hours: int | None = None,
 ) -> bytes:
-    """``Load`` response (QH, AVG, RT). ``values`` = (offset-aware start, value1, value2)."""
+    """``Load`` response (QH, AVG, RT) in the live shape of docs/06 §4.2.
+
+    ``values`` = (offset-aware interval start, value1, value2); ``@date`` names the start (F13).
+    """
     if values is None:
         start = datetime.combine(day, datetime.min.time(), tzinfo=PRAGUE)
         end = start + timedelta(hours=hours) if hours else start + timedelta(days=1)
@@ -99,19 +102,24 @@ def ceps_load_response(
             i += 1
         values = vals
     items = "".join(CEPS_ITEM.format(date=ts.isoformat(), v1=v1, v2=v2) for ts, v1, v2 in values)
+    # the live `information` block (docs/06 §4.2): local-day bounds, each with its own offset
+    start_label = datetime.combine(day, datetime.min.time(), tzinfo=PRAGUE).isoformat()
+    last_second = datetime.max.time().replace(microsecond=0)
+    end_label = datetime.combine(day, last_second, tzinfo=PRAGUE).isoformat()
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">\n'
         "  <soap:Body>\n"
         '    <LoadResponse xmlns="https://www.ceps.cz/CepsData/">\n'
         "      <LoadResult>\n"
-        "        <root>\n"
+        '        <root xmlns="https://www.ceps.cz/CepsData/StructuredData/1.0">\n'
         "        <information>\n"
-        f"          <dateFrom>{day.isoformat()}T00:00:00</dateFrom>\n"
-        f"          <dateTo>{day.isoformat()}T23:59:59</dateTo>\n"
-        "          <agregation>QH</agregation>\n"
-        "          <function>AVG</function>\n"
+        "          <name>Load</name>\n"
+        f"          <date_from>{start_label}</date_from>\n"
+        f"          <date_to>{end_label}</date_to>\n"
         "          <version>RT</version>\n"
+        "          <function>AVG</function>\n"
+        "          <aggregation>QH</aggregation>\n"
         "        </information>\n"
         "        <series>\n"
         '          <serie id="value1" name="Load including pumping [MW]" />\n'

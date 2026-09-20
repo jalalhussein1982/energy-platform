@@ -48,7 +48,7 @@ mapping:
     timezone: Europe/Prague
     timestamp: {source: "@date"}    # carries the local offset, e.g. 2026-09-17T00:00:00+02:00 (S14)
     resolution: {constant: PT15M}
-    interval_label: start       # [UNVERIFIED] — verified in Phase 4 (review F13); a wrong guess is a one-line change
+    interval_label: start       # verified 2026-09-20 by the HR/QH and DY/QH consistency checks (docs/06 §4.4, review F13)
   source_version: {constant: RT}  # bound to the `version` identity dimension (04-contracts §2.3)
   source_published_at: null     # not provided (01 §3)
   metrics:
