@@ -52,11 +52,11 @@
 **Files:** this file, `docs/adr/ADR-033-polling-cadence-and-correction-window.md`,
 `docs/adr/ADR-034-mapping-ignore-fields.md`.
 
-- [ ] ADR-033 ACCEPTED: 01 §5 values, fetch-layer politeness as built (cite `RetryPolicy`,
+- [x] ADR-033 ACCEPTED: 01 §5 values, fetch-layer politeness as built (cite `RetryPolicy`,
       `Conditional`, `RateLimiter`), `cadence.correction` shape, re-capture semantics, Phase 5 hand-off.
-- [ ] ADR-034 ACCEPTED: `mapping.ignore_fields`, validation rule, effect on `unknown_field`,
+- [x] ADR-034 ACCEPTED: `mapping.ignore_fields`, validation rule, effect on `unknown_field`,
       `derivation_id` note (part of `mapping_block()`), schema minor.
-- [ ] Commit `docs(phase-4): plan, ADR-033 (D-5 cadence and correction window), ADR-034 (mapping.ignore_fields)`.
+- [x] Commit `docs(phase-4): plan, ADR-033 (D-5 cadence and correction window), ADR-034 (mapping.ignore_fields)`.
 
 ### Task 4.2 — Contract changes decided above (platform)
 
@@ -66,102 +66,102 @@
 `tests/contracts/test_manifest.py`, `tests/contracts/test_manifest_negative.py`, `tests/mapping/…`,
 `tests/contracts/test_golden.py`, `tests/harness/test_goldens.py`.
 
-- [ ] `cadence.correction: {cron, days ≥ 1}` optional; cron validated like `cadence.cron`.
-- [ ] `mapping.ignore_fields: [str, …]` optional; an entry equal to a mapped `source` (time, version,
+- [x] `cadence.correction: {cron, days ≥ 1}` optional; cron validated like `cadence.cron`.
+- [x] `mapping.ignore_fields: [str, …]` optional; an entry equal to a mapped `source` (time, version,
       metric) is a `ValidationError`; the engine subtracts them before `unknown_field`.
-- [ ] `Expect`: `row_count: 0` alone is valid; runner reports `row_count` mismatch as before; the
+- [x] `Expect`: `row_count: 0` alone is valid; runner reports `row_count` mismatch as before; the
       negative "empty golden" test still fails on a golden with nothing expected.
-- [ ] `make schema`; schema staleness test green; 04 updated; `make check` green.
-- [ ] Commit `feat(contracts): cadence.correction and mapping.ignore_fields (ADR-033, ADR-034); an empty document is a golden outcome`.
+- [x] `make schema`; schema staleness test green; 04 updated; `make check` green.
+- [x] Commit `feat(contracts): cadence.correction and mapping.ignore_fields (ADR-033, ADR-034); an empty document is a golden outcome`.
 
 ### Task 4.3 — Live verification and evidence index
 
 **Files:** `docs/06-source-verification.md`, `docs/evidence/README.md`; local evidence directory
 (outside the repo).
 
-- [ ] Bounded reads, each with time, status, digest, size: OTE WSDL; T1 `GetImPricePeriodE` for
+- [x] Bounded reads, each with time, status, digest, size: OTE WSDL; T1 `GetImPricePeriodE` for
       one recent day; E1 `GetDamPricePeriodE` for one day (both `PeriodResolution` values if the
       WSDL requires the element); T2 results page (link discovery) and the daily XLSX for one recent
       day; ČEPS WSDL; T3 `Load` QH/AVG/RT for one day; OTE terms page; `ceps.cz/robots.txt`;
       the ČEPS web-services page and any linked interface description.
-- [ ] F13: read the interface description (or the WSDL annotations); record the verdict per P4-D9.
-- [ ] `docs/06`: per source — endpoint verified, auth, rate limits observed, terms notes (V-1, V-3),
+- [x] F13: read the interface description (or the WSDL annotations); record the verdict per P4-D9.
+- [x] `docs/06`: per source — endpoint verified, auth, rate limits observed, terms notes (V-1, V-3),
       quirks (decimal comma, DST rows, progressive fill), reconciliation mismatches seen, F13 outcome,
       the polling campaign procedure (P4-D12), the fixture inventory pointer.
-- [ ] `docs/evidence/README.md` (F12): one row per read; raw captures not committed.
-- [ ] Commit `docs(sources): live verification of T1, T2, T3, E1 endpoints; evidence index (F12); F13 outcome`.
+- [x] `docs/evidence/README.md` (F12): one row per read; raw captures not committed.
+- [x] Commit `docs(sources): live verification of T1, T2, T3, E1 endpoints; evidence index (F12); F13 outcome`.
 
 ### Task 4.4 — T1 `ote_intraday_market` (branch `target/ote_intraday_market`)
 
-- [ ] `energyctl new-target ote_intraday_market --modality soap-xml --dataset ote.idm_continuous --host www.ote-cr.cz`;
+- [x] `energyctl new-target ote_intraday_market --modality soap-xml --dataset ote.idm_continuous --host www.ote-cr.cz`;
       manifest filled from 01 §3 T1 and the live WSDL (`ignore_fields: [Emerg]`, `cadence.correction`).
-- [ ] Fixtures (synthetic, `--from-file`): `ordinary_day` (96), `spring_dst_day` (92, 2026-03-29),
+- [x] Fixtures (synthetic, `--from-file`): `ordinary_day` (96), `spring_dst_day` (92, 2026-03-29),
       `autumn_dst_day` (100, 2025-10-26), `hourly_native` (PT60M, 24, a 2024-06 day), `partial_day`
       (rolling, first 40 periods), `no_trade_null` (complete day, one period without `Price`),
       `negative_and_zero_price`, `empty_result`, `decimal_comma`, `soap_fault`, `emerg_flag`.
-- [ ] Goldens: values read from the blobs; `row_count`; `quality_events`; quarantine reasons.
-- [ ] README: fixture table, what the platform does with each, what is not in this target.
-- [ ] `energyctl validate`, `run-target-tests`, `make check`, `energyctl pr-bundle`,
+- [x] Goldens: values read from the blobs; `row_count`; `quality_events`; quarantine reasons.
+- [x] README: fixture table, what the platform does with each, what is not in this target.
+- [x] `energyctl validate`, `run-target-tests`, `make check`, `energyctl pr-bundle`,
       `python -m scripts.apply_pr_bundle`, `make pr-surface BASE=main` on the branch.
 
 ### Task 4.5 — T2 `ote_intraday_market_xlsx` (branch `target/ote_intraday_market_xlsx`)
 
-- [ ] Scaffold with `--modality dated-file`; manifest per 01 §3 T2 (discovery + fallback template,
+- [x] Scaffold with `--modality dated-file`; manifest per 01 §3 T2 (discovery + fallback template,
       `ignore_fields: ["Time interval"]`).
-- [ ] Fixtures: `ordinary_day` (96), `spring_dst_day` (92, bridging label), `autumn_dst_day` (100,
+- [x] Fixtures: `ordinary_day` (96), `spring_dst_day` (92, bridging label), `autumn_dst_day` (100,
       repeated labels), `partial_day` (10 of 96 filled), `no_trade_null` (zero volumes, NULL prices),
       `negative_and_zero_price`, `decimal_comma_string` (a text cell), `extra_column`,
       `changed_unit_header` (CZK/MWh → quarantine).
-- [ ] Goldens, README, gates, bundle, branch, `pr-surface` as in 4.4.
+- [x] Goldens, README, gates, bundle, branch, `pr-surface` as in 4.4.
 
 ### Task 4.6 — T3 `ceps_load` (branch `target/ceps_load`)
 
-- [ ] Scaffold with `--dataset ceps.load`; manifest per 01 §3 T3; `interval_label` per the F13 verdict.
-- [ ] Fixtures: `ordinary_day` (96), `spring_dst_day` (92, offset change inside the day),
+- [x] Scaffold with `--dataset ceps.load`; manifest per 01 §3 T3; `interval_label` per the F13 verdict.
+- [x] Fixtures: `ordinary_day` (96), `spring_dst_day` (92, offset change inside the day),
       `autumn_dst_day` (100, repeated wall-clock hour with two offsets), `partial_day`,
       `missing_value` (an item without `value2`), `negative_load` (`negative_value` warning),
       `empty_data`, `decimal_comma`, `soap_fault`.
-- [ ] Goldens (with `note:` when F13 stays unverified), README, gates, bundle, branch, `pr-surface`.
-- [ ] `docs/06` F13 section finalised on `main` if the verdict changed after 4.3 — docs commit.
+- [x] Goldens (with `note:` when F13 stays unverified), README, gates, bundle, branch, `pr-surface`.
+- [x] `docs/06` F13 section finalised on `main` if the verdict changed after 4.3 — docs commit.
 
 ### Task 4.7 — E1 `ote_dam` through the MCP server (branch `target/ote_dam`)
 
-- [ ] Start `energyctl mcp-serve --root . --outbox <scratch>` and drive it with a JSON-RPC client
+- [x] Start `energyctl mcp-serve --root . --outbox <scratch>` and drive it with a JSON-RPC client
       (outside the repo): `scaffold_target` → `write_target_file` (manifest, README, goldens, test,
       fixture entry + blob) → `validate_target` → `run_target_tests` → `open_pr`. Every refusal met on
       the way is recorded in `docs/06` §E1 as the demo's evidence.
-- [ ] Fixtures: `ordinary_day` (PT15M, 96), `hourly_day` (PT60M, 24), `spring_dst_day`,
+- [x] Fixtures: `ordinary_day` (PT15M, 96), `hourly_day` (PT60M, 24), `spring_dst_day`,
       `autumn_dst_day`, `no_result`, `negative_price`, `soap_fault`.
-- [ ] Apply the bundle; `make check`; `make pr-surface BASE=main`.
+- [x] Apply the bundle; `make check`; `make pr-surface BASE=main`.
 
 ### Task 4.8 — `epex_intraday` negative demo (Route B)
 
-- [ ] Scaffold in a scratch targets root; `energyctl validate` → `ADMISSION_REQUIRED`;
+- [x] Scaffold in a scratch targets root; `energyctl validate` → `ADMISSION_REQUIRED`;
       `energyctl admission-request epex_intraday --out docs/admissions/` → `docs/admissions/epex_intraday.md`
       with the terms note ("restricted; not to be scraped") and the gaps exactly as reported.
-- [ ] Commit `docs(admissions): epex_intraday admission request as the Route B negative demo (ADR-022, 05 C-54)`.
+- [x] Commit `docs(admissions): epex_intraday admission request as the Route B negative demo (ADR-022, 05 C-54)`.
 
 ### Task 4.9 — Nightly live smoke
 
 **Files:** `tests/live/__init__.py`, `tests/live/test_smoke.py`, `Makefile` (`live-smoke`),
 `.github/workflows/nightly-live-smoke.yml`, `tests/harness/test_ci_wrappers.py`, `docs/05-constraint-matrix.md` §2 (inventory row).
 
-- [ ] Test discovers `targets/*/` at collection; marked `live`; one `record_live` per target into a
+- [x] Test discovers `targets/*/` at collection; marked `live`; one `record_live` per target into a
       temporary directory; asserts decode and parse only.
-- [ ] `make live-smoke` = `pytest -m live tests/live`; `make test` still deselects `live`.
-- [ ] Workflow: `schedule: "17 3 * * *"` + `workflow_dispatch`, `permissions: contents: read`,
+- [x] `make live-smoke` = `pytest -m live tests/live`; `make test` still deselects `live`.
+- [x] Workflow: `schedule: "17 3 * * *"` + `workflow_dispatch`, `permissions: contents: read`,
       steps `make ci-bootstrap`, `make live-smoke`; action pinned (05 C-42).
-- [ ] `test_ci_workflow_only_calls_make` covers every `.github/workflows/*.yml`.
-- [ ] Commit `feat(ci): nightly live smoke over committed targets, shape only (ADR-020; P4-D10)`.
+- [x] `test_ci_workflow_only_calls_make` covers every `.github/workflows/*.yml`.
+- [x] Commit `feat(ci): nightly live smoke over committed targets, shape only (ADR-020; P4-D10)`.
 
 ### Task 4.10 — Integration proof and close
 
-- [ ] Branch `phase-4/all-targets` from `main`, merge the four `target/*` branches, `make check`
+- [x] Branch `phase-4/all-targets` from `main`, merge the four `target/*` branches, `make check`
       green, `pytest tests/harness/test_goldens.py -q` lists every golden; delete nothing.
-- [ ] `docs/03-roadmap.md` Phase 4 checkboxes (honest: the polling campaign and the EPEX scheduler
+- [x] `docs/03-roadmap.md` Phase 4 checkboxes (honest: the polling campaign and the EPEX scheduler
       rule are recorded, not ticked); `docs/04-contracts.md` §6 rows; `docs/05` §2 `live-smoke` row;
       `docs/progress.md` entry with the next prompt (03 Phase 5 starter, verbatim).
-- [ ] Commit `docs(phase-4): roadmap, contracts test table, progress`.
+- [x] Commit `docs(phase-4): roadmap, contracts test table, progress`.
 
 ## Acceptance for the phase
 

@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|
 | T1 `ote_intraday_market` | `POST https://www.ote-cr.cz/pw-data/services/PublicDataService`, `GetImPricePeriodE`, HTTP 200 for 2024-06-30, 2025-10-26, 2026-03-29, 2026-09-19, 2026-09-20 | none | none (five requests in four seconds, all 200) | OTE Terms of Use: no copying without written consent (§1.4) | shape as 01 §3; 96 / 92 / 100 / 24 items; rolling fill by **item absence** |
 | T2 `ote_intraday_market_xlsx` | discovery page + `pubweb/attachments/27/…/IM_15MIN_DD_MM_YYYY_EN.xlsx`, HTTP 200 for 2025-10-26, 2026-03-29, 2026-09-19, 2026-09-20 | none | none | as T1 | header texts contain **newlines**; `ETag` and `Last-Modified` present; rolling fill by **blank cells** |
-| T3 `ceps_load` | `POST https://www.ceps.cz/_layouts/CepsData.asmx`, `Load`, HTTP 200 for 2025-10-26, 2026-03-29, 2026-09-19 (QH), plus HR and DY for 2026-09-19 | none | none | `robots.txt` disallows all crawling; the documented web service is used; interface description v3.2 obtained (§3.5) | **F13 resolved: `@date` labels the interval start** (§3.4) |
+| T3 `ceps_load` | `POST https://www.ceps.cz/_layouts/CepsData.asmx`, `Load`, HTTP 200 for 2025-10-26, 2026-03-29, 2026-09-19 (QH), plus HR and DY for 2026-09-19 | none | none | `robots.txt` disallows all crawling; the documented web service is used; interface description v3.2 obtained (§4.5) | **F13 resolved: `@date` labels the interval start** (§4.4) |
 | E1 `ote_dam` | same endpoint as T1, `GetDamPricePeriodE`, HTTP 200 for 2026-09-20 (PT60M) and 2026-09-21 (PT15M) | none | none | as T1 | request needs `PeriodResolution`; response adds `PeriodInterval`, `HourlyPrice`, `VolumeTotal`; `EmergencyState` absent when not declared; D+1 results already served at 14:24 CEST on D |
 
 No 01 §4 candidate was read. No latency figure is quoted (§6).
@@ -130,6 +130,29 @@ Consequence: the T3 manifest keeps `interval_label: start`, now with this sectio
 
 `PeriodInterval` is display only → `ignore_fields`. `EmergencyState` maps to the registered `emergency_state` metric (unit `1`); absent → NULL ("no result").
 
+### 5.1 The adapter-addition demo through the MCP server (plan P4-D5)
+
+`targets/ote_dam/` was built by a JSON-RPC client talking to `energyctl mcp-serve --root . --outbox …` (no `--allow-network`); the client and the transcript (28 requests) are in the local evidence directory (`e1_mcp_transcript.json`). In order:
+
+| Step | Tool | Result |
+|---|---|---|
+| 1 | `initialize`, `tools/list` | exactly the ADR-007 eight tools |
+| 2 | `scaffold_target(ote_dam, soap-xml, ote.dam, www.ote-cr.cz)` | six files, `admission_required: false` |
+| 3 | `validate_target` on the scaffold | admission `OK`, surface lists every `REPLACE_ME` (05 C-13) |
+| 4 | `write_target_file(fetch.py, "import httpx")` | **refused**, rolled back: file outside the target surface (05 C-48, C-02) |
+| 5 | `write_target_file(../ote_intraday_market/manifest.yaml)` | **refused**: escapes `targets/ote_dam/` (05 C-48) |
+| 6 | `write_target_file(parser.py)` with `float(...)` | **refused**, rolled back, no file left behind (05 C-49, C-05) |
+| 7 | `record_fixture(live: true)` | **refused**: network not enabled for this server (05 C-50) |
+| 8 | `write_target_file(manifest.yaml)`, `validate_target` | `OK`; remaining surface problems are the scaffold golden's placeholders |
+| 9 | `record_fixture(payload_path=…)` × 7 | Bronze objects from the synthetic payloads staged under the (git-ignored) `.energy_platform/inbox/` |
+| 10 | `write_target_file` × 7 goldens, README | last write reports `remaining_problems: []` |
+| 11 | `validate_target`, `run_target_tests` | `OK`; surface OK, seven goldens OK (384 / 96 / 368 / 400 / 384 / 0 / 0 rows), pytest exit 0 |
+| 12 | `open_pr` | bundle written to the outbox for `target/ote_dam`; the server never pushed |
+
+Outside the server: `scripts/apply_pr_bundle.py` turned the bundle into the branch `target/ote_dam` (one commit, byte-identical to the working copy), `make check` and `make pr-surface BASE=main` are green.
+
+**Harness defect found and fixed on the way (platform commit, not part of the target):** the first `scaffold_target` for `ote.dam` produced a manifest the model refused (`emergency_state.unit` rendered as the YAML integer `1`); the scaffolder now quotes every unit and a regression test pins it.
+
 ## 6. Polling-observation campaign (defined, not run — P4-D12)
 
 01 §5 requires one week of polls per target before any latency figure is quoted. Procedure, using only shipped verbs:
@@ -145,7 +168,17 @@ afterwards:
 
 `content_changed` is computed by Bronze from the payload hash, so a stale poll (T2 `304`, or an identical body) is a successful poll and not a data point. Run it on a laptop or the Phase 5 `local` profile; the ledger is the report. **No figure is quoted here.** The single observations above (T1/T2 in step at 14:24, E1 complete by 14:24 on D-1) are anecdotes, not measurements.
 
-## 7. What was not verified
+## 7. One live pass through the platform's own fetch path
+
+After the four targets were on their branches, `make live-smoke` (`tests/live/test_smoke.py`, plan
+P4-D10) was run **once** by hand on `phase-4/all-targets` at about 12:55Z: one `record_live` per
+target for the previous delivery day through `energy_platform.fetch` (ADR-026 layer 2: host and
+registry check, resolution and peer check, bounded retries), then decode and generic parse. All four
+passed in about one second — the committed manifests fetch, decode and parse against the live
+sources, including T2's discovery step and E1's `{next_delivery_day}` request. Values were not
+looked at, and nothing from this run was kept (temporary Bronze).
+
+## 8. What was not verified
 
 - Redistribution rights for OTE and ČEPS (01 §10, V-1/V-3): unchanged, human action.
 - ČEPS `function` values other than AVG, `version` values other than RT, and history depth.
