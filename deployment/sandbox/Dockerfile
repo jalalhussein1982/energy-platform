@@ -18,6 +18,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # The platform library, locked. No dev group: pytest is not in the image, so `run_target_tests`
 # reports the goldens (the platform pipeline) and says that pytest is unavailable.
+# libpq5: energyctl imports psycopg at start-up even for mcp-serve (found in Phase 5, P5-D2).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libpq5 \
+ && rm -rf /var/lib/apt/lists/*
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md /app/

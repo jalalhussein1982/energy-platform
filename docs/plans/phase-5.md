@@ -150,10 +150,10 @@ docs/07-operations.md                         # deploy, drills, restore, rollbac
 
 **Files:** `deployment/image/Dockerfile`, `Makefile` (`image`, `image-digest`, `IMAGE_REPO ?= energy-platform`, `IMAGE_TAG ?= dev`), `.dockerignore`, `tests/harness/test_workloads.py` (the new Dockerfile is scanned by `scan()`), `docs/07-operations.md` §1 (image build and digest).
 
-- [ ] Dockerfile per P5-D2 (two `FROM` by digest, `uv sync --frozen --no-dev`, `COPY energy_platform targets pyproject.toml uv.lock README.md alembic.ini`), `USER 10001:10001`, `ENTRYPOINT ["/app/.venv/bin/python", "-m", "energy_platform.cli"]`, `HEALTHCHECK NONE`.
-- [ ] `make image` = `docker build -f deployment/image/Dockerfile -t $(IMAGE_REPO):$(IMAGE_TAG) .`; `make image-digest` prints the `RepoDigests` entry or, with `KIND=1`, the digest from the kind node (`docker exec <node> crictl inspecti --output go-template …`).
-- [ ] `make workload-check` green (Dockerfile pins). Build succeeds locally: `docker run --rm energy-platform:dev --help` prints the verbs.
-- [ ] Commit `feat(image): platform runtime image by digest (ADR-016 §1)`.
+- [x] Dockerfile per P5-D2 (two `FROM` by digest, `uv sync --frozen --no-dev`, `COPY energy_platform targets pyproject.toml uv.lock README.md alembic.ini`), `USER 10001:10001`, `ENTRYPOINT ["/app/.venv/bin/python", "-m", "energy_platform.cli"]`, `HEALTHCHECK NONE`.
+- [x] `make image` = `docker build -f deployment/image/Dockerfile -t $(IMAGE_REPO):$(IMAGE_TAG) .`; `make image-digest` prints the `RepoDigests` entry or, with `KIND=1`, the digest from the kind node (`docker exec <node> crictl inspecti --output go-template …`).
+- [x] `make workload-check` green (Dockerfile pins). Build succeeds locally: `docker run --rm energy-platform:dev --help` prints the verbs.
+- [x] Commit `feat(image): platform runtime image by digest (ADR-016 §1)`.
 
 ### Task 5.6 — Helm chart core and the `helm-lint` gate
 

@@ -147,3 +147,13 @@ def test_unparsable_yaml_under_deployment_is_reported(tmp_path: Path) -> None:
     (tmp_path / "deployment").mkdir()
     (tmp_path / "deployment" / "broken.yaml").write_text("kind: [\n")
     assert any("unparsable" in p for p in scan(tmp_path, []))
+
+
+def test_platform_image_dockerfile_is_digest_pinned_and_scanned() -> None:
+    """P5-D2: the runtime image is part of what `make workload-check` scans (05 C-43)."""
+    dockerfile = REPO / "deployment" / "image" / "Dockerfile"
+    assert dockerfile.is_file()
+    text = dockerfile.read_text(encoding="utf-8")
+    assert check_dockerfile(text, str(dockerfile)) == []
+    assert text.count("@sha256:") == 2 and "USER 10001:10001" in text
+    assert not [p for p in scan(REPO, []) if "deployment/image" in p]

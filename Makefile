@@ -12,10 +12,14 @@ RUN       := $(UV) run
 CHART_DIR := deployment/helm/energy-platform
 TF_DIR    := deployment/own-cluster/terraform
 KIND_NAME := energy-platform
+DOCKER    ?= docker
+IMAGE_REPO ?= energy-platform
+IMAGE_TAG  ?= dev
+IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
 
 .PHONY: help check lint lock-check format type test db-test schema fixtures deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
-        harness-check pr-surface live-smoke
+        harness-check pr-surface live-smoke image image-digest
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -90,6 +94,23 @@ ci-bootstrap: ## Install uv on a bare CI runner (the only tool installation CI i
 	@command -v $(UV) >/dev/null && { echo "uv present: $$($(UV) --version)"; exit 0; } || true
 	curl -LsSf https://astral.sh/uv/$(UV_VERSION)/install.sh | sh
 	@echo 'add $$HOME/.local/bin to PATH in the workflow step if not already'
+
+# ---------------------------------------------------------------- platform image (ADR-016 §1, P5-D2)
+image: ## Build the platform runtime image deployment/image/Dockerfile as $(IMAGE)
+	$(DOCKER) build -f deployment/image/Dockerfile -t $(IMAGE) .
+
+image-digest: ## Print the digest reference of $(IMAGE): from the kind node (KIND=1, after kind load) or from RepoDigests (after a push)
+	@if [ -n "$(KIND)" ]; then \
+	  node="$$($(DOCKER) ps --filter name=$(KIND_NAME)-control-plane --format '{{.Names}}' | head -1)"; \
+	  test -n "$$node" || { echo "image-digest: kind node $(KIND_NAME)-control-plane is not running" >&2; exit 1; }; \
+	  ref="$$($(DOCKER) exec "$$node" crictl inspecti --output go-template --template '{{range .status.repoDigests}}{{.}}{{"\n"}}{{end}}' docker.io/library/$(IMAGE) 2>/dev/null | grep '@sha256:' | head -1)"; \
+	  test -n "$$ref" || { echo "image-digest: $(IMAGE) has no digest on the node; run make image && kind load docker-image $(IMAGE) --name $(KIND_NAME)" >&2; exit 1; }; \
+	  echo "$$ref"; \
+	else \
+	  ref="$$($(DOCKER) image inspect --format '{{index .RepoDigests 0}}' $(IMAGE) 2>/dev/null)"; \
+	  test -n "$$ref" || { echo "image-digest: $(IMAGE) has no RepoDigest; push it to a registry first (or KIND=1 after kind load)" >&2; exit 1; }; \
+	  echo "$$ref"; \
+	fi
 
 # ---------------------------------------------------------------- local reproduction (ADR-010) — Phase 5
 local-up: ## kind cluster → Helm deps → platform → migrations → smoke tests

@@ -1,0 +1,10 @@
+# Only what deployment/image/Dockerfile copies is sent to the daemon.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!energy_platform/
+!targets/
+**/__pycache__/
+**/*.pyc
+targets/*/tests/
