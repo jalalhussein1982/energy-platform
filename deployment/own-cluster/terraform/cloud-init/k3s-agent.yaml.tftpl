@@ -1,0 +1,16 @@
+#cloud-config
+# k3s agent node (ADR-035 §2): joins the server over the private network with the
+# Terraform-generated token (delivered only through this user data).
+package_update: true
+packages: [curl, ca-certificates]
+write_files:
+  - path: /etc/rancher/k3s/config.yaml
+    permissions: "0600"
+    content: |
+      server: https://${server_private_address}:6443
+      token: ${k3s_token}
+      node-ip: ${private_address}
+      flannel-iface: ${private_iface}
+runcmd:
+  - "curl -sfL https://get.k3s.io -o /tmp/install-k3s.sh"
+  - "INSTALL_K3S_VERSION=${k3s_version} INSTALL_K3S_SKIP_SELINUX_RPM=true sh /tmp/install-k3s.sh agent"

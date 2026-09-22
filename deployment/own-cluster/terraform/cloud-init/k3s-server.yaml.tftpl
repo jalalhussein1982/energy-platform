@@ -1,0 +1,41 @@
+#cloud-config
+# k3s server node (ADR-035 §1-§2). Rendered by the nodes module for both roots.
+# Structured authentication (V-14) with anonymous auth explicitly OFF; Traefik and servicelb
+# disabled; secrets encryption on; the embedded NetworkPolicy controller stays on (ADR-026).
+package_update: true
+packages: [curl, ca-certificates]
+write_files:
+  - path: /etc/rancher/k3s/config.yaml
+    permissions: "0600"
+    content: |
+      disable: [traefik, servicelb]
+      secrets-encryption: true
+      write-kubeconfig-mode: "0600"
+      tls-san:
+        - ${private_address}
+      node-ip: ${private_address}
+      flannel-iface: ${private_iface}
+      cluster-cidr: ${cluster_cidr}
+      service-cidr: ${service_cidr}
+      token: ${k3s_token}
+      kube-apiserver-arg:
+        - authentication-config=/etc/rancher/k3s/authn.yaml
+  - path: /etc/rancher/k3s/authn.yaml
+    permissions: "0600"
+    content: |
+${indent(6, authn_yaml)}
+  - path: /var/lib/rancher/k3s/server/manifests/energy-platform-rbac.yaml
+    permissions: "0644"
+    content: |
+${indent(6, rbac_yaml)}
+runcmd:
+  - mkdir -p /var/lib/rancher/k3s/storage /etc/rancher/k3s/config.yaml.d
+%{ if storage_device_glob != "" ~}
+  # the Postgres block volume is attached seconds after first boot (its id is only known once it
+  # exists): wait for it, format once, mount it under the k3s local-path provisioner root
+  - "for i in $(seq 1 60); do DEV=$(ls ${storage_device_glob} 2>/dev/null | head -1); [ -n \"$DEV\" ] && break; sleep 5; done; if [ -n \"$DEV\" ]; then blkid \"$DEV\" >/dev/null || mkfs.ext4 -L k3s-storage \"$DEV\"; grep -q k3s-storage /etc/fstab || echo \"LABEL=k3s-storage /var/lib/rancher/k3s/storage ext4 defaults,nofail 0 2\" >> /etc/fstab; mount -a; fi"
+%{ endif ~}
+  # the public address is only known after boot: append it to tls-san through a k3s drop-in
+  - "PUB=$(curl -sf --max-time 5 ${public_ip_metadata_url} || true); if [ -n \"$PUB\" ]; then printf 'tls-san+:\\n  - %s\\n' \"$PUB\" > /etc/rancher/k3s/config.yaml.d/10-public-tls-san.yaml; fi"
+  - "curl -sfL https://get.k3s.io -o /tmp/install-k3s.sh"
+  - "INSTALL_K3S_VERSION=${k3s_version} INSTALL_K3S_SKIP_SELINUX_RPM=true sh /tmp/install-k3s.sh server"

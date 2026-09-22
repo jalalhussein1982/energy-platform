@@ -1,0 +1,48 @@
+# Namespace-scoped rights for the OIDC deploy identity (V-14, ADR-035 §2, ADR-028 §2):
+# everything the chart needs inside its namespace, nothing cluster-scoped.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${namespace}
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: energy-platform-deployer
+  namespace: ${namespace}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, secrets, services, serviceaccounts, persistentvolumeclaims, pods, pods/log, events, endpoints]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/exec, pods/portforward]
+    verbs: [create]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [batch]
+    resources: [cronjobs, jobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [policy]
+    resources: [poddisruptionbudgets]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: energy-platform-deployer
+  namespace: ${namespace}
+subjects:
+  - kind: User
+    name: gha:${github_repository}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: energy-platform-deployer
+  apiGroup: rbac.authorization.k8s.io

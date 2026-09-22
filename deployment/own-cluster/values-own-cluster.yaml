@@ -1,0 +1,24 @@
+# `own-cluster` Helm values (ADR-001 amend): operators allowed behind flags on a cluster we
+# built. The demo cluster is deployed with `tenant` values on purpose (ADR-028 §2: it proves the
+# tenant contract on the own-cluster path); this file is the profile for scenario B/C where the
+# operators exist. Layer on top of deployment/tenant/values-tenant.yaml.
+residency: CZ
+postgres:
+  mode: cnpg                  # CloudNativePG when the operator is installed on the cluster
+  cnpg:
+    instances: 2
+    storage: 20Gi
+bronze:
+  tiering:
+    mode: move                # the portable cold tier (ADR-021); set coldEndpoint / coldBucket
+secrets:
+  eso:
+    enabled: false            # true once an External Secrets store exists (secrets.eso.storeRef)
+metrics:
+  operator:
+    enabled: true             # PodMonitor + PrometheusRule (prometheus-operator installed by us)
+    labels:
+      release: kube-prometheus-stack
+egress:
+  clusterCIDRs: [10.42.0.0/16, 10.43.0.0/16]   # k3s defaults (cloud-init cluster-cidr / service-cidr)
+  fqdnPolicy: none            # cilium only where the CNI was swapped and verified
