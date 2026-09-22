@@ -18,7 +18,12 @@ terraform -chdir=deployment/own-cluster/terraform/roots/hcloud apply ~/.config/e
 ```
 
 The Makefile uses `terraform` or, when absent, `tofu` (OpenTofu ≥ 1.8 supports the same
-`test`/`mock_provider` features).
+`test`/`mock_provider` features). **A saved plan is applied by the tool that made it**: a
+Terraform plan is unreadable to `tofu` and the reverse ("string field contains invalid UTF-8"),
+and `apply` checks the lock file the plan was made with. Since 2026-09-23 the author's Mac has
+Terraform 1.16.3, so `make` picks `terraform`; the committed `.terraform.lock.hcl` files are
+Terraform's (both roots validate and pass their mock tests under Terraform 1.16.3 and OpenTofu
+1.12.6).
 
 ## Cost guard (ADR-028 §5) — before the first `apply`
 
@@ -26,6 +31,12 @@ The Makefile uses `terraform` or, when absent, `tofu` (OpenTofu ≥ 1.8 supports
 |---|---|---|---|
 | Hetzner Cloud | **€25 / month** budget alert in the console | 2 × `cx23` (≈ €3.79 each), one 10 GB volume (≈ €0.50), one primary IPv4 (≈ €0.60), Object Storage (≈ €5 base incl. 1 TB, at demo volume) | ≈ €14 / month |
 | OCI | **€10 / month** budget alert in the console | Object Storage store B within the Always Free 20 GB; egress within the free allowance at demo volume | ≈ €0 / month |
+
+Everything written to either bucket is locked for 90 days (Object Lock on A, retention rule on
+B) and cannot be deleted early, so what the demo writes per day is the real cost driver. With
+ADR-036 amendment 1 (2026-09-23) that is Bronze plus one compressed base backup a day plus
+compressed WAL — tens of MB a day at demo volume (docs/07 §5.2); the first shape (raw WAL,
+96 bases a day, ≈ 4.5 GiB/day) was fixed before any apply.
 
 Author checklist, in this order:
 
@@ -37,10 +48,21 @@ Author checklist, in this order:
    `~/.config/energy-platform/verify.env` already holds the S3 keys from V-12/V-13.
 3. `make terraform-plan-hcloud`, read the plan (2 servers, 1 network, 1 subnet, 1 firewall,
    1 ssh key, 1 volume, 1 S3 bucket + versioning + lock configuration, 1 OCI bucket).
-4. `terraform apply <planfile>` (Level 3). Then `terraform output demo_cluster_url` and
+   *(2026-09-23: planned by the agent with Terraform 1.16.3 — `hcloud-20260923-011113.tfplan`,
+   12 to add, `github_repository = jalalhussein1982/energy-platform`, admin `/32` = the
+   author's address at 01:11 CEST; the 2026-09-22 plan was deleted.)*
+4. Immediately before applying, check the admin address still matches: `curl -4 -s
+   https://api.ipify.org` against `terraform -chdir=… show -json <planfile> | jq -r
+   .variables.admin_cidr.value`. A different address only locks SSH out (the API port is open
+   to OIDC tokens, ADR-035 §4), but step 5 needs SSH — re-plan if it changed. Then
+   `terraform -chdir=deployment/own-cluster/terraform/roots/hcloud apply <planfile>` (Level 3).
+5. `terraform output demo_cluster_url` and
    `ssh root@<server> cat /var/lib/rancher/k3s/server/tls/server-ca.crt` give the two public
    values the deploy workflow needs (`DEMO_CLUSTER_URL`, `DEMO_CLUSTER_CA`, Task 5.9).
-5. Deletion of servers is `terraform destroy` (Level 3). **Buckets are never deleted by
+   The state is local (`roots/hcloud/terraform.tfstate`, git-ignored): it is the only record of
+   what exists, `destroy` needs it, and it holds the k3s token and S3 keys in plain text — keep a
+   `chmod 600` copy outside the checkout.
+6. Deletion of servers is `terraform destroy` (Level 3). **Buckets are never deleted by
    Terraform** (`lifecycle { prevent_destroy }` is deliberately not used because it would also
    block `destroy` of everything else; the bucket resources are simply left out of any destroy
    by `-target`, and Object Lock / the retention rule would refuse object deletion anyway).

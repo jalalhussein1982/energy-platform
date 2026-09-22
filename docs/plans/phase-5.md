@@ -269,7 +269,7 @@ ships ~4.5 GiB/day of uncompressed WAL (`archive_timeout = 300`) into a director
 two days) and 96 base backups a day, every object under the 90-day COMPLIANCE lock on A and
 mirrored to B. **Author decisions (2026-09-23):** repository `jalalhussein1982/energy-platform`,
 private, created by the agent with `gh`; ADR-035 §4 accepted as written; ADR-036 amendment
-approved; the admin address is re-read (the plan-time `62.209.249.82` was a hostel network).
+approved; the admin address is re-read (the plan-time address belonged to another network).
 This addendum supersedes the "Push to any remote" line of the header for the remote the author
 named, nothing else.
 

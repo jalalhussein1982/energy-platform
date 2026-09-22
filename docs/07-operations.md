@@ -73,15 +73,27 @@ Plan: 12 to add, 0 to change, 0 to destroy.
 `terraform apply <planfile>` is the author's (Level 3); the cost ceilings and the checklist are
 in `deployment/own-cluster/README.md`.
 
+**Re-plan, 2026-09-23 01:11 CEST** (`hcloud-20260923-011113.tfplan`): the 2026-09-22 plan held an
+admin address from another network, so it was deleted and the root re-planned with the current
+one — same 12 resources, `github_repository = jalalhussein1982/energy-platform`. The author's Mac
+now has Terraform 1.16.3 next to OpenTofu 1.12.6 and `make` prefers `terraform`, so this plan is
+a Terraform plan: `tofu show` cannot read it ("string field contains invalid UTF-8") and it must
+be applied with `terraform`. `make terraform-validate` under Terraform 1.16.3: both roots valid,
+4/4 mock runs pass; the lock files are now Terraform's.
+
 ## 4. Tenant and demo deploys
 
 `make deploy-tenant ENV=demo` layers `deployment/tenant/values-demo.yaml` on
-`values-tenant.yaml`; `make deploy-demo` first builds the kube context from the GitHub Actions
-ID token (`scripts/oidc_kube_context.sh`, audience `energy-platform-demo`, V-14). The demo
-deploy itself is **blocked on the author** (Level 3 and outward-facing steps, listed in
-`deployment/tenant/README.md`): `terraform apply` of the `hcloud` plan, a GitHub remote for this
-checkout, the two repository variables, the namespace Secret, the platform image pushed to the
-registry the workflow names. Nothing runs on the reference cluster (ADR-028).
+`values-tenant.yaml`; `make deploy-demo` first checks `DEMO_OCI_NAMESPACE` (store B's endpoint
+is built from it), then builds the kube context from the GitHub Actions ID token
+(`scripts/oidc_kube_context.sh`, audience `energy-platform-demo`, V-14). The workflow's `image`
+job builds and pushes the amd64 image with the job token and hands the digest to the `deploy`
+job (plan P5-D20); the pods pull the private package with `image.pullSecrets: [ghcr-pull]`
+(P5-D21); the demo values carry the providers' object-store ranges, no placeholders (P5-D22).
+Still **blocked on the author** (Level 3, `deployment/tenant/README.md`): `terraform apply` of
+the `hcloud` plan, the variables `DEMO_CLUSTER_URL` / `DEMO_CLUSTER_CA`, the two namespace
+Secrets (`energy-platform`, `ghcr-pull`), the first workflow run. Nothing runs on the reference
+cluster (ADR-028).
 
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
