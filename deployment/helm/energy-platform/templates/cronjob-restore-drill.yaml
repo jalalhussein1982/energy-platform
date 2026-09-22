@@ -49,8 +49,10 @@ spec:
           restartPolicy: Never
           serviceAccountName: {{ $fullname }}
           automountServiceAccountToken: false
+          # uid 999 = the postgres image's user: initdb and postgres need their uid in /etc/passwd;
+          # rclone and the platform image run as any non-root uid
           securityContext:
-{{ include "energy-platform.podSecurity" (dict "uid" 10001) | indent 12 }}
+{{ include "energy-platform.podSecurity" (dict "uid" 999) | indent 12 }}
           initContainers:
 {{ $fetchContainer | indent 12 }}
             - name: prep
