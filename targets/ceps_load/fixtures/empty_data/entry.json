@@ -1,0 +1,20 @@
+{
+  "capture_id": "ceps_load:2026-09-20T221500Z:1",
+  "target_id": "ceps_load",
+  "scheduled_for": "2026-09-20T22:15:00Z",
+  "attempt": 1,
+  "fetched_at": "2026-09-20T22:15:00Z",
+  "source_url": "https://www.ceps.cz/_layouts/CepsData.asmx",
+  "http_status": 200,
+  "content_type": "text/xml; charset=utf-8",
+  "payload_sha256": "a9827d040733fb54fd82a5ea4b73223a0a998cb36f66f9faf820bc3805892c59",
+  "raw_ref": "bronze/blobs/a9/a9827d040733fb54fd82a5ea4b73223a0a998cb36f66f9faf820bc3805892c59",
+  "size": 835,
+  "content_changed": true,
+  "source_transport": "soap",
+  "source_published_at": null,
+  "tier": "hot",
+  "etag": null,
+  "last_modified": null,
+  "hops": []
+}

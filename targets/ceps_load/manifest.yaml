@@ -1,0 +1,61 @@
+# T3 — ČEPS transmission-system load, SOAP Load, QH / AVG / RT (docs/01-data-scope.md §3 T3).
+# Endpoint, request, live response shape and the labelling of `@date` verified on 2026-09-20
+# (docs/06-source-verification.md §4; evidence rows 2, 14–16, 22–24). Other `function` values,
+# non-RT versions and history depth stay [UNVERIFIED] (01 §3). Declared here, never coded (ADR-005).
+schema_version: 1
+target_id: ceps_load
+description: ČEPS system load, quarter-hour averages (QH, AVG), real data (RT), Load and Load including pumping
+license: "ČEPS web-service terms not published beyond the interface description v3.2 (docs/06 §4.5); robots.txt disallows crawling and only the documented service is used; fixtures synthetic (01 §10)"
+terms_url: https://www.ceps.cz/en/web-services
+allowed_hosts:
+  - www.ceps.cz
+modality: soap-xml
+cadence:
+  cron: "*/15 * * * *"        # 01 §5; publication cadence [UNVERIFIED] until the campaign (06 §6)
+  timezone: Europe/Prague
+  correction:                 # 01 §5 correction window 1 day [assumption] (ADR-033 §3)
+    cron: "11 * * * *"
+    days: 1
+history:
+  max_age: P1Y                # 2025-10-26 served live (06 §4.3); the portal's 2010 range is a UI range, not proof (01 §3)
+fetch:
+  soap_xml:
+    url: https://www.ceps.cz/_layouts/CepsData.asmx
+    soap_action: https://www.ceps.cz/CepsData/Load
+    soap_version: "1.1"
+    body_template: |
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:ceps="https://www.ceps.cz/CepsData/">
+        <soapenv:Body>
+          <ceps:Load>
+            <ceps:dateFrom>{date_from}</ceps:dateFrom>
+            <ceps:dateTo>{date_to}</ceps:dateTo>
+            <ceps:agregation>QH</ceps:agregation>
+            <ceps:function>AVG</ceps:function>
+            <ceps:version>RT</ceps:version>
+          </ceps:Load>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    params:                     # local Prague clock without offset (interface description v3.2), dateTo inclusive
+      date_from: "{delivery_day:%Y-%m-%d}T00:00:00"
+      date_to: "{delivery_day:%Y-%m-%d}T23:59:59"
+contract:
+  dataset_id: ceps.load
+  source_transport: soap
+  decode: soap
+  metrics: [load_incl_pumping, load]
+mapping:
+  dimensions:                   # identity key: (area, delivery_start_utc, resolution, aggregation_function, version)
+    area: CZ
+    aggregation_function: AVG
+  time:
+    kind: timestamp
+    timezone: Europe/Prague
+    timestamp: {source: "@date"}    # carries the local offset; the repeated DST hour has two offsets (06 §4.3)
+    resolution: {constant: PT15M}
+    interval_label: start       # verified: HR items equal the mean of the four QH items h:00…h:45 (06 §4.4, review F13)
+  source_version: {constant: RT}  # bound to the `version` identity dimension (04 §2.3)
+  source_published_at: null     # not provided (01 §3)
+  metrics:                      # values carry 0–3 decimals live (06 §4.2)
+    load_incl_pumping: {source: "@value1", unit: MW, sign: as_published, decimal_separator: dot}   # serie value1 = "Load including pumping [MW]"
+    load: {source: "@value2", unit: MW, sign: as_published, decimal_separator: dot}                # serie value2 = "Load [MW]"

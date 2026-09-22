@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <LoadResponse xmlns="https://www.ceps.cz/CepsData/">
+      <LoadResult>
+        <root xmlns="https://www.ceps.cz/CepsData/StructuredData/1.0">
+        <information>
+          <name>Load</name>
+          <date_from>2026-09-18T00:00:00+02:00</date_from>
+          <date_to>2026-09-18T23:59:59+02:00</date_to>
+          <version>RT</version>
+          <function>AVG</function>
+          <aggregation>QH</aggregation>
+        </information>
+        <series>
+          <serie id="value1" name="Load including pumping [MW]" />
+          <serie id="value2" name="Load [MW]" />
+        </series>
+        <data>
+        <item date="2026-09-18T00:00:00+02:00" value1="5400" value2="5300.000" />
+        <item date="2026-09-18T00:15:00+02:00" value1="5441.1" value2="5329.125" />
+        <item date="2026-09-18T00:30:00+02:00" value1="5482.2" value2="5358.250" />
+        <item date="2026-09-18T00:45:00+02:00" value1="5523" value2="5387.375" />
+        <item date="2026-09-18T01:00:00+02:00" value1="5564.1" value2="5416.000" />
+        <item date="2026-09-18T01:15:00+02:00" value1="5605" value2="5445.125" />
+        <item date="2026-09-18T01:30:00+02:00" value1="5646" value2="5474.250" />
+        <item date="2026-09-18T01:45:00+02:00" value1="5687.1" />
+        <item date="2026-09-18T02:00:00+02:00" value1="5728.2" value2="5532.000" />
+        <item date="2026-09-18T02:15:00+02:00" value1="5769" value2="5561.125" />
+        <item date="2026-09-18T02:30:00+02:00" value1="5810" value2="5590.250" />
+        <item date="2026-09-18T02:45:00+02:00" value1="5851.2" value2="5619.375" />
+        <item date="2026-09-18T03:00:00+02:00" value1="5892" value2="5648.000" />
+        <item date="2026-09-18T03:15:00+02:00" value1="5933.1" value2="5677.125" />
+        <item date="2026-09-18T03:30:00+02:00" value1="5974.2" value2="5706.250" />
+        <item date="2026-09-18T03:45:00+02:00" value1="6015" value2="5735.375" />
+        <item date="2026-09-18T04:00:00+02:00" value1="6056.1" value2="5764.000" />
+        <item date="2026-09-18T04:15:00+02:00" value1="6097.2" value2="5793.125" />
+        <item date="2026-09-18T04:30:00+02:00" value1="6138" value2="5822.250" />
+        <item date="2026-09-18T04:45:00+02:00" value1="6179.1" value2="5851.375" />
+        <item date="2026-09-18T05:00:00+02:00" value1="6220" value2="5880.000" />
+        <item date="2026-09-18T05:15:00+02:00" value1="6261" value2="5909.125" />
+        <item date="2026-09-18T05:30:00+02:00" value1="5402.1" value2="5938.250" />
+        <item date="2026-09-18T05:45:00+02:00" value1="5443.2" value2="5967.375" />
+        <item date="2026-09-18T06:00:00+02:00" value1="5484" value2="5996.000" />
+        <item date="2026-09-18T06:15:00+02:00" value1="5525" value2="6025.125" />
+        <item date="2026-09-18T06:30:00+02:00" value1="5566.2" value2="6054.250" />
+        <item date="2026-09-18T06:45:00+02:00" value1="5607" value2="6083.375" />
+        <item date="2026-09-18T07:00:00+02:00" value1="5648.1" value2="5312.000" />
+        <item date="2026-09-18T07:15:00+02:00" value1="5689.2" value2="5341.125" />
+        <item date="2026-09-18T07:30:00+02:00" value1="5730" value2="5370.250" />
+        <item date="2026-09-18T07:45:00+02:00" value1="5771.1" value2="5399.375" />
+        <item date="2026-09-18T08:00:00+02:00" value1="5812.2" value2="5428.000" />
+        <item date="2026-09-18T08:15:00+02:00" value1="5853" value2="5457.125" />
+        <item date="2026-09-18T08:30:00+02:00" value1="5894.1" value2="5486.250" />
+        <item date="2026-09-18T08:45:00+02:00" value1="5935" value2="5515.375" />
+        <item date="2026-09-18T09:00:00+02:00" value1="5976" value2="5544.000" />
+        <item date="2026-09-18T09:15:00+02:00" value1="6017.1" value2="5573.125" />
+        <item date="2026-09-18T09:30:00+02:00" value1="6058.2" value2="5602.250" />
+        <item date="2026-09-18T09:45:00+02:00" value1="6099" value2="5631.375" />
+        <item date="2026-09-18T10:00:00+02:00" value1="6140" value2="5660.000" />
+        <item date="2026-09-18T10:15:00+02:00" value1="6181.2" value2="5689.125" />
+        <item date="2026-09-18T10:30:00+02:00" value1="6222" value2="5718.250" />
+        <item date="2026-09-18T10:45:00+02:00" value1="6263.1" value2="5747.375" />
+        <item date="2026-09-18T11:00:00+02:00" value1="5404.2" value2="5776.000" />
+        <item date="2026-09-18T11:15:00+02:00" value1="5445" value2="5805.125" />
+        <item date="2026-09-18T11:30:00+02:00" value1="5486.1" value2="5834.250" />
+        <item date="2026-09-18T11:45:00+02:00" value1="5527.2" value2="5863.375" />
+        <item date="2026-09-18T12:00:00+02:00" value1="5568" value2="5892.000" />
+        <item date="2026-09-18T12:15:00+02:00" value1="5609.1" value2="5921.125" />
+        <item date="2026-09-18T12:30:00+02:00" value1="5650" value2="5950.250" />
+        <item date="2026-09-18T12:45:00+02:00" value1="5691" value2="5979.375" />
+        <item date="2026-09-18T13:00:00+02:00" value1="5732.1" value2="6008.000" />
+        <item date="2026-09-18T13:15:00+02:00" value1="5773.2" value2="6037.125" />
+        <item date="2026-09-18T13:30:00+02:00" value1="5814" value2="6066.250" />
+        <item date="2026-09-18T13:45:00+02:00" value1="5855" value2="6095.375" />
+        <item date="2026-09-18T14:00:00+02:00" value1="5896.2" value2="5324.000" />
+        <item date="2026-09-18T14:15:00+02:00" value1="5937" value2="5353.125" />
+        <item date="2026-09-18T14:30:00+02:00" value1="5978.1" value2="5382.250" />
+        <item date="2026-09-18T14:45:00+02:00" value1="6019.2" value2="5411.375" />
+        <item date="2026-09-18T15:00:00+02:00" value1="6060" value2="5440.000" />
+        <item date="2026-09-18T15:15:00+02:00" value1="6101.1" value2="5469.125" />
+        <item date="2026-09-18T15:30:00+02:00" value1="6142.2" value2="5498.250" />
+        <item date="2026-09-18T15:45:00+02:00" value1="6183" value2="5527.375" />
+        <item date="2026-09-18T16:00:00+02:00" value1="6224.1" value2="5556.000" />
+        <item date="2026-09-18T16:15:00+02:00" value1="6265" value2="5585.125" />
+        <item date="2026-09-18T16:30:00+02:00" value1="5406" value2="5614.250" />
+        <item date="2026-09-18T16:45:00+02:00" value1="5447.1" value2="5643.375" />
+        <item date="2026-09-18T17:00:00+02:00" value1="5488.2" value2="5672.000" />
+        <item date="2026-09-18T17:15:00+02:00" value1="5529" value2="5701.125" />
+        <item date="2026-09-18T17:30:00+02:00" value1="5570" value2="5730.250" />
+        <item date="2026-09-18T17:45:00+02:00" value1="5611.2" value2="5759.375" />
+        <item date="2026-09-18T18:00:00+02:00" value1="5652" value2="5788.000" />
+        <item date="2026-09-18T18:15:00+02:00" value1="5693.1" value2="5817.125" />
+        <item date="2026-09-18T18:30:00+02:00" value1="5734.2" value2="5846.250" />
+        <item date="2026-09-18T18:45:00+02:00" value1="5775" value2="5875.375" />
+        <item date="2026-09-18T19:00:00+02:00" value1="5816.1" value2="5904.000" />
+        <item date="2026-09-18T19:15:00+02:00" value1="5857.2" value2="5933.125" />
+        <item date="2026-09-18T19:30:00+02:00" value1="5898" value2="5962.250" />
+        <item date="2026-09-18T19:45:00+02:00" value1="5939.1" value2="5991.375" />
+        <item date="2026-09-18T20:00:00+02:00" value1="5980" value2="6020.000" />
+        <item date="2026-09-18T20:15:00+02:00" value1="6021" value2="6049.125" />
+        <item date="2026-09-18T20:30:00+02:00" value1="6062.1" value2="6078.250" />
+        <item date="2026-09-18T20:45:00+02:00" value1="6103.2" value2="5307.375" />
+        <item date="2026-09-18T21:00:00+02:00" value1="6144" value2="5336.000" />
+        <item date="2026-09-18T21:15:00+02:00" value1="6185" value2="5365.125" />
+        <item date="2026-09-18T21:30:00+02:00" value1="6226.2" value2="5394.250" />
+        <item date="2026-09-18T21:45:00+02:00" value1="6267" value2="5423.375" />
+        <item date="2026-09-18T22:00:00+02:00" value1="5408.1" value2="5452.000" />
+        <item date="2026-09-18T22:15:00+02:00" value1="5449.2" value2="5481.125" />
+        <item date="2026-09-18T22:30:00+02:00" value1="5490" value2="5510.250" />
+        <item date="2026-09-18T22:45:00+02:00" value1="5531.1" value2="5539.375" />
+        <item date="2026-09-18T23:00:00+02:00" value1="5572.2" value2="5568.000" />
+        <item date="2026-09-18T23:15:00+02:00" value1="5613" value2="5597.125" />
+        <item date="2026-09-18T23:30:00+02:00" value1="5654.1" value2="5626.250" />
+        <item date="2026-09-18T23:45:00+02:00" value1="5695" value2="5655.375" />
+        </data>
+        </root>
+      </LoadResult>
+    </LoadResponse>
+  </soap:Body>
+</soap:Envelope>

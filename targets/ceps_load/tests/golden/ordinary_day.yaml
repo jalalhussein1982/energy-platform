@@ -1,0 +1,13 @@
+# Ordinary day (2026-09-19, +02:00): 96 items → 192 metric rows. @date names the interval start
+# (docs/06 §4.4): item 00:00:00+02:00 = [2026-09-18T22:00Z, 22:15Z). The version identity
+# dimension is the constant source_version RT (04 §2.3).
+fixture: ordinary_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep (item attributes @date, @value1, @value2), UTC instants derived by hand from the offset each item carries; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 192
+  quality_events: [partition_status]     # "2026-09-19: complete 96/96"
+  rows:
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, metric: load_incl_pumping, value: "5400", source_version: RT}
+    - {delivery_start_utc: 2026-09-19T00:00:00+02:00, resolution: PT15M, metric: load, value: "5300.000", source_version: RT}
+    - {delivery_start_utc: 2026-09-19T23:45:00+02:00, resolution: PT15M, metric: load_incl_pumping, value: "5695"}
+    - {delivery_start_utc: 2026-09-19T23:45:00+02:00, resolution: PT15M, metric: load, value: "5655.375", dimensions: {area: CZ, aggregation_function: AVG}}

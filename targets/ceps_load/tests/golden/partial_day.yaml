@@ -1,0 +1,11 @@
+# Rolling partial day: the day request returns the quarter-hours published so far (here 56 items,
+# up to 13:45 local); completeness says partial 56/96. Cadence of the fill is [UNVERIFIED] (06 §6).
+fixture: partial_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep (item attributes @date, @value1, @value2), UTC instants derived by hand from the offset each item carries; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 112
+  quality_events: [partition_status]     # "2026-09-20: partial 56/96"
+  rows:
+    - {delivery_start_utc: 2026-09-20T00:00:00+02:00, resolution: PT15M, metric: load_incl_pumping, value: "5400"}
+    - {delivery_start_utc: 2026-09-20T13:45:00+02:00, resolution: PT15M, metric: load_incl_pumping, value: "5855"}
+    - {delivery_start_utc: 2026-09-20T13:45:00+02:00, resolution: PT15M, metric: load, value: "6095.375"}

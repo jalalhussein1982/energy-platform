@@ -1,0 +1,16 @@
+# 25-hour day (2025-10-26): 100 items; 02:00…02:45 appear twice, first with +02:00 (items 9–12,
+# 00:00Z…00:45Z) then with +01:00 (items 13–16, 01:00Z…01:45Z) — the live pattern (docs/06 §4.3).
+# Offset-aware parsing makes the repeated wall-clock hour unambiguous (01 §7).
+fixture: autumn_dst_day
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep (item attributes @date, @value1, @value2), UTC instants derived by hand from the offset each item carries; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 200
+  quality_events: [partition_status]     # "2025-10-26: complete 100/100"
+  rows:
+    - {delivery_start_utc: 2025-10-25T22:00:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5400"}
+    - {delivery_start_utc: 2025-10-26T00:00:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5728.2"}
+    - {delivery_start_utc: 2025-10-26T00:00:00Z, resolution: PT15M, metric: load, value: "5532.000"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5892"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, metric: load, value: "5648.000"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, metric: load_incl_pumping, value: "5859"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, metric: load, value: "5771.375"}
