@@ -141,10 +141,10 @@ docs/07-operations.md                         # deploy, drills, restore, rollbac
 
 **Files:** `energy_platform/runtime/drill.py`, `energy_platform/cli.py`, `tests/runtime/test_drill.py`.
 
-- [ ] `restore_drill(live: Store, scratch: Store, replica: Bronze, manifests, *, now, dry_run) -> DrillReport`: `dry_run` lists the targets, counts capture-log entries in the replica and checks `scratch.ping()`; full run = `reconcile` over the full history (window = everything), `replay_range` over every run, then compare per target: `runs` count by state, `observations_current` row count and an order-independent SHA-256 over `(observation identity, value)` between live and scratch; `ok` iff equal; RTO measured as wall clock and reported.
-- [ ] CLI `energyctl restore-drill --scratch-dsn … [--dry-run]` with the replica Bronze from `ENERGY_PLATFORM_S3_REPLICA_*` (same shape as P5-D4, secretRef `BRONZE_REPLICA`) and the live DSN from `ENERGY_PLATFORM_DSN` (read-only use).
-- [ ] Tests with `MemoryStore` ×2 and a memory Bronze seeded through the fixture path: identical → ok; a Silver row missing in scratch → not ok with the differing target named; dry-run never writes.
-- [ ] Commit `feat(drill): restore-drill verb rebuilding the ledger and Silver from the replica Bronze (ADR-024 §2, ADR-021 §5)`.
+- [x] `restore_drill(live: Store, scratch: Store, replica: Bronze, manifests, *, now, dry_run) -> DrillReport`: `dry_run` lists the targets, counts capture-log entries in the replica and checks `scratch.ping()`; full run = `reconcile` over the full history (window = everything), `replay_range` over every run, then compare per target: `runs` count by state, `observations_current` row count and an order-independent SHA-256 over `(observation identity, value)` between live and scratch; `ok` iff equal; RTO measured as wall clock and reported.
+- [x] CLI `energyctl restore-drill --scratch-dsn … [--dry-run]` with the replica Bronze from `ENERGY_PLATFORM_S3_REPLICA_*` (same shape as P5-D4, secretRef `BRONZE_REPLICA`) and the live DSN from `ENERGY_PLATFORM_DSN` (read-only use).
+- [x] Tests with `MemoryStore` ×2 and a memory Bronze seeded through the fixture path: identical → ok; a Silver row missing in scratch → not ok with the differing target named; dry-run never writes.
+- [x] Commit `feat(drill): restore-drill verb rebuilding the ledger and Silver from the replica Bronze (ADR-024 §2, ADR-021 §5)`.
 
 ### Task 5.5 — Platform image
 

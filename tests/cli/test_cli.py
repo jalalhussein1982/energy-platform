@@ -245,3 +245,70 @@ def test_gaps_with_freshness_writes_the_sli_row(tmp_path: Path) -> None:
     finally:
         store.truncate_all()
         store.close()
+
+
+def test_restore_drill_needs_a_scratch_dsn_and_a_replica(tmp_path: Path) -> None:
+    no_scratch = runner.invoke(
+        app,
+        ["restore-drill", "--replica-dir", str(tmp_path)],
+        env={"ENERGY_PLATFORM_SCRATCH_DSN": ""},
+    )
+    assert no_scratch.exit_code == 1 and "--scratch-dsn" in no_scratch.output
+    no_replica = runner.invoke(
+        app,
+        [
+            "restore-drill",
+            "--scratch-dsn",
+            "postgresql:///x",
+            "-m",
+            str(EX / "manifests/ote_idm_soap.yaml"),
+        ],
+        env={"ENERGY_PLATFORM_S3_REPLICA_ENDPOINT": ""},
+    )
+    assert no_replica.exit_code == 1 and "replica" in no_replica.output
+
+
+@pytest.mark.db
+def test_restore_drill_rebuilds_into_a_scratch_schema_and_matches_live(tmp_path: Path) -> None:
+    """ADR-002 / ADR-024 §2 on a real server: live in public, scratch in its own schema."""
+    dsn = os.environ.get("ENERGY_PLATFORM_TEST_DSN")
+    if not dsn:
+        pytest.skip("ENERGY_PLATFORM_TEST_DSN not set; run `make db-test`")
+    import psycopg
+
+    manifest = str(EX / "manifests/ote_idm_soap.yaml")
+    common = ["--dsn", dsn, "--bronze-dir", str(tmp_path)]
+    cap = runner.invoke(
+        app, ["capture", "-m", manifest, "--fixture", str(EX / "fixtures/ote_idm_soap"), *common]
+    )
+    assert cap.exit_code == 0, cap.output
+    assert runner.invoke(app, ["process", "-m", manifest, *common]).exit_code == 0
+    drill = runner.invoke(
+        app,
+        [
+            "restore-drill",
+            "--scratch-dsn",
+            dsn,
+            "--scratch-schema",
+            "drill_scratch",
+            "-m",
+            manifest,
+            "--replica-dir",
+            str(tmp_path),
+            "--dsn",
+            dsn,
+        ],
+    )
+    assert drill.exit_code == 0, drill.output
+    report = json.loads(drill.stdout)
+    assert report["ok"] and report["targets"][0]["message"].startswith("identical")
+    assert report["targets"][0]["scratch"]["rows"] == 192
+    with psycopg.connect(dsn) as conn:
+        n = conn.execute("SELECT count(*) FROM drill_scratch.observations").fetchone()
+        assert n is not None and n[0] == 192
+        conn.execute("DROP SCHEMA drill_scratch CASCADE")
+    store = PostgresStore(dsn)
+    try:
+        store.truncate_all()
+    finally:
+        store.close()

@@ -30,7 +30,12 @@ import typer
 from pydantic import ValidationError
 
 from energy_platform.bronze import Bronze, FileBlobStore, FileCaptureLog, load_fixture
-from energy_platform.bronze.config import BronzeConfigError, bronze_from_env, object_store_from_env
+from energy_platform.bronze.config import (
+    BronzeConfigError,
+    bronze_from_env,
+    object_store_from_env,
+    replica_bronze_from_env,
+)
 from energy_platform.contracts.manifest import (
     Manifest,
     ManifestSyntaxError,
@@ -57,6 +62,7 @@ from energy_platform.runtime import (
     record_freshness,
     replay_derivation,
     replay_range,
+    restore_drill,
     smoke,
     storage_probe,
 )
@@ -70,8 +76,8 @@ app = typer.Typer(
     name="energyctl",
     help=(
         "energy-platform command line: validate, capture, recapture, process, replay, gaps, "
-        "freshness, smoke, storage-probe, demo; new-target, record-fixture, run-target-tests, "
-        "admission-request, pr-bundle, mcp-serve"
+        "freshness, smoke, storage-probe, restore-drill, demo; new-target, record-fixture, "
+        "run-target-tests, admission-request, pr-bundle, mcp-serve"
     ),
     no_args_is_help=True,
     pretty_exceptions_enable=False,
@@ -363,6 +369,77 @@ def smoke_cmd(
         if dsn is not None and schema is not None:
             drop_schema(dsn, schema)
     _echo(report)
+    raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command("restore-drill")
+def restore_drill_cmd(
+    scratch_dsn: Annotated[
+        str | None,
+        typer.Option(
+            "--scratch-dsn",
+            envvar="ENERGY_PLATFORM_SCRATCH_DSN",
+            help="the restored / empty PostgreSQL the ledger and Silver are rebuilt into",
+        ),
+    ] = None,
+    scratch_schema: Annotated[
+        str | None,
+        typer.Option("--scratch-schema", help="rebuild into this schema of --scratch-dsn instead"),
+    ] = None,
+    manifests: Annotated[
+        list[Path] | None, typer.Option("--manifest", "-m", help="manifest(s) to drill")
+    ] = None,
+    targets_root: TargetsRootOpt = TARGETS,
+    replica_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--replica-dir", help="replica Bronze directory (default: the S3 replica env)"
+        ),
+    ] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="list and check, rebuild nothing")
+    ] = False,
+    dsn: DsnOpt = None,
+) -> None:
+    """ADR-002 restore drill: rebuild ledger + Silver from the replica Bronze into a scratch
+    database and compare with live (ENERGY_PLATFORM_DSN, read-only). Exit 1 on any difference."""
+    if not scratch_dsn:
+        typer.echo(
+            "restore-drill: --scratch-dsn or ENERGY_PLATFORM_SCRATCH_DSN is required", err=True
+        )
+        raise typer.Exit(code=1)
+    paths = list(manifests or []) or [
+        d / "manifest.yaml" for d in target_dirs(targets_root) if (d / "manifest.yaml").is_file()
+    ]
+    if not paths:
+        typer.echo(f"restore-drill: no manifests under {targets_root} and none given", err=True)
+        raise typer.Exit(code=1)
+    loaded = [_manifest(p) for p in paths]
+    if replica_dir is not None:
+        replica = Bronze(FileBlobStore(replica_dir), FileCaptureLog(replica_dir))
+    else:
+        try:
+            replica = replica_bronze_from_env(os.environ)
+        except (BronzeConfigError, ObjectStoreError) as exc:
+            typer.echo(f"restore-drill: replica: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+    live: Store | None = None
+    if dsn:
+        live = _store(dsn, required=True)
+    if scratch_schema is not None and not dry_run:
+        create_schema(scratch_dsn, scratch_schema)
+    try:
+        if not dry_run:
+            upgrade(scratch_dsn, schema=scratch_schema)
+        scratch: Store = PostgresStore(scratch_dsn, schema=scratch_schema)
+    except (StoreUnavailable, OSError, RuntimeError, ValueError) as exc:
+        typer.echo(f"restore-drill: scratch: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    report = restore_drill(loaded, scratch=scratch, replica=replica, live=live, dry_run=dry_run)
+    _echo(report)
+    typer.echo(
+        f"restore-drill: {'OK' if report.ok else 'FAILED'} in {report.seconds:.1f}s", err=True
+    )
     raise typer.Exit(code=0 if report.ok else 1)
 
 
