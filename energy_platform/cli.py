@@ -426,7 +426,14 @@ def restore_drill_cmd(
     live: Store | None = None
     if dsn:
         live = _store(dsn, required=True)
-    if scratch_schema is not None and not dry_run:
+    if scratch_schema is not None and dry_run:
+        typer.echo(
+            f"restore-drill: dry run — schema {scratch_schema} would be created and migrated; "
+            "checking the scratch server only",
+            err=True,
+        )
+        scratch_schema = None
+    if scratch_schema is not None:
         create_schema(scratch_dsn, scratch_schema)
     try:
         if not dry_run:
