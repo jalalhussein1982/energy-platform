@@ -180,4 +180,4 @@ the scratch server, rebuilds nothing). On kind, 2026-09-22 06:17: smoke `Succeed
 metric present, dry run `OK in 0.2s`.
 
 Phase gate (03 Phase 5): from a **clean clone**, `make local-down && make local-up && make
-smoke-test` — CLEAN_CLONE_SECTION.
+smoke-test` — 2026-09-22 06:37–06:42, commit 93dafd9: **exit 0 in 305 s** (kind node and third-party images already cached on the laptop). Two earlier runs failed honestly and shaped the gate: a fresh cluster has no freshness row until the gaps CronJob fires, so `smoke-test` runs one gaps+freshness Job first; and store B holds no backup yet, so the drill's dry run starts an empty scratch cluster and checks reachability only (the drill pod runs as uid 999 because `initdb` needs its user in `/etc/passwd`).

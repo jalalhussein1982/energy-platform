@@ -239,10 +239,10 @@ docs/07-operations.md                         # deploy, drills, restore, rollbac
 
 **Files:** `Makefile` (`smoke-test`), `docs/07-operations.md` (index, RPO/RTO table with measured values), `docs/05-constraint-matrix.md` (§2 gate rows final), `docs/03-roadmap.md` (Phase 5 checkboxes; V-11 stays open; demo deploy box ticked only if the author ran it), `docs/progress.md` (dated entry + Phase 6 starter prompt), `README.md` (reproduce block: `make local-up && make smoke-test`).
 
-- [ ] `make smoke-test` = `helm test energy-platform -n energy-platform --logs` (re-runs the smoke hook) → exporter port-forward and the freshness metric assertion → `kubectl create job --from=cronjob/restore-drill restore-drill-dry-run` with `--dry-run` injected via `RESTORE_DRILL_ARGS` env → wait and print the log; every step fails loudly.
+- [x] `make smoke-test` = `helm test energy-platform -n energy-platform --logs` (re-runs the smoke hook) → exporter port-forward and the freshness metric assertion → `kubectl create job --from=cronjob/restore-drill restore-drill-dry-run` with `--dry-run` injected via `RESTORE_DRILL_ARGS` env → wait and print the log; every step fails loudly.
 - [ ] Clean-clone proof: `git clone . /tmp/clean && cd /tmp/clean && make local-down local-up smoke-test` (kind cluster name shared; the Make targets are idempotent) — record the wall clock.
-- [ ] Docs, roadmap ticks, progress entry, Phase 6 starter (verbatim from `03`). `make check` green.
-- [ ] Commit `docs(phase-5): operations runbook, gate rows, roadmap ticks, progress entry with the Phase 6 starter`.
+- [x] Docs, roadmap ticks, progress entry, Phase 6 starter (verbatim from `03`). `make check` green.
+- [x] Commit `docs(phase-5): operations runbook, gate rows, roadmap ticks, progress entry with the Phase 6 starter`.
 
 ## Author tasks (Level 3, never the agent)
 
