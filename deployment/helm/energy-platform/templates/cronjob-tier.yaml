@@ -1,0 +1,33 @@
+{{- /*
+ADR-021 §1 / ADR-036 §3, bronze.tiering.mode=move: blobs older than afterDays move from the hot
+bucket to the cold location with identical keys (content-addressed); capture-log entries stay
+hot; the Bronze read path tries hot then cold. rclone move = copy, verify checksum, delete
+source — under the same tool the replication uses. Replication has already mirrored these
+blobs to B (ADR-021 §4: tiering never reduces the copy count).
+*/ -}}
+{{- if eq .Values.bronze.tiering.mode "move" }}
+{{- $cold := dict "endpoint" .Values.bronze.tiering.coldEndpoint "bucket" .Values.bronze.tiering.coldBucket "region" .Values.bronze.tiering.coldRegion -}}
+{{- $script := printf "rclone move A:%s/bronze/blobs COLD:%s/bronze/blobs --min-age %dd --checksum --s3-no-check-bucket --stats-one-line -v\necho \"tier: blobs older than %d days moved to the cold location\"" .Values.bronze.bucket .Values.bronze.tiering.coldBucket (int .Values.bronze.tiering.afterDays) (int .Values.bronze.tiering.afterDays) -}}
+{{- $env := printf "%s\n%s" (include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE")) (include "energy-platform.rcloneEnv" (dict "root" . "alias" "COLD" "store" $cold "secret" "BRONZE_COLD")) -}}
+{{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "tier" "script" $script "env" $env "mounts" list) -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-tier
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: tier
+spec:
+  schedule: {{ .Values.bronze.tiering.schedule | quote }}
+  timeZone: {{ .Values.schedule.timezone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.schedule.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.schedule.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 7200
+      template:
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "tier" "container" $container) | indent 8 }}
+{{- end }}

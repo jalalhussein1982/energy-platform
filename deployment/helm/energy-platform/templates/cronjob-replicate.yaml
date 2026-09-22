@@ -1,0 +1,35 @@
+{{- /*
+ADR-036 §3: Bronze replication A → B is `rclone copy --immutable --checksum` of the WHOLE bucket
+(never `sync`, nothing is ever deleted or overwritten on B): `bronze/blobs`, the capture log
+under `captures/` (ADR-002 layout) and the Postgres backup prefix — a replica without the
+capture log is not a Bronze (found by the first restore drill),
+followed by `rclone check --one-way --min-age 5m` (objects younger than five minutes may have
+landed after the copy; the next run copies them): a difference fails the Job — the alert.
+Provider "Other" for any S3-compatible endpoint (OCI verified in V-13). No internet egress:
+the object-store NetworkPolicy rule is the only one this pod matches.
+*/ -}}
+{{- if .Values.bronze.replica.enabled }}
+{{- $script := printf "rclone copy A:%s B:%s --immutable --checksum --s3-no-check-bucket --stats-one-line -v\nrclone check A:%s B:%s --one-way --min-age 5m\necho \"replicate: A→B verified (blobs, capture log, backups)\"" .Values.bronze.bucket .Values.bronze.replica.bucket .Values.bronze.bucket .Values.bronze.replica.bucket -}}
+{{- $env := printf "%s\n%s" (include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE")) (include "energy-platform.rcloneEnv" (dict "root" . "alias" "B" "store" .Values.bronze.replica "secret" "BRONZE_REPLICA")) -}}
+{{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "replicate" "script" $script "env" $env "mounts" list) -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-replicate
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: replicate
+spec:
+  schedule: {{ .Values.bronze.replica.schedule | quote }}
+  timeZone: {{ .Values.schedule.timezone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.schedule.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.schedule.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3600
+      template:
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "replicate" "container" $container) | indent 8 }}
+{{- end }}

@@ -88,7 +88,20 @@ def test_one_cronjob_template_rendered_per_target(tmp_path: Path) -> None:
         assert f"ep-energy-platform-capture-{tid}"[:52].rstrip("-") in cronjobs
         assert f"ep-energy-platform-process-{tid}"[:52].rstrip("-") in cronjobs
         assert f"ep-energy-platform-recapture-{tid}"[:52].rstrip("-") in cronjobs
+        assert f"ep-energy-platform-backfill-{tid}"[:52].rstrip("-") in cronjobs
     assert "ep-energy-platform-gaps" in cronjobs
+    process = cronjobs["ep-energy-platform-process-ote-intraday-market"]
+    assert process["spec"]["schedule"] == "3-59/15 * * * *"  # never races the capture
+    backfill = cronjobs["ep-energy-platform-backfill-ote-intraday-market"]
+    bargs = backfill["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0]["args"]
+    assert bargs == [
+        "backfill",
+        "-m",
+        "/app/targets/ote_intraday_market/manifest.yaml",
+        "--live",
+        "--limit",
+        "8",
+    ]
     for cj in cronjobs.values():
         assert cj["spec"]["concurrencyPolicy"] == "Forbid"
         assert cj["spec"]["timeZone"] == "Europe/Prague"
@@ -193,3 +206,53 @@ def test_missing_digest_or_residency_is_refused(tmp_path: Path) -> None:
             cmd += ["--set", f"image.digest={DIGEST}"]
         result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
         assert result.returncode != 0
+
+
+def test_dr_workloads_render_behind_their_flags(tmp_path: Path) -> None:
+    """ADR-036: replication, backup shipping, tiering and the restore drill (Task 5.10)."""
+    local = named(render(tmp_path, LOCAL), "CronJob")
+    assert "ep-energy-platform-replicate" in local and "ep-energy-platform-pg-backup" in local
+    assert "ep-energy-platform-restore-drill" in local and "ep-energy-platform-tier" not in local
+    replicate = local["ep-energy-platform-replicate"]["spec"]["jobTemplate"]["spec"]["template"][
+        "spec"
+    ]
+    script = replicate["containers"][0]["args"][0]
+    assert "rclone copy A:bronze B:bronze-replica --immutable --checksum" in script  # whole bucket
+    assert "rclone sync" not in script and "rclone check" in script and "--one-way" in script
+    backup = local["ep-energy-platform-pg-backup"]["spec"]["jobTemplate"]["spec"]["template"][
+        "spec"
+    ]
+    assert backup["initContainers"][0]["command"][0] == "pg_basebackup"
+    assert "-X" in backup["initContainers"][0]["command"]
+    assert backup["affinity"]["podAffinity"]  # pinned next to Postgres: the WAL claim is RWO
+    drill = local["ep-energy-platform-restore-drill"]["spec"]["jobTemplate"]["spec"]["template"][
+        "spec"
+    ]
+    names = [c["name"] for c in drill["initContainers"]]
+    assert names == ["fetch", "prep", "scratch-postgres"]
+    assert drill["initContainers"][2]["restartPolicy"] == "Always"  # native sidecar
+    assert "B:bronze-replica/backups/postgres/base/" in drill["initContainers"][0]["args"][0]
+    env = {e["name"] for e in drill["containers"][0]["env"]}
+    assert {
+        "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT",
+        "BRONZE_REPLICA_ACCESS_KEY_ID",
+        "ENERGY_PLATFORM_DSN",
+    } <= env
+    assert "--scratch-schema rebuild" in drill["containers"][0]["args"][0]
+    flags = named(render(tmp_path, ALL_FLAGS), "CronJob")
+    assert "ep-energy-platform-tier" not in flags  # lifecycle mode: the probe hook, no move job
+    tenant = named(render(tmp_path, TENANT), "CronJob")
+    assert "ep-energy-platform-pg-backup" in tenant and "ep-energy-platform-replicate" in tenant
+
+
+def test_smoke_env_has_no_duplicate_keys_and_uses_dir_bronze(tmp_path: Path) -> None:
+    smoke = named(render(tmp_path, TENANT), "Job")["ep-energy-platform-smoke"]
+    env = [e["name"] for e in smoke["spec"]["template"]["spec"]["containers"][0]["env"]]
+    assert len(env) == len(set(env)), env
+    assert (
+        dict(
+            (e["name"], e.get("value"))
+            for e in smoke["spec"]["template"]["spec"]["containers"][0]["env"]
+        )["ENERGY_PLATFORM_BRONZE"]
+        == "dir"
+    )

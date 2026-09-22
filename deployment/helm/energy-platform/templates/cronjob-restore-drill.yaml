@@ -1,0 +1,138 @@
+{{- /*
+ADR-002 restore drill / ADR-036 §5 / ADR-024 §2 / ADR-021 §5 — a backup that has never been
+restored is a hypothesis. Every run:
+  1. fetch  (rclone)   newest base backup + the WAL archive from STORE B (the independent copy);
+  2. prep   (postgres) untar base + pg_wal into a scratch PGDATA, recovery.signal,
+                       restore_command from the fetched archive (PITR to the end of the archive);
+  3. scratch-postgres  a native sidecar (init container, restartPolicy Always) serving the
+                       restored cluster on 127.0.0.1 — started only after prep, and the drill
+                       waits for its startupProbe;
+  4. drill  (platform) `energyctl restore-drill` twice: against the RESTORED database
+                       (proves the backups), then into a fresh schema of the same scratch
+                       server with --scratch-schema rebuild (proves the Bronze-only ledger
+                       rebuild: reconcile over the full replica history + replay from B).
+       Both compare processed runs and a Silver checksum with the live database; any
+       difference fails the Job (a failed Job is the alert). Wall clock is the RTO figure.
+`RESTORE_DRILL_ARGS` (default empty) lets `make smoke-test` run the dry-run variant.
+*/ -}}
+{{- if .Values.drills.restore.enabled }}
+{{- $fullname := include "energy-platform.fullname" . -}}
+{{- $fetch := printf "LATEST=$(rclone lsf B:%s/%s/base/ --dirs-only 2>/dev/null | sort | tail -1)\ntest -n \"$LATEST\" || { echo \"restore-drill: no base backup under B:%s/%s/base/ yet\"; exit 1; }\nrclone copy \"B:%s/%s/base/$LATEST\" /restore/base --stats-one-line -v\nrclone copy B:%s/%s/wal /restore/wal --stats-one-line -v\necho \"restore-drill: fetched base $LATEST and $(ls /restore/wal | wc -l) WAL files from store B\"" .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix -}}
+{{- $fetchEnv := include "energy-platform.rcloneEnv" (dict "root" . "alias" "B" "store" .Values.bronze.replica "secret" "BRONZE_REPLICA") -}}
+{{- $fetchMounts := list (dict "name" "restore" "mountPath" "/restore") -}}
+{{- $fetchContainer := include "energy-platform.rcloneContainer" (dict "root" . "name" "fetch" "script" $fetch "env" $fetchEnv "mounts" $fetchMounts) -}}
+{{- $replicaEnv := include "energy-platform.s3Env" (dict "root" . "prefix" "ENERGY_PLATFORM_S3_REPLICA" "secret" "BRONZE_REPLICA" "store" .Values.bronze.replica) -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-restore-drill
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: drill
+spec:
+  schedule: {{ .Values.drills.restore.schedule | quote }}
+  timeZone: {{ .Values.schedule.timezone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+{{ include "energy-platform.selectorLabels" . | indent 12 }}
+            energy-platform.io/role: drill
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ $fullname }}
+          automountServiceAccountToken: false
+          securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 10001) | indent 12 }}
+          initContainers:
+{{ $fetchContainer | indent 12 }}
+            - name: prep
+              image: {{ include "energy-platform.thirdPartyImage" .Values.postgres.image }}
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  mkdir -p /restore/pgdata /restore/pgdata/pg_wal
+                  tar -xzf /restore/base/base.tar.gz -C /restore/pgdata
+                  tar -xzf /restore/base/pg_wal.tar.gz -C /restore/pgdata/pg_wal
+                  rm -f /restore/pgdata/postmaster.pid /restore/pgdata/recovery.conf
+                  chmod 0700 /restore/pgdata
+                  cat >> /restore/pgdata/postgresql.auto.conf <<'EOF'
+                  restore_command = 'cp /restore/wal/%f %p'
+                  archive_mode = off
+                  listen_addresses = '127.0.0.1'
+                  unix_socket_directories = '/var/run/postgresql'
+                  EOF
+                  printf 'local all all trust\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all ::1/128 scram-sha-256\n' > /restore/pgdata/pg_hba.conf
+                  touch /restore/pgdata/recovery.signal
+                  echo "restore-drill: scratch PGDATA prepared for PITR to the end of the archive"
+              securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 16 }}
+              resources:
+{{ toYaml .Values.resources.job | indent 16 }}
+              volumeMounts:
+                - name: restore
+                  mountPath: /restore
+                - name: tmp
+                  mountPath: /tmp
+            - name: scratch-postgres
+              image: {{ include "energy-platform.thirdPartyImage" .Values.postgres.image }}
+              restartPolicy: Always
+              command: ["postgres", "-D", "/restore/pgdata"]
+              env:
+                - name: PGDATA
+                  value: /restore/pgdata
+              startupProbe:
+                exec:
+                  command: ["pg_isready", "-h", "127.0.0.1", "-U", {{ .Values.postgres.user | quote }}]
+                periodSeconds: 5
+                failureThreshold: 120
+              securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 16 }}
+              resources:
+{{ toYaml .Values.resources.postgres | indent 16 }}
+              volumeMounts:
+                - name: restore
+                  mountPath: /restore
+                - name: run
+                  mountPath: /var/run/postgresql
+                - name: tmp
+                  mountPath: /tmp
+          containers:
+            - name: drill
+              image: {{ include "energy-platform.image" . }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  SCRATCH="postgresql://{{ .Values.postgres.user }}:$POSTGRES_PASSWORD@127.0.0.1:5432/{{ .Values.postgres.database }}"
+                  echo "== restore-drill: against the RESTORED database (backups)"
+                  /app/.venv/bin/python -m energy_platform.cli restore-drill --scratch-dsn "$SCRATCH" $RESTORE_DRILL_ARGS
+                  echo "== restore-drill: Bronze-only rebuild into a fresh schema (ADR-024 §2)"
+                  /app/.venv/bin/python -m energy_platform.cli restore-drill --scratch-dsn "$SCRATCH" --scratch-schema rebuild $RESTORE_DRILL_ARGS
+              env:
+                - name: RESTORE_DRILL_ARGS
+                  value: ""
+{{ include "energy-platform.platformEnv" (dict "root" . "bronzeMode" "s3") | indent 16 }}
+{{ $replicaEnv | indent 16 }}
+              securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 16 }}
+              resources:
+{{ toYaml .Values.resources.job | indent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: restore
+              emptyDir: {}
+            - name: run
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
+{{- end }}

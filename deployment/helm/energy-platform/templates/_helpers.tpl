@@ -131,18 +131,18 @@ capabilities:
 {{- end }}
 {{- end -}}
 
-{{/* the platform environment every verb pod gets */}}
+{{/* the platform environment every verb pod gets; the smoke passes bronzeMode "dir" (P5-D5) */}}
 {{- define "energy-platform.platformEnv" -}}
 - name: ENERGY_PLATFORM_TARGETS
   value: /app/targets
 - name: ENERGY_PLATFORM_BRONZE
-  value: s3
+  value: {{ default "s3" .bronzeMode }}
 - name: TMPDIR
   value: /tmp
-{{ include "energy-platform.dsnEnv" . }}
-{{ include "energy-platform.s3Env" (dict "root" . "prefix" "ENERGY_PLATFORM_S3" "secret" "BRONZE" "store" .Values.bronze) }}
-{{- if eq .Values.bronze.tiering.mode "move" }}
-{{ include "energy-platform.s3Env" (dict "root" . "prefix" "ENERGY_PLATFORM_S3_COLD" "secret" "BRONZE_COLD" "store" (dict "endpoint" .Values.bronze.tiering.coldEndpoint "bucket" .Values.bronze.tiering.coldBucket "region" .Values.bronze.tiering.coldRegion "allowInsecure" .Values.bronze.tiering.coldAllowInsecure)) }}
+{{ include "energy-platform.dsnEnv" .root }}
+{{ include "energy-platform.s3Env" (dict "root" .root "prefix" "ENERGY_PLATFORM_S3" "secret" "BRONZE" "store" .root.Values.bronze) }}
+{{- if eq .root.Values.bronze.tiering.mode "move" }}
+{{ include "energy-platform.s3Env" (dict "root" .root "prefix" "ENERGY_PLATFORM_S3_COLD" "secret" "BRONZE_COLD" "store" (dict "endpoint" .root.Values.bronze.tiering.coldEndpoint "bucket" .root.Values.bronze.tiering.coldBucket "region" .root.Values.bronze.tiering.coldRegion "allowInsecure" .root.Values.bronze.tiering.coldAllowInsecure)) }}
 {{- end }}
 {{- end -}}
 
@@ -154,7 +154,7 @@ capabilities:
   args:
 {{ toYaml .args | indent 4 }}
   env:
-{{ include "energy-platform.platformEnv" .root | indent 4 }}
+{{ include "energy-platform.platformEnv" (dict "root" .root "bronzeMode" (default "s3" .bronzeMode)) | indent 4 }}
 {{- if .extraEnv }}
 {{ toYaml .extraEnv | indent 4 }}
 {{- end }}

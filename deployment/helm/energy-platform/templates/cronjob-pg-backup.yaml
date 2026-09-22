@@ -1,0 +1,84 @@
+{{- /*
+ADR-036 §4, postgres.mode=statefulset: base backup + continuous WAL archive = PITR without a
+custom Postgres image. init container: pg_basebackup (tar, gzip, WAL streamed into the backup so
+it is self-consistent) into an emptyDir; container: rclone ships the base under
+<backupPrefix>/base/<timestamp>/ and the archive_command target (the wal-archive volume, mounted
+read-only) under <backupPrefix>/wal/, both --immutable. The pod is pinned next to the Postgres
+pod because the wal-archive claim is ReadWriteOnce. The replication job mirrors the prefix to B.
+*/ -}}
+{{- if and (eq .Values.postgres.mode "statefulset") .Values.postgres.backup.enabled }}
+{{- $fullname := include "energy-platform.fullname" . -}}
+{{- $script := printf "STAMP=$(date -u +%%Y%%m%%dT%%H%%M%%SZ)\nrclone copy /backup/base A:%s/%s/base/$STAMP/ --immutable --s3-no-check-bucket --stats-one-line -v\nrclone copy /wal-archive A:%s/%s/wal/ --immutable --checksum --s3-no-check-bucket --stats-one-line -v\necho \"pg-backup: base $STAMP and WAL archive shipped to A:%s/%s\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
+{{- $env := include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE") -}}
+{{- $mounts := list (dict "name" "backup" "mountPath" "/backup" "readOnly" true) (dict "name" "wal-archive" "mountPath" "/wal-archive" "readOnly" true) -}}
+{{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "ship" "script" $script "env" $env "mounts" $mounts) -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-pg-backup
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: backup
+spec:
+  schedule: {{ .Values.postgres.backup.schedule | quote }}
+  timeZone: {{ .Values.schedule.timezone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.schedule.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.schedule.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+{{ include "energy-platform.selectorLabels" . | indent 12 }}
+            energy-platform.io/role: backup
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ $fullname }}
+          automountServiceAccountToken: false
+          securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 999) | indent 12 }}
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 22 }}
+                      energy-platform.io/role: postgres
+          initContainers:
+            - name: pg-basebackup
+              image: {{ include "energy-platform.thirdPartyImage" .Values.postgres.image }}
+              command: ["pg_basebackup", "-h", "{{ $fullname }}-postgres", "-U", {{ .Values.postgres.user | quote }}, "-D", "/backup/base", "-Ft", "-z", "-X", "stream", "--checkpoint=fast", "--no-password", "-v"]
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secrets.existingSecret }}
+                      key: POSTGRES_PASSWORD
+                - name: HOME
+                  value: /tmp
+              securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 16 }}
+              resources:
+{{ toYaml .Values.resources.job | indent 16 }}
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                - name: tmp
+                  mountPath: /tmp
+          containers:
+{{ $container | indent 12 }}
+          volumes:
+            - name: backup
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
+            - name: wal-archive
+              persistentVolumeClaim:
+                claimName: {{ $fullname }}-postgres-wal-archive
+                readOnly: true
+{{- end }}

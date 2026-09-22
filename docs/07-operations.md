@@ -50,3 +50,96 @@ Two things the first attempts taught: an image loaded with `kind load` has no re
 `name@digest` in containerd (the pod tried Docker Hub), hence the registry container; and a
 Helm hook's env list may not repeat a key under server-side apply (the smoke's `dir` Bronze is a
 parameter of the container helper, not an override).
+
+## 3. Terraform (`own-cluster`)
+
+`make terraform-validate` (2026-09-22, OpenTofu 1.12.6): `fmt -check`, `validate` and `test`
+with mock providers on both roots — `hcloud` 2 runs passed (demo sizing and controls, admin-only
+API), `openstack` 2 runs passed (reference sizing and controls, quota guard `agent_count <= 2`).
+
+`make terraform-plan-hcloud` (2026-09-22 05:23, with the author's local credentials read from
+`~/.config/hcloud/cli.toml`, `~/.config/energy-platform/verify.env`, `~/.oci/config`; the plan
+file is under `~/.config/energy-platform/plans/`, never in the repository):
+
+```text
+Plan: 12 to add, 0 to change, 0 to destroy.
+  hcloud_network, hcloud_network_subnet, hcloud_firewall, hcloud_ssh_key,
+  hcloud_server.server (cx23, nbg1), hcloud_server.agent[0] (cx23), hcloud_volume.postgres (10 GB),
+  random_password.k3s_token,
+  aws_s3_bucket.bronze + versioning + object_lock_configuration (COMPLIANCE, 90 d)   ← store A
+  oci_objectstorage_bucket.replica (versioning Disabled, retention rule 90 d)       ← store B
+```
+
+`terraform apply <planfile>` is the author's (Level 3); the cost ceilings and the checklist are
+in `deployment/own-cluster/README.md`.
+
+## 4. Tenant and demo deploys
+
+`make deploy-tenant ENV=demo` layers `deployment/tenant/values-demo.yaml` on
+`values-tenant.yaml`; `make deploy-demo` first builds the kube context from the GitHub Actions
+ID token (`scripts/oidc_kube_context.sh`, audience `energy-platform-demo`, V-14). The demo
+deploy itself is **blocked on the author** (Level 3 and outward-facing steps, listed in
+`deployment/tenant/README.md`): `terraform apply` of the `hcloud` plan, a GitHub remote for this
+checkout, the two repository variables, the namespace Secret, the platform image pushed to the
+registry the workflow names. Nothing runs on the reference cluster (ADR-028).
+
+## 5. Backups, replication, restore (ADR-002, ADR-036)
+
+Measured on the local profile, 2026-09-22 (MinIO A → MinIO B on one kind node; the numbers are
+mechanics, not the demo's cross-provider figures, which the replication CronJob measures on
+the demo cluster once it exists):
+
+| Job | Result |
+|---|---|
+| `pg-backup` (every 5 min locally; `*/15` by default = the ADR-002 Silver RPO) | `pg_basebackup -Ft -z -X stream` + `rclone copy --immutable` of base and WAL archive: 96 MiB shipped in ~4 s to `A:bronze/backups/postgres/{base/<stamp>,wal}` |
+| `replicate` (`rclone copy --immutable --checksum` then `check --one-way --min-age 5m`) | first run: 1 difference — a capture had landed between copy and check, hence `--min-age`; then `0 differences found, 3 matching files` |
+| `restore-drill` | see below |
+
+The first backup attempt failed with `no pg_hba.conf entry for replication connection`: the
+chart's `pg_hba.conf` gained the two `replication` lines and the Postgres pod carries a
+content checksum of its config so such a change restarts it.
+
+## 7. Observability (ADR-037 / ADR-012)
+
+The `gaps` CronJob writes one `target_freshness` row per target every cadence; the `metrics`
+Deployment (`postgres_exporter`, image by digest, default metrics off, queries in a ConfigMap)
+exposes it on `:9187/metrics` with `prometheus.io/*` annotations; `PodMonitor` and
+`PrometheusRule` render only behind `metrics.operator.enabled`, and the same rules ship as the
+ConfigMap `<release>-alert-rules` for any scraper. Dashboard:
+`deployment/helm/energy-platform/dashboards/freshness.json`.
+
+| Metric (as exported) | Meaning |
+|---|---|
+| `energy_platform_freshness_age_seconds{target}` | age of the newest **non-NULL** observation the target itself delivered — the SLI |
+| `energy_platform_freshness_status_active{target,status}` | 1 for the current 01 §5 state (`pending`, `partial`, `late`, `complete`) |
+| `energy_platform_freshness_periods_count{target,kind}` | observed vs expected periods of the partition (92/96/100 by the DST calendar; 4 for the hourly ČEPS partition) |
+| `energy_platform_source_unavailable{target}` / `energy_platform_pipeline_failed{target}` | theirs vs ours (ADR-012) |
+| `energy_platform_stale_fetch_streak{target}` | consecutive unchanged captures |
+| `energy_platform_freshness_computed_age_seconds{target}` | age of the row: a dead gap detector shows here |
+| `energy_platform_runs_total{target,state}` | ledger runs by state |
+
+Alerts (`_alerts.tpl`): `EnergyPlatformTargetLate` (page, 30 min), `EnergyPlatformPipelineFailed`
+(page, 15 min), `EnergyPlatformSourceUnavailable` (warning, 1 h), `EnergyPlatformFreshnessStale`
+(page, row older than 45 min), `EnergyPlatformExporterDown`, and — needing kube-state-metrics —
+`EnergyPlatformRestoreDrillFailed`, `EnergyPlatformReplicationFailed`.
+
+Two things the first live cycle taught, both fixed the same day: `postgres_exporter`'s driver
+defaults to `sslmode=require` (the statefulset-mode DSN gets `?sslmode=disable`, in-namespace
+and NetworkPolicy-scoped), and freshness must count a target's **own** non-NULL rows over every
+version — the XLSX row wins the current view for the shared OTE metrics, and the XLSX carries
+all 96 periods of the day with NULLs for the future, which had made T1 read 0/96 and T2 96/96
+with a negative age. ČEPS load for the current hour is normally `partial` (published with a
+lag); whether the previous hour turns `late` under the 2 × cadence tolerance is what the
+one-week campaign (06 §6) will show, and the alert's `for: 30m` is the slack until then.
+
+### 5.1 Restore drill on kind (2026-09-22)
+
+| Run | What happened |
+|---|---|
+| 05:20, 05:30 | `fetch` failed loudly: "no base backup under B:…/base/ yet" — the first backup (05:25) was mirrored to B by the 05:30 replication, after the drill had started. Correct behaviour, not a bug. |
+| 05:40 | base `20260922T033008Z` + 11 WAL segments fetched from **store B** (128 MiB, 25 MiB/s); `prep` untarred base and `pg_wal`, wrote `recovery.signal` + `restore_command`; the scratch Postgres replayed the archive ("archive recovery complete … ready to accept connections") — **PITR from B works**. The drill verb then found no capture-log entries in the replica: replication had mirrored `bronze/` (blobs) but the capture log lives under `captures/` at the bucket root (ADR-002 layout). Fixed: the whole bucket is replicated. |
+| 05:50 | 16 WAL segments, 192 MiB; ledger rebuilt from B by `reconcile` (11 runs per 15-minute target, 8 for `ote_dam` from the backfill); `ceps_load` and `ote_intraday_market_xlsx` **identical** to live (236 and 1298 rows). Two comparison artefacts, fixed the same hour: `ote_dam` "ahead of live" (live had not processed its backfilled captures — its process CronJob runs 12:00–23:00) and T1's per-transport *current view* differing because the tie-break between the two OTE transports depends on processing order (ADR-023 §3). The drill now compares Silver **versions** (identity + payload + derivation → value): live ⊆ rebuild is the invariant; being ahead is reported. |
+
+RTO figures measured on kind, 05:50 run: fetch from B 12 s, recovery to end of archive < 1 s
+after start-up, `energyctl restore-drill` 7 s for four targets (≈ 1,800 Silver versions). The
+demo cluster's cross-provider numbers are what its own drill CronJob will record.

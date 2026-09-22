@@ -9,8 +9,8 @@ another target's fixture.
 {{- $manifest := printf "/app/targets/%s" .Values.smoke.manifest -}}
 {{- $fixture := printf "/app/targets/%s" .Values.smoke.fixture -}}
 {{- $args := list "smoke" "-m" $manifest "--fixture" $fixture -}}
-{{- $extra := list (dict "name" "ENERGY_PLATFORM_BRONZE" "value" "dir") (dict "name" "ENERGY_PLATFORM_BRONZE_DIR" "value" "/tmp/smoke-bronze") -}}
-{{- $container := include "energy-platform.container" (dict "root" . "name" "smoke" "args" $args "extraEnv" $extra) -}}
+{{- $extra := list (dict "name" "ENERGY_PLATFORM_BRONZE_DIR" "value" "/tmp/smoke-bronze") -}}
+{{- $container := include "energy-platform.container" (dict "root" . "name" "smoke" "args" $args "extraEnv" $extra "bronzeMode" "dir") -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
