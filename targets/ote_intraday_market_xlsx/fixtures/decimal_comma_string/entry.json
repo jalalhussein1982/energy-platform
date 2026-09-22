@@ -1,0 +1,20 @@
+{
+  "capture_id": "ote_intraday_market_xlsx:2026-09-18T223000Z:1",
+  "target_id": "ote_intraday_market_xlsx",
+  "scheduled_for": "2026-09-18T22:30:00Z",
+  "attempt": 1,
+  "fetched_at": "2026-09-18T22:30:00Z",
+  "source_url": "https://www.ote-cr.cz/pubweb/attachments/27/{delivery_day:%Y}/month{delivery_day:%m}/day{delivery_day:%d}/IM_15MIN_{delivery_day:%d}_{delivery_day:%m}_{delivery_day:%Y}_EN.xlsx",
+  "http_status": 200,
+  "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "payload_sha256": "28b6ce9df92a8d6ab853ccb85644c35dfd0d67788a69f0e8e140970643f2ca60",
+  "raw_ref": "bronze/blobs/28/28b6ce9df92a8d6ab853ccb85644c35dfd0d67788a69f0e8e140970643f2ca60",
+  "size": 10529,
+  "content_changed": true,
+  "source_transport": "xlsx",
+  "source_published_at": null,
+  "tier": "hot",
+  "etag": null,
+  "last_modified": null,
+  "hops": []
+}

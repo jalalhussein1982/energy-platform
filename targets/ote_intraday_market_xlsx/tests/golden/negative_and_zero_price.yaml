@@ -1,0 +1,14 @@
+# Negative and zero prices kept as published (01 §9; live minimum −4.21 EUR/MWh, docs/06 §1.6):
+# row 11 (period 5) and row 12 (period 6).
+fixture: negative_and_zero_price
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with openpyxl (row 6 header, data from row 7), UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 672
+  quality_events: [partition_status]
+  rows:
+    - {delivery_start_utc: 2026-09-17T01:00:00+02:00, resolution: PT15M, period_index: 5, metric: price_vwap, value: "-4.21"}
+    - {delivery_start_utc: 2026-09-17T01:00:00+02:00, resolution: PT15M, period_index: 5, metric: price_min, value: "-9.5"}
+    - {delivery_start_utc: 2026-09-17T01:00:00+02:00, resolution: PT15M, period_index: 5, metric: price_max, value: "155.55"}
+    - {delivery_start_utc: 2026-09-17T01:00:00+02:00, resolution: PT15M, period_index: 5, metric: price_last, value: "-4.21"}
+    - {delivery_start_utc: 2026-09-17T01:15:00+02:00, resolution: PT15M, period_index: 6, metric: price_vwap, value: "0"}
+    - {delivery_start_utc: 2026-09-17T01:15:00+02:00, resolution: PT15M, period_index: 6, metric: price_min, value: "-1"}
