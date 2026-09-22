@@ -1,0 +1,33 @@
+{{- /*
+ADR-026 layer 3, optional: egress.fqdnPolicy=cilium renders a CiliumNetworkPolicy (a CRD) with
+toFQDNs = the union of the committed targets' allowed hosts (from the generated targets values,
+themselves validated against the host registry). Off by default; only where the operator
+verified the CNI. Never part of the core render (05 C-56).
+*/ -}}
+{{- if eq .Values.egress.fqdnPolicy "cilium" }}
+{{- $hosts := list }}
+{{- range .Values.targets }}{{ range .hosts }}{{ $hosts = append $hosts . }}{{ end }}{{ end }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-fqdn-fetch
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+    matchExpressions:
+      - key: energy-platform.io/role
+        operator: In
+        values: ["capture", "recapture", "backfill"]
+  egress:
+    - toFQDNs:
+{{- range $hosts | uniq | sortAlpha }}
+        - matchName: {{ . | quote }}
+{{- end }}
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+{{- end }}

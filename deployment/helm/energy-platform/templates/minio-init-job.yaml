@@ -1,0 +1,70 @@
+{{- /*
+Bucket bootstrap for the local MinIOs (ADR-036 §1): bucket A created `--with-lock` (versioning
++ Object Lock, the store-A control), bucket B plain (the copy target, never written by capture).
+Runs as a post-install/post-upgrade hook at weight -20 so it precedes migrate (-10), the
+storage probe (-5) and the smoke (0); idempotent (`mb --ignore-existing`).
+*/ -}}
+{{- if .Values.objectstore.local.enabled }}
+{{- $fullname := include "energy-platform.fullname" . }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fullname }}-minio-init
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: hook
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+{{ include "energy-platform.selectorLabels" . | indent 8 }}
+        energy-platform.io/role: hook
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ $fullname }}
+      automountServiceAccountToken: false
+      securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 10001) | indent 8 }}
+      containers:
+        - name: mc
+          image: {{ include "energy-platform.thirdPartyImage" .Values.objectstore.local.mcImage }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              mc alias set a "http://{{ $fullname }}-minio-a:9000" "$A_KEY" "$A_SECRET"
+              mc alias set b "http://{{ $fullname }}-minio-b:9000" "$B_KEY" "$B_SECRET"
+              mc mb --ignore-existing --with-lock "a/{{ .Values.objectstore.local.bucketA }}"
+              mc version enable "a/{{ .Values.objectstore.local.bucketA }}"
+              mc mb --ignore-existing "b/{{ .Values.objectstore.local.bucketB }}"
+              mc version info "a/{{ .Values.objectstore.local.bucketA }}"
+              echo "minio-init: A={{ .Values.objectstore.local.bucketA }} (lock+versioning), B={{ .Values.objectstore.local.bucketB }}"
+          env:
+            - name: MC_CONFIG_DIR
+              value: /tmp/mc
+            - name: HOME
+              value: /tmp
+            - name: A_KEY
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.existingSecret }}, key: BRONZE_ACCESS_KEY_ID}}
+            - name: A_SECRET
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.existingSecret }}, key: BRONZE_SECRET_ACCESS_KEY}}
+            - name: B_KEY
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.existingSecret }}, key: BRONZE_REPLICA_ACCESS_KEY_ID}}
+            - name: B_SECRET
+              valueFrom: {secretKeyRef: {name: {{ .Values.secrets.existingSecret }}, key: BRONZE_REPLICA_SECRET_ACCESS_KEY}}
+          securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 12 }}
+          resources:
+{{ toYaml .Values.resources.job | indent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

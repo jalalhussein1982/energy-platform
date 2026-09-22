@@ -1,0 +1,24 @@
+{{- /*
+The gap detector (ADR-031) over every committed target, then the ADR-037 freshness row per
+target — one pod per firing for all targets, no internet egress.
+*/ -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-gaps
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: gaps
+spec:
+  schedule: {{ .Values.schedule.gaps.cron | quote }}
+  timeZone: {{ .Values.schedule.timezone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.schedule.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.schedule.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: {{ .Values.schedule.activeDeadlineSeconds }}
+      template:
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "gaps" "container" (include "energy-platform.container" (dict "root" . "name" "gaps" "args" (list "gaps" "--all" "--lookback-hours" (toString .Values.schedule.gaps.lookbackHours) "--with-freshness")))) | indent 8 }}

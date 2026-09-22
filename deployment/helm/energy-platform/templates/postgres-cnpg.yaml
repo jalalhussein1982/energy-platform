@@ -1,0 +1,31 @@
+{{- /*
+postgres.mode=cnpg: a CloudNativePG Cluster CR — a CRD-backed kind, therefore only where the
+operator pre-exists (own-cluster behind the flag; tenant only when V-10-style verification
+showed the operator, ADR-001 amend). Never in the default render (05 C-56). The operator
+creates the app secret <fullname>-pg-app with key `uri`, which the DSN helper reads.
+*/ -}}
+{{- if eq .Values.postgres.mode "cnpg" }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-pg
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  instances: {{ .Values.postgres.cnpg.instances }}
+  imageName: {{ include "energy-platform.thirdPartyImage" .Values.postgres.image }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgres.database }}
+      owner: {{ .Values.postgres.user }}
+  storage:
+    size: {{ .Values.postgres.cnpg.storage }}
+{{- if .Values.postgres.storageClassName }}
+    storageClass: {{ .Values.postgres.storageClassName | quote }}
+{{- end }}
+  resources:
+{{ toYaml .Values.resources.postgres | indent 4 }}
+  postgresql:
+    parameters:
+      timezone: UTC
+{{- end }}

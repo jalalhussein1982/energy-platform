@@ -1,0 +1,41 @@
+# `tenant` profile (ADR-001 amend): a namespace on a shared cluster, no cluster rights, no CRDs.
+# Everything is consumed by name (storage class) or declared by CIDR (object store, Postgres).
+# This file is the base every environment's values-<env>.yaml layers on; `make helm-lint`
+# renders it and checks restricted PSS, digests and requests/limits (A-14, 05 C-43/C-44/C-57).
+#
+# Layer-1 NetworkPolicy (ADR-026) is DECLARED here; whether the cluster's CNI ENFORCES egress
+# policy is V-11 — open for the reference cluster. Until CONFIRMED, layer 2 (host allowlist and
+# private-range rejection in energy_platform.fetch) is the control known to hold there.
+residency: CZ
+postgres:
+  mode: statefulset            # or external with a DSN in the Secret; cnpg only where V-10 showed the operator
+  storageClassName: ""         # the cluster's default class; set by name when the tenant must
+  size: 5Gi
+  backup:
+    enabled: true
+bronze:
+  endpoint: https://s3.tenant.example   # the tenant's S3 endpoint (values-<env>.yaml overrides)
+  bucket: energy-platform-bronze
+  retention:
+    mode: COMPLIANCE
+    days: 90
+  tiering:
+    mode: none                 # `move` once a cold endpoint exists; lifecycle only where probed
+  replica:
+    enabled: true
+    endpoint: https://s3b.tenant.example
+    bucket: energy-platform-bronze-replica
+secrets:
+  existingSecret: energy-platform      # created from CI/SOPS before install (D-7)
+metrics:
+  enabled: true
+  operator:
+    enabled: false             # PodMonitor only where prometheus-operator pre-exists (V-4)
+egress:
+  clusterCIDRs: []             # set per environment: the cluster's pod and service CIDRs
+  objectStore:
+    cidrs: [203.0.113.0/24]    # per environment: the two stores' addresses
+    ports: [443]
+drills:
+  restore:
+    enabled: true

@@ -1,0 +1,51 @@
+# `local` profile (ADR-010): kind + Cilium on a laptop. Two MinIOs in the chart (A with Object
+# Lock, B plain), Postgres as a StatefulSet, generated credentials in one Secret created by
+# `make local-secrets` (no credentials required to run, P5-D10). The image digest is set by
+# `make deploy-local` from the kind node after `kind load docker-image`.
+residency: local
+postgres:
+  mode: statefulset
+  size: 1Gi
+  walArchive:
+    size: 512Mi
+  backup:
+    enabled: true
+    schedule: "*/5 * * * *"
+bronze:
+  endpoint: http://energy-platform-minio-a:9000
+  bucket: bronze
+  allowInsecure: true
+  retention:
+    mode: COMPLIANCE
+    days: 1
+  tiering:
+    mode: none
+  replica:
+    enabled: true
+    endpoint: http://energy-platform-minio-b:9000
+    bucket: bronze-replica
+    allowInsecure: true
+    schedule: "*/5 * * * *"
+objectstore:
+  local:
+    enabled: true
+    size: 1Gi
+secrets:
+  existingSecret: energy-platform
+metrics:
+  enabled: true
+egress:
+  clusterCIDRs: [10.244.0.0/16, 10.96.0.0/12]   # kind-config.yaml podSubnet / serviceSubnet
+schedule:
+  startJitterSeconds: 5
+drills:
+  restore:
+    enabled: true
+    schedule: "*/10 * * * *"
+resources:
+  postgres:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  minio:
+    requests: {cpu: 25m, memory: 96Mi}
+    limits: {cpu: 500m, memory: 384Mi}

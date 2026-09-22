@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "energy-platform values",
+  "type": "object",
+  "required": ["image", "residency", "bronze", "postgres", "secrets"],
+  "properties": {
+    "image": {
+      "type": "object",
+      "required": ["repository", "digest"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "description": "ADR-016 §1: images by digest only; the deploy Make targets set it"
+        }
+      }
+    },
+    "residency": {"type": "string", "enum": ["CZ", "DE", "local"]},
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "manifest", "cron", "timezone"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "manifest": {"type": "string"},
+          "cron": {"type": "string"},
+          "timezone": {"type": "string"},
+          "correction": {
+            "type": ["object", "null"],
+            "required": ["cron", "days"],
+            "properties": {"cron": {"type": "string"}, "days": {"type": "integer", "minimum": 1}}
+          },
+          "hosts": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {"type": "string", "enum": ["statefulset", "cnpg", "external"]}
+      }
+    },
+    "bronze": {
+      "type": "object",
+      "required": ["endpoint", "bucket", "tiering"],
+      "properties": {
+        "endpoint": {"type": "string", "pattern": "^https?://"},
+        "bucket": {"type": "string", "minLength": 1},
+        "retention": {
+          "type": "object",
+          "properties": {
+            "mode": {"type": "string", "enum": ["", "COMPLIANCE", "GOVERNANCE"]},
+            "days": {"type": "integer", "minimum": 0}
+          }
+        },
+        "tiering": {
+          "type": "object",
+          "required": ["mode"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["none", "move", "lifecycle"]},
+            "storageClass": {"type": "string"}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"mode": {"const": "lifecycle"}}},
+              "then": {
+                "properties": {"storageClass": {"minLength": 1, "not": {"const": "STANDARD"}}},
+                "required": ["storageClass"]
+              }
+            },
+            {
+              "if": {"properties": {"mode": {"const": "move"}}},
+              "then": {
+                "properties": {
+                  "coldEndpoint": {"pattern": "^https?://"},
+                  "coldBucket": {"minLength": 1}
+                },
+                "required": ["coldEndpoint", "coldBucket"]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "required": ["existingSecret"],
+      "properties": {"existingSecret": {"type": "string", "minLength": 1}}
+    },
+    "egress": {
+      "type": "object",
+      "properties": {"fqdnPolicy": {"type": "string", "enum": ["none", "cilium"]}}
+    }
+  }
+}

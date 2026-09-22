@@ -1,0 +1,156 @@
+{{- /*
+postgres.mode=statefulset (D-2 default for local and tenant): the official image by digest,
+uid 999, PGDATA in a subdirectory, WAL archiving to a shared volume that pg-backup ships
+(ADR-036 §4). Restricted PSS with emptyDirs for the paths Postgres writes outside PGDATA.
+*/ -}}
+{{- if eq .Values.postgres.mode "statefulset" }}
+{{- $name := printf "%s-postgres" (include "energy-platform.fullname" .) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-config
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+data:
+  postgresql.conf: |
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 50
+    shared_buffers = 128MB
+    timezone = 'UTC'
+    log_timezone = 'UTC'
+    wal_level = replica
+    archive_mode = on
+    archive_command = 'test ! -f /wal-archive/%f && cp %p /wal-archive/%f'
+    archive_timeout = 300
+    unix_socket_directories = '/var/run/postgresql'
+  pg_hba.conf: |
+    local   all  all              trust
+    host    all  all  127.0.0.1/32 scram-sha-256
+    host    all  all  ::1/128      scram-sha-256
+    host    all  all  0.0.0.0/0    scram-sha-256
+    host    all  all  ::/0         scram-sha-256
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  clusterIP: None
+  selector:
+{{ include "energy-platform.selectorLabels" . | indent 4 }}
+    energy-platform.io/role: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: postgres
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  selector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: postgres
+  template:
+    metadata:
+      labels:
+{{ include "energy-platform.selectorLabels" . | indent 8 }}
+        energy-platform.io/role: postgres
+    spec:
+      serviceAccountName: {{ include "energy-platform.fullname" . }}
+      automountServiceAccountToken: false
+      securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 999) | indent 8 }}
+      containers:
+        - name: postgres
+          image: {{ include "energy-platform.thirdPartyImage" .Values.postgres.image }}
+          args: ["-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.postgres.database | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgres.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 12 }}
+          resources:
+{{ toYaml .Values.resources.postgres | indent 12 }}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", {{ .Values.postgres.database | quote }}, "-h", "127.0.0.1"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ .Values.postgres.user | quote }}, "-d", {{ .Values.postgres.database | quote }}, "-h", "127.0.0.1"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: wal-archive
+              mountPath: /wal-archive
+            - name: config
+              mountPath: /etc/postgresql
+              readOnly: true
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $name }}-config
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: wal-archive
+          persistentVolumeClaim:
+            claimName: {{ $name }}-wal-archive
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+{{- if .Values.postgres.storageClassName }}
+        storageClassName: {{ .Values.postgres.storageClassName | quote }}
+{{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.size }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-wal-archive
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+{{- if .Values.postgres.storageClassName }}
+  storageClassName: {{ .Values.postgres.storageClassName | quote }}
+{{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.walArchive.size }}
+{{- end }}

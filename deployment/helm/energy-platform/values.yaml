@@ -1,0 +1,168 @@
+# energy-platform chart values. The core renders tenant-clean (no CRDs, restricted PSS, images
+# by digest, requests/limits on every container). Everything cluster-level sits behind a flag
+# and is off here: postgres.mode=cnpg, metrics.operator.enabled, secrets.eso.enabled,
+# egress.fqdnPolicy. Third-party digests were resolved on 2026-09-22 with
+# `docker buildx imagetools inspect` (multi-arch index digests); the tag they came from is the
+# comment. Change a digest deliberately; `make workload-check` refuses a tag.
+
+image:
+  repository: energy-platform            # the platform runtime image (deployment/image/Dockerfile)
+  digest: ""                             # REQUIRED: sha256:<64 hex>; every deploy target sets it
+  pullPolicy: IfNotPresent
+
+# ADR-036 §6 / ADR-028 §4: declared on every workload as a label; CZ for production, DE for the
+# demo, local for kind. REQUIRED so the deviation is visible, never hidden.
+residency: ""
+
+# Generated at deploy time by `python -m scripts.render_target_values targets` and passed with
+# -f (P5-D3). Never committed. Shape: {id, manifest, cron, timezone, correction: {cron, days}|null,
+# hosts: [...]}.
+targets: []
+
+schedule:
+  timezone: Europe/Prague                # CronJob spec.timeZone (Kubernetes >= 1.27)
+  startJitterSeconds: 60                 # D-5 start jitter: the verb sleeps 0..N s in-process
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  activeDeadlineSeconds: 900             # a stuck pod never outlives its cadence (Forbid)
+  gaps:
+    cron: "*/15 * * * *"                 # gap detector + freshness (ADR-031, ADR-037)
+    lookbackHours: 48
+
+postgres:
+  mode: statefulset                      # statefulset | cnpg | external (D-2, ADR-030)
+  image:
+    repository: docker.io/library/postgres
+    digest: sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6   # postgres:16 (16.15)
+  database: energy
+  user: energy
+  storageClassName: ""                   # "" = the cluster default (tenant: consume by name)
+  size: 5Gi
+  walArchive:
+    size: 2Gi                            # ADR-036 §4: archive_command target, shipped by pg-backup
+  cnpg:                                  # only rendered with mode=cnpg (operator pre-existing)
+    instances: 1
+    storage: 5Gi
+  external:
+    dsnSecretKey: ENERGY_PLATFORM_DSN    # key in secrets.existingSecret holding the full DSN
+  backup:                                # statefulset mode only (ADR-036 §4)
+    enabled: false
+    schedule: "*/15 * * * *"
+
+bronze:
+  endpoint: ""                           # REQUIRED: https://host[:port] (http needs allowInsecure)
+  bucket: ""                             # REQUIRED
+  region: us-east-1
+  allowedHosts: []                       # [] = the endpoint host only
+  allowInsecure: false
+  retention:                             # Object Lock headers on every PUT (ADR-032, V-12)
+    mode: ""                             # "" | COMPLIANCE | GOVERNANCE
+    days: 0
+  backupPrefix: backups/postgres         # where pg-backup ships base + WAL (ADR-036 §4)
+  tiering:                               # ADR-021 / ADR-036 §2
+    mode: none                           # none | move | lifecycle (lifecycle only where probed)
+    afterDays: 90
+    storageClass: ""                     # lifecycle: the class the storage-probe hook must confirm
+    schedule: "45 2 * * *"
+    coldEndpoint: ""
+    coldBucket: ""
+    coldRegion: us-east-1
+    coldAllowInsecure: false
+  replica:                               # store B (ADR-036 §1, §3); written by replicate only
+    enabled: false
+    endpoint: ""
+    bucket: ""
+    region: us-east-1
+    allowInsecure: false
+    schedule: "17 * * * *"
+
+objectstore:
+  local:                                 # two MinIOs for the local profile (ADR-036 §1)
+    enabled: false
+    image:
+      repository: quay.io/minio/minio
+      digest: sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e   # RELEASE.2025-09-07T16-13-09Z
+    mcImage:
+      repository: quay.io/minio/mc
+      digest: sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727   # latest, 2026-09-22
+    size: 2Gi
+    bucketA: bronze
+    bucketB: bronze-replica
+
+secrets:
+  existingSecret: energy-platform        # keys: POSTGRES_PASSWORD (statefulset), ENERGY_PLATFORM_DSN
+                                         # (external), BRONZE_ACCESS_KEY_ID, BRONZE_SECRET_ACCESS_KEY,
+                                         # BRONZE_REPLICA_*, BRONZE_COLD_* as configured
+  eso:                                   # D-7: External Secrets Operator behind the flag
+    enabled: false
+    storeRef:
+      name: ""
+      kind: ClusterSecretStore
+    refreshInterval: 1h
+    remoteKeys: {}                       # secret key -> remote key (data[].remoteRef.key)
+
+metrics:                                 # ADR-037 / D-6 (Task 5.12 renders the exporter)
+  enabled: true
+  image:
+    repository: quay.io/prometheuscommunity/postgres-exporter
+    digest: sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e   # latest, 2026-09-22
+  operator:
+    enabled: false                       # PodMonitor + PrometheusRule (CRDs) only when true
+    labels: {}
+  scrapeFrom:
+    namespaceSelector: {}                # {} = this namespace only
+
+egress:                                  # ADR-026 layer 1
+  privateCIDRs:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - 169.254.0.0/16
+    - 100.64.0.0/10
+    - 127.0.0.0/8
+  clusterCIDRs: []                       # pod + service CIDRs of the cluster (values per env)
+  dns:
+    namespace: kube-system
+    podLabels:
+      k8s-app: kube-dns
+  postgres:                              # external mode: where the DSN points
+    cidrs: []
+    port: 5432
+  objectStore:                           # off-cluster stores (demo, tenant): endpoint addresses
+    cidrs: []
+    ports: [443]
+  fqdnPolicy: none                       # none | cilium (CiliumNetworkPolicy, operator-verified CNI)
+
+smoke:                                   # ADR-025 hook: one fixture capture+process
+  manifest: ote_intraday_market/manifest.yaml
+  fixture: ote_intraday_market/fixtures/ordinary_day
+
+drills:
+  restore:                               # ADR-002 / ADR-036 §5 (Task 5.10 renders the CronJob)
+    enabled: false
+    schedule: "30 3 * * *"
+
+rclone:
+  image:
+    repository: docker.io/rclone/rclone
+    digest: sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5   # 1.75.1
+
+resources:
+  job:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  postgres:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  minio:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  exporter:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
+  rclone:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+
+podAnnotations: {}

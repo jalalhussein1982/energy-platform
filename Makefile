@@ -19,7 +19,7 @@ IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
 
 .PHONY: help check lint lock-check format type test db-test schema fixtures deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
-        harness-check pr-surface live-smoke image image-digest
+        harness-check pr-surface live-smoke image image-digest target-values
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -66,16 +66,32 @@ secret-scan: sync ## Fail on credential-looking strings in tracked files
 	$(RUN) python scripts/secret_scan.py
 
 # ---------------------------------------------------------------- deployment gates (real from Phase 5)
-helm-lint: ## helm lint + render with tenant values + restricted-PSS check (A-14). Skips honestly until the chart exists.
+HELM ?= helm
+# Helm 4 renamed --atomic to --rollback-on-failure and made --wait hook-only by default; the
+# deploy targets need the same semantics ADR-025 names (--atomic --wait) on either major.
+HELM_MAJOR := $(shell $(HELM) version --short 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')
+HELM_ATOMIC := $(if $(filter 4,$(HELM_MAJOR)),--rollback-on-failure --wait=watcher --wait-for-jobs,--atomic --wait --wait-for-jobs)
+HELM_TIMEOUT ?= 15m
+LINT_DIGEST := sha256:0000000000000000000000000000000000000000000000000000000000000000
+TARGET_VALUES := /tmp/ep-targets.yaml
+
+target-values: sync ## Render the chart's targets: values from targets/*/manifest.yaml (P5-D3; refuses a restricted licence)
+	$(RUN) python -m scripts.render_target_values targets > $(TARGET_VALUES)
+
+helm-lint: sync ## helm lint + template (tenant, local, all-flags) → workload digests/resources + restricted-PSS check (A-14). Skips honestly until the chart exists.
 	@if [ ! -d "$(CHART_DIR)" ]; then \
 	  echo "helm-lint: no chart at $(CHART_DIR) yet (Phase 5) — nothing to check"; \
-	elif ! command -v helm >/dev/null; then \
+	elif ! command -v $(HELM) >/dev/null; then \
 	  echo "helm-lint: chart exists but helm is not installed"; exit 1; \
 	else \
-	  helm lint $(CHART_DIR) -f deployment/tenant/values-tenant.yaml && \
-	  helm template ep $(CHART_DIR) -f deployment/tenant/values-tenant.yaml > /tmp/ep-rendered.yaml && \
-	  $(RUN) python -m scripts.check_workloads /tmp/ep-rendered.yaml && \
-	  $(RUN) python scripts/check_restricted_pss.py /tmp/ep-rendered.yaml; \
+	  $(RUN) python -m scripts.render_target_values targets > $(TARGET_VALUES) && \
+	  for values in deployment/tenant/values-tenant.yaml deployment/local/values-local.yaml $(CHART_DIR)/ci/all-flags-values.yaml; do \
+	    echo "== helm-lint: $$values"; \
+	    $(HELM) lint $(CHART_DIR) -f $$values -f $(TARGET_VALUES) --set image.digest=$(LINT_DIGEST) && \
+	    $(HELM) template ep $(CHART_DIR) -f $$values -f $(TARGET_VALUES) --set image.digest=$(LINT_DIGEST) > /tmp/ep-rendered.yaml && \
+	    $(RUN) python -m scripts.check_workloads /tmp/ep-rendered.yaml && \
+	    $(RUN) python -m scripts.check_restricted_pss /tmp/ep-rendered.yaml || exit 1; \
+	  done; \
 	fi
 
 terraform-validate: ## terraform fmt/validate/test with mock providers. Skips honestly until the profile exists.

@@ -1,0 +1,23 @@
+{{- /*
+ADR-021 §3 / ADR-025 weight -5: rendered only with bronze.tiering.mode=lifecycle. PUT one object
+with the configured storage class, HEAD it back; a gateway that answers 400 InvalidArgument or
+reports STANDARD fails the upgrade (and --rollback-on-failure restores the previous revision).
+*/ -}}
+{{- if eq .Values.bronze.tiering.mode "lifecycle" }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-storage-probe
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: hook
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "hook" "container" (include "energy-platform.container" (dict "root" . "name" "storage-probe" "args" (list "storage-probe" "--storage-class" .Values.bronze.tiering.storageClass)))) | indent 4 }}
+{{- end }}

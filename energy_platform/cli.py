@@ -526,7 +526,13 @@ def backfill_cmd(
 
 @app.command("gaps")
 def gaps_cmd(
-    manifest: ManifestOpt,
+    manifest: Annotated[
+        Path | None, typer.Option("--manifest", "-m", help="path to a manifest.yaml")
+    ] = None,
+    all_targets: Annotated[
+        bool, typer.Option("--all", help="every target under --targets-root (the CronJob)")
+    ] = False,
+    targets_root: TargetsRootOpt = TARGETS,
     lookback_hours: Annotated[int, typer.Option("--lookback-hours")] = 48,
     with_freshness: Annotated[
         bool, typer.Option("--with-freshness", help="then write the ADR-037 freshness row")
@@ -535,13 +541,26 @@ def gaps_cmd(
     bronze_dir: BronzeOpt = None,
 ) -> None:
     """Classify expected instants: pending, unprocessed_capture, missing_capture, unrecoverable."""
-    rt = _runtime(
-        _manifest(manifest), _store(dsn, required=True), _bronze(bronze_dir), _live_fetcher
+    if (manifest is None) == (not all_targets):
+        typer.echo("choose exactly one of --manifest PATH or --all", err=True)
+        raise typer.Exit(code=1)
+    paths = (
+        [manifest]
+        if manifest is not None
+        else [
+            d / "manifest.yaml"
+            for d in target_dirs(targets_root)
+            if (d / "manifest.yaml").is_file()
+        ]
     )
-    for gap in detect_gaps(rt, lookback=timedelta(hours=lookback_hours)):
-        _echo(gap)
-    if with_freshness:
-        _echo(record_freshness(rt))
+    store = _store(dsn, required=True)
+    bronze = _bronze(bronze_dir)
+    for path in paths:
+        rt = _runtime(_manifest(path), store, bronze, _live_fetcher)
+        for gap in detect_gaps(rt, lookback=timedelta(hours=lookback_hours)):
+            _echo(gap)
+        if with_freshness:
+            _echo(record_freshness(rt))
 
 
 @app.command("freshness")

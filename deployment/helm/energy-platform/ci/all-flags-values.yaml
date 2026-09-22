@@ -1,0 +1,44 @@
+# Every cluster-level flag ON, for `make helm-lint` only: proves the flagged paths render and
+# stay restricted-PSS/digest clean. Never a deploy target (cnpg + eso + operator CRDs + Cilium
+# FQDN policy + lifecycle tiering + replica). The image digest is set by the Make target.
+residency: CZ
+postgres:
+  mode: cnpg
+bronze:
+  endpoint: https://s3.example.internal
+  bucket: bronze
+  retention:
+    mode: COMPLIANCE
+    days: 30
+  tiering:
+    mode: lifecycle
+    storageClass: COLD
+  replica:
+    enabled: true
+    endpoint: https://s3b.example.internal
+    bucket: bronze-replica
+secrets:
+  existingSecret: energy-platform
+  eso:
+    enabled: true
+    storeRef:
+      name: vault
+      kind: ClusterSecretStore
+    remoteKeys:
+      BRONZE_ACCESS_KEY_ID: energy/bronze/access-key-id
+      BRONZE_SECRET_ACCESS_KEY: energy/bronze/secret-access-key
+metrics:
+  enabled: true
+  operator:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+egress:
+  clusterCIDRs: [10.42.0.0/16, 10.43.0.0/16]
+  objectStore:
+    cidrs: [203.0.113.0/24]
+    ports: [443]
+  fqdnPolicy: cilium
+drills:
+  restore:
+    enabled: true

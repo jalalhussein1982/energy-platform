@@ -1,0 +1,22 @@
+{{- /*
+ADR-025 hook chain, weight -10: Alembic upgrade to head on first install (post-install, after
+the database is ready under --wait) and before a new image (pre-upgrade). Every migration is
+expand/contract and compatible with code N-1 (ADR-016 §3), so an automatic rollback leaves a
+schema the previous image accepts.
+*/ -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-migrate
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: hook
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "hook" "container" (include "energy-platform.container" (dict "root" . "name" "migrate" "args" (list "migrate")))) | indent 4 }}

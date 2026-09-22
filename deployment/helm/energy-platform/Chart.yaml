@@ -1,0 +1,17 @@
+apiVersion: v2
+name: energy-platform
+description: >-
+  High-availability ingestion of public intraday energy data (OTE, ČEPS). Tenant-clean core:
+  no CRDs, restricted Pod Security, images by digest, one CronJob template per target,
+  ADR-025 hook chain (migrate → storage-probe → smoke), NetworkPolicies per ADR-026 layer 1.
+type: application
+version: 0.5.0
+appVersion: "0.0.1"
+kubeVersion: ">=1.29.0-0"
+keywords: [energy, ingestion, ote, ceps, cronjob, bronze, silver]
+sources:
+  - https://github.com/jalalhussein1982/energy-platform
+maintainers:
+  - name: Jalal Hussein
+annotations:
+  energy-platform.io/adr: "ADR-001 (amend), ADR-003 rev., ADR-016, ADR-021, ADR-025, ADR-026, ADR-035, ADR-036, ADR-037"

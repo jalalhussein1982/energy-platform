@@ -1,0 +1,29 @@
+{{- /*
+ADR-025 weight 0: one fixture capture+process against the new image, inside the upgrade
+(post-install, post-upgrade) so a failure rolls the release back; the `test` annotation lets an
+operator re-run the same Job with `helm test`. The smoke uses a throwaway Postgres schema and a
+throwaway Bronze under /tmp (P5-D5): synthetic fixture rows never reach production tables or the
+production bucket. The rollback drill (P5-D13) injects a failure by pointing smoke.fixture at
+another target's fixture.
+*/ -}}
+{{- $manifest := printf "/app/targets/%s" .Values.smoke.manifest -}}
+{{- $fixture := printf "/app/targets/%s" .Values.smoke.fixture -}}
+{{- $args := list "smoke" "-m" $manifest "--fixture" $fixture -}}
+{{- $extra := list (dict "name" "ENERGY_PLATFORM_BRONZE" "value" "dir") (dict "name" "ENERGY_PLATFORM_BRONZE_DIR" "value" "/tmp/smoke-bronze") -}}
+{{- $container := include "energy-platform.container" (dict "root" . "name" "smoke" "args" $args "extraEnv" $extra) -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "energy-platform.fullname" . }}-smoke
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: hook
+  annotations:
+    helm.sh/hook: post-install,post-upgrade,test
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "hook" "container" $container) | indent 4 }}

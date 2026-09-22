@@ -1,0 +1,209 @@
+{{- /*
+ADR-026 layer 1, standard NetworkPolicy API (no CRD):
+  1. default deny ingress + egress for every pod of this release;
+  2. DNS to kube-dns for every pod;
+  3. Postgres: platform verb pods -> the chart's Postgres pod (statefulset/cnpg) or the external
+     CIDRs; ingress on the Postgres pod only from platform pods;
+  4. object store: platform pods -> the local MinIO pods (port 9000) or the off-cluster CIDRs;
+  5. TCP 443 to the public internet, minus private/metadata/cluster ranges, for the pods that
+     fetch and nothing else: capture, recapture, backfill. process, gaps, hooks, drills, the
+     exporter have no internet egress. Layer 2 (host allowlist, redirects, private-range
+     rejection on resolution) lives in energy_platform.fetch.
+*/ -}}
+{{- $fullname := include "energy-platform.fullname" . }}
+{{- $verbRoles := list "capture" "process" "recapture" "backfill" "gaps" "hook" "drill" "backup" "replicate" "tier" "metrics" }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-default-deny
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-dns
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.dns.namespace }}
+          podSelector:
+            matchLabels:
+{{ toYaml .Values.egress.dns.podLabels | indent 14 }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-postgres-egress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+    matchExpressions:
+      - key: energy-platform.io/role
+        operator: In
+        values: {{ toJson $verbRoles }}
+  policyTypes: [Egress]
+  egress:
+{{- if eq .Values.postgres.mode "external" }}
+    - to:
+{{- range .Values.egress.postgres.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+{{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.postgres.port }}
+{{- else if eq .Values.postgres.mode "cnpg" }}
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: {{ $fullname }}-pg
+      ports:
+        - protocol: TCP
+          port: 5432
+{{- else }}
+    - to:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+{{- end }}
+{{- if eq .Values.postgres.mode "statefulset" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-postgres-ingress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+      ports:
+        - protocol: TCP
+          port: 5432
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-object-store-egress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+    matchExpressions:
+      - key: energy-platform.io/role
+        operator: In
+        values: {{ toJson $verbRoles }}
+  policyTypes: [Egress]
+  egress:
+{{- if .Values.objectstore.local.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: objectstore
+      ports:
+        - protocol: TCP
+          port: 9000
+{{- end }}
+{{- if .Values.egress.objectStore.cidrs }}
+    - to:
+{{- range .Values.egress.objectStore.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+{{- end }}
+      ports:
+{{- range .Values.egress.objectStore.ports }}
+        - protocol: TCP
+          port: {{ . }}
+{{- end }}
+{{- end }}
+{{- if and (not .Values.objectstore.local.enabled) (not .Values.egress.objectStore.cidrs) }}
+{{- fail "egress.objectStore.cidrs is required when objectstore.local.enabled is false (ADR-026 layer 1: the object store must be reachable by an explicit rule)" }}
+{{- end }}
+{{- if .Values.objectstore.local.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-object-store-ingress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: objectstore
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+      ports:
+        - protocol: TCP
+          port: 9000
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-internet-fetch
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+    matchExpressions:
+      - key: energy-platform.io/role
+        operator: In
+        values: ["capture", "recapture", "backfill"]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+{{- range concat .Values.egress.privateCIDRs .Values.egress.clusterCIDRs }}
+              - {{ . }}
+{{- end }}
+      ports:
+        - protocol: TCP
+          port: 443
