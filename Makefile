@@ -252,8 +252,13 @@ ci-kind-tools: ## CI only: install kind and helm at pinned versions (the runner 
 local-down: ## Tear the kind cluster down
 	$(KIND) delete cluster --name $(KIND_NAME)
 
-smoke-test: ## helm test (the smoke hook again) → freshness metric present → restore-drill dry run as a one-off Job
+smoke-test: ## helm test (the smoke hook again) → one gaps+freshness run → freshness metric present → restore-drill dry run as a one-off Job
 	$(HELM_KIND) test $(RELEASE) -n $(NAMESPACE) --logs --timeout 10m
+	$(KUBE) -n $(NAMESPACE) delete job gaps-smoke --ignore-not-found >/dev/null
+	$(KUBE) -n $(NAMESPACE) create job gaps-smoke --from=cronjob/$(RELEASE)-gaps >/dev/null
+	$(KUBE) -n $(NAMESPACE) wait --for=condition=complete job/gaps-smoke --timeout=300s >/dev/null \
+	  || { $(KUBE) -n $(NAMESPACE) logs job/gaps-smoke | tail -20; echo "smoke-test: FAIL — gaps+freshness run"; exit 1; }
+	@echo "smoke-test: gaps + freshness row written"
 	@$(KUBE) -n $(NAMESPACE) port-forward svc/$(RELEASE)-metrics 19187:9187 >/dev/null 2>&1 & pf=$$!; sleep 3; \
 	  metrics="$$(curl -s --max-time 10 http://127.0.0.1:19187/metrics)"; kill $$pf 2>/dev/null; wait $$pf 2>/dev/null; \
 	  echo "$$metrics" | grep -E '^energy_platform_freshness_age_seconds\{.*target="ote_intraday_market"' \

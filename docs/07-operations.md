@@ -167,3 +167,17 @@ failed attempt present and reconciled" is asserted as "production ledger and Bro
 because the smoke never writes production Bronze (P5-D5). `.github/workflows/weekly-drills.yml`
 runs the same drill on a kind cluster in CI every Monday (`make ci-kind-tools` installs pinned
 kind and Helm on the runner).
+
+## 8. `make smoke-test` and the clean-clone gate
+
+`make smoke-test` = `helm test --logs` (the smoke hook Job again: one fixture capture+process in
+a throwaway schema and Bronze against the deployed image), one `gaps --all --with-freshness` run
+as a one-off Job from the CronJob (on a brand-new cluster the CronJob has not fired yet, which the
+first clean-clone run showed), a scrape of the exporter through a
+port-forward asserting `energy_platform_freshness_age_seconds{target="ote_intraday_market"}`, and
+the restore drill as a one-off Job with `RESTORE_DRILL_ARGS=--dry-run` (lists the replica, checks
+the scratch server, rebuilds nothing). On kind, 2026-09-22 06:17: smoke `Succeeded` (9 s),
+metric present, dry run `OK in 0.2s`.
+
+Phase gate (03 Phase 5): from a **clean clone**, `make local-down && make local-up && make
+smoke-test` — CLEAN_CLONE_SECTION.
