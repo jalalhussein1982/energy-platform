@@ -7,7 +7,9 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 UV        ?= uv
-UV_VERSION ?= 0.11.7   # pinned installer version for ci-bootstrap (F11); bump deliberately
+# pinned installer version for ci-bootstrap (F11); bump deliberately. No comment after the value:
+# Make keeps the spaces before a trailing `#` and the installer URL would break.
+UV_VERSION ?= 0.11.7
 RUN       := $(UV) run
 CHART_DIR := deployment/helm/energy-platform
 TF_DIR    := deployment/own-cluster/terraform
@@ -16,10 +18,12 @@ DOCKER    ?= docker
 IMAGE_REPO ?= energy-platform
 IMAGE_TAG  ?= dev
 IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
+IMAGE_PLATFORM ?=                        # e.g. linux/amd64 for the demo's cx23 nodes; empty = the build host's
+IMAGE_DIGEST   ?=                        # sha256:… of a pushed image; deploy-tenant reads the local Docker when empty
 
 .PHONY: help check lint lock-check format type test db-test schema fixtures deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
-        harness-check pr-surface live-smoke image image-digest target-values \
+        harness-check pr-surface live-smoke image image-push image-digest target-values \
         local-cluster local-registry local-cni local-image local-secrets deploy-local local-egress-test terraform-plan-hcloud \
         deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template rollback-drill ci-kind-tools
 
@@ -123,27 +127,39 @@ terraform-plan-hcloud: ## Plan the demo root into $(TF_PLAN_DIR) (outside the re
 	@echo "terraform-plan-hcloud: plan written under $(TF_PLAN_DIR); apply is the author's (Level 3)"
 
 ci-bootstrap: ## Install uv on a bare CI runner (the only tool installation CI is allowed to do)
-	@command -v $(UV) >/dev/null && { echo "uv present: $$($(UV) --version)"; exit 0; } || true
-	curl -LsSf https://astral.sh/uv/$(UV_VERSION)/install.sh | sh
-	@echo 'add $$HOME/.local/bin to PATH in the workflow step if not already'
+	@# one shell: `exit 0` on a separate recipe line would not skip the install
+	@if command -v $(UV) >/dev/null; then echo "uv present: $$($(UV) --version)"; exit 0; fi; \
+	curl -LsSf https://astral.sh/uv/$(UV_VERSION)/install.sh | sh; \
+	if [ -n "$${GITHUB_PATH:-}" ]; then echo "$$HOME/.local/bin" >> "$$GITHUB_PATH"; echo "ci-bootstrap: $$HOME/.local/bin added to PATH for the next steps"; \
+	else echo 'ci-bootstrap: add $$HOME/.local/bin to PATH if it is not there'; fi
 
 # ---------------------------------------------------------------- platform image (ADR-016 §1, P5-D2)
-image: ## Build the platform runtime image deployment/image/Dockerfile as $(IMAGE)
-	$(DOCKER) build -f deployment/image/Dockerfile -t $(IMAGE) .
+image: ## Build the platform runtime image deployment/image/Dockerfile as $(IMAGE) (for IMAGE_PLATFORM when set)
+	$(DOCKER) build $(if $(IMAGE_PLATFORM),--platform $(IMAGE_PLATFORM)) -f deployment/image/Dockerfile -t $(IMAGE) .
+
+image-push: image ## Build and push $(IMAGE); logs in with REGISTRY_USER/REGISTRY_TOKEN when set (CI: the job token); prints the digest and, in CI, writes it to GITHUB_OUTPUT (plan P5-D20)
+	@if [ -n "$${REGISTRY_TOKEN:-}" ]; then \
+	  printf '%s' "$$REGISTRY_TOKEN" | $(DOCKER) login $(firstword $(subst /, ,$(IMAGE_REPO))) -u "$${REGISTRY_USER:?REGISTRY_USER unset}" --password-stdin; \
+	fi
+	$(DOCKER) push $(IMAGE)
+	@ref="$$(make -s image-digest)" && test -n "$$ref" || { echo "image-push: no digest for $(IMAGE) after the push" >&2; exit 1; }; \
+	echo "image-push: $$ref"; \
+	if [ -n "$${GITHUB_OUTPUT:-}" ]; then echo "digest=$${ref##*@}" >> "$$GITHUB_OUTPUT"; fi
 
 LOCAL_REGISTRY      ?= kind-registry
 LOCAL_REGISTRY_PORT ?= 5001
 LOCAL_IMAGE_REPO    := localhost:$(LOCAL_REGISTRY_PORT)/$(IMAGE_REPO)
-REGISTRY_IMAGE      ?= docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373   # registry:2, 2026-09-22
+# registry:2, resolved 2026-09-22
+REGISTRY_IMAGE      ?= docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
 
-image-digest: ## Print the digest reference of $(IMAGE): from the kind-attached registry (KIND=1, after make local-image) or from RepoDigests (after a push)
-	@if [ -n "$(KIND)" ]; then \
+image-digest: ## Print the digest reference of $(IMAGE): from the kind-attached registry (FROM_LOCAL_REGISTRY=1, after make local-image) or from RepoDigests (after a push)
+	@if [ -n "$(FROM_LOCAL_REGISTRY)" ]; then \
 	  ref="$$($(DOCKER) image inspect --format '{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' $(LOCAL_IMAGE_REPO):$(IMAGE_TAG) 2>/dev/null | grep '^$(LOCAL_IMAGE_REPO)@sha256:' | head -1)"; \
 	  test -n "$$ref" || { echo "image-digest: $(LOCAL_IMAGE_REPO):$(IMAGE_TAG) has no digest; run make local-image" >&2; exit 1; }; \
 	  echo "$$ref"; \
 	else \
-	  ref="$$($(DOCKER) image inspect --format '{{index .RepoDigests 0}}' $(IMAGE) 2>/dev/null)"; \
-	  test -n "$$ref" || { echo "image-digest: $(IMAGE) has no RepoDigest; push it to a registry first (or KIND=1 after make local-image)" >&2; exit 1; }; \
+	  ref="$$($(DOCKER) image inspect --format '{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' $(IMAGE) 2>/dev/null | grep '^$(IMAGE_REPO)@sha256:' | head -1)"; \
+	  test -n "$$ref" || { echo "image-digest: $(IMAGE) has no RepoDigest; push it to a registry first (or FROM_LOCAL_REGISTRY=1 after make local-image)" >&2; exit 1; }; \
 	  echo "$$ref"; \
 	fi
 
@@ -184,7 +200,7 @@ local-registry: ## A registry container attached to the kind network; nodes reso
 local-image: ## Push $(IMAGE) to the kind-attached registry; the deploy references it by the digest the push returns
 	$(DOCKER) tag $(IMAGE) $(LOCAL_IMAGE_REPO):$(IMAGE_TAG)
 	$(DOCKER) push $(LOCAL_IMAGE_REPO):$(IMAGE_TAG)
-	@echo "local-image: $$(make -s image-digest KIND=1)"
+	@echo "local-image: $$(make -s image-digest FROM_LOCAL_REGISTRY=1)"
 
 local-secrets: ## Generate the local Secret (random Postgres password and MinIO keys); never asks for credentials (P5-D10)
 	@$(KUBE) get namespace $(NAMESPACE) >/dev/null 2>&1 || $(KUBE) create namespace $(NAMESPACE) >/dev/null
@@ -200,7 +216,7 @@ deploy-local: target-values ## helm upgrade --install with rollback-on-failure +
 	$(HELM_KIND) upgrade --install $(RELEASE) $(CHART_DIR) -n $(NAMESPACE) --create-namespace \
 	  -f deployment/local/values-local.yaml -f $(TARGET_VALUES) \
 	  --set image.repository=$(LOCAL_IMAGE_REPO) \
-	  --set image.digest=$$(make -s image-digest KIND=1 | sed 's/.*@//') \
+	  --set image.digest=$$(make -s image-digest FROM_LOCAL_REGISTRY=1 | sed 's/.*@//') \
 	  $(HELM_ATOMIC) --timeout $(HELM_TIMEOUT) $(HELM_EXTRA)
 
 local-egress-test: ## ADR-026 §4: capture pod reaches 443; metadata/private blocked; process pod has no internet
@@ -220,12 +236,12 @@ ENV ?= demo
 OIDC_KUBECONFIG := /tmp/ep-oidc-kubeconfig
 DEMO_SECRET_KEYS := POSTGRES_PASSWORD BRONZE_ACCESS_KEY_ID BRONZE_SECRET_ACCESS_KEY BRONZE_REPLICA_ACCESS_KEY_ID BRONZE_REPLICA_SECRET_ACCESS_KEY
 
-deploy-tenant: target-values ## helm upgrade --install with tenant values + values-$(ENV).yaml (KUBECONFIG = a namespace-scoped kubeconfig); IMAGE must have a RepoDigest
+deploy-tenant: target-values ## helm upgrade --install with tenant values + values-$(ENV).yaml (KUBECONFIG = a namespace-scoped kubeconfig); IMAGE_DIGEST, or IMAGE with a RepoDigest
 	@test -f deployment/tenant/values-$(ENV).yaml || { echo "deploy-tenant: deployment/tenant/values-$(ENV).yaml does not exist"; exit 1; }
 	$(HELM) upgrade --install $(RELEASE) $(CHART_DIR) -n $(NAMESPACE) \
 	  -f deployment/tenant/values-tenant.yaml -f deployment/tenant/values-$(ENV).yaml -f $(TARGET_VALUES) \
 	  --set image.repository=$(IMAGE_REPO) \
-	  --set image.digest=$$(make -s image-digest | sed 's/.*@//') \
+	  --set image.digest=$(or $(IMAGE_DIGEST),$$(make -s image-digest | sed 's/.*@//')) \
 	  $(HELM_ATOMIC) --timeout $(HELM_TIMEOUT) $(HELM_EXTRA)
 
 kubeconfig-oidc: ## Inside GitHub Actions: kubeconfig from the job's OIDC token + the public cluster CA (no stored credential)

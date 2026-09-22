@@ -17,7 +17,7 @@ filesystem read-only.
 ```bash
 make image                         # docker build → energy-platform:dev
 make image-digest                  # repo@sha256:… from RepoDigests (after a push)
-make image-digest KIND=1           # …or from the kind node after `kind load docker-image`
+make image-digest FROM_LOCAL_REGISTRY=1  # …or from the kind node after `kind load docker-image`
 ```
 
 The chart refuses to render without `image.digest` (`values.schema.json`); the deploy Make

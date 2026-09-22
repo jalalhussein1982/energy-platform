@@ -254,3 +254,62 @@ docs/07-operations.md                         # deploy, drills, restore, rollbac
 ## Acceptance for the phase
 
 `make check` green on `main`; `make helm-lint` and `make terraform-validate` real and green; from a clean clone `make local-up && make smoke-test` passes (hooks ran migrations and the smoke, egress assertions printed, freshness metric present, restore drill dry-run ok); one real restore drill and the rollback drill passed on kind with transcripts in `docs/07-operations.md`; `hcloud` plan produced and summarised; tenant/demo values render; the deploy workflow exists and is blocked only on the author tasks above; ADR-035, ADR-036, ADR-037 accepted; roadmap Phase 5 boxes ticked except those that depend on author tasks, which say so.
+
+---
+
+## Addendum (2026-09-23) — demo-deploy blockers found at hand-over (Tasks 5.14 – 5.17)
+
+A review of the author checklist on 2026-09-23 found four defects that would fail or overrun
+the first demo deploy: (1) the deploy workflow reads the image digest from the runner's local
+Docker, which never holds the image; (2) `values-demo.yaml` still carries `REPLACE_*`
+placeholders the workflow cannot fill (an invalid `ipBlock` CIDR is rejected by the API);
+(3) GHCR packages are private by default and the chart has no pull secret; (4) the backup shape
+ships ~4.5 GiB/day of uncompressed WAL (`archive_timeout = 300`) into a directory nothing prunes
+(k3s `local-path` does not enforce the 2 Gi request, so the shared 10 GB volume fills in about
+two days) and 96 base backups a day, every object under the 90-day COMPLIANCE lock on A and
+mirrored to B. **Author decisions (2026-09-23):** repository `jalalhussein1982/energy-platform`,
+private, created by the agent with `gh`; ADR-035 §4 accepted as written; ADR-036 amendment
+approved; the admin address is re-read (the plan-time `62.209.249.82` was a hostel network).
+This addendum supersedes the "Push to any remote" line of the header for the remote the author
+named, nothing else.
+
+| # | Decision | Why |
+|---|---|---|
+| P5-D19 | **Bounded backup footprint (ADR-036 amendment 1).** `archive_command` gzips each segment (`gzip -n`, deterministic) to `<f>.gz.part` and renames it; a segment already archived with identical content is success. A `pg-wal-ship` CronJob (`postgres.backup.walSchedule`, default every 10 min) `rclone move`s the archive to `A:<backupPrefix>/wal/` (`--immutable --checksum`, `*.part` and `lost+found` excluded), so the local archive holds only what is not yet in A. The base backup (`postgres.backup.baseSchedule`, default daily 02:15) writes a `START_WAL` marker from `backup_label`; the restore drill fetches the newest base and only the WAL at or after that segment, and `restore_command` reads `.gz` or a plain file. RPO = `archive_timeout` (5 min) + `walSchedule` (10 min) = 15 min, as ADR-002. | The volume and the lock arithmetic above; the drill fetched the whole WAL history every day. |
+| P5-D20 | **The deploy workflow builds and pushes the image** on the `ubuntu-latest` runner (amd64 = the `cx23` architecture; the author's laptop is arm64) with `make image-push`, logging in with the job's `github.token`; only the `image` job has `packages: write`, only the `deploy` job has `id-token: write`. The digest goes from the image job's output to `IMAGE_DIGEST`; `deploy-tenant` uses `IMAGE_DIGEST` when set and reads the local Docker otherwise. | Defect (1), and a laptop build would be the wrong architecture. |
+| P5-D21 | **Private registry pulls**: `image.pullSecrets` (list of Secret names) is rendered as `imagePullSecrets` on every pod that runs the platform image; the demo sets `[ghcr-pull]`, a `docker-registry` Secret the author creates from a classic PAT with `read:packages` only. | Defect (3); the repository is private, so the package is too. |
+| P5-D22 | **Demo values without placeholders**: `egress.objectStore.cidrs` are the providers' ranges — Hetzner `88.198.120.0/25` (the RIPE netblock of `nbg1.your-objectstorage.com`, resolved 2026-09-23) and OCI `134.70.40.0/21`, `134.70.48.0/22` (Oracle `public_ip_ranges.json`, tag `OBJECT_STORAGE`, `eu-frankfurt-1`); `bronze.replica.endpoint` is built by `make deploy-demo` from `DEMO_OCI_NAMESPACE` (a repository variable; the tenancy namespace stays out of the repository, as Task 5.9 decided) and the render fails without it. A test renders the demo values. | Defect (2). |
+| P5-D23 | **GitHub remote** created with `gh` at the author's instruction (private); repository variable `DEMO_OCI_NAMESPACE` and the `demo` environment set by the agent; `DEMO_CLUSTER_URL` / `DEMO_CLUSTER_CA` wait for `terraform apply`. The first CI run on GitHub is the first real run of `ci.yml`. | Author instruction 2026-09-23. |
+| P5-D24 | **The `hcloud` plan is re-made** with the current admin address; the author re-checks the address immediately before `apply` (a changed address means SSH is refused, nothing else). | The plan-time address was a different network. |
+
+### Task 5.14 — Bounded backup footprint (ADR-036 amendment 1)
+
+**Files:** `docs/adr/ADR-036-…md`, `deployment/helm/energy-platform/templates/{_postgres.tpl, cronjob-pg-backup.yaml, cronjob-pg-wal-ship.yaml, cronjob-restore-drill.yaml}`, `values.yaml`, `deployment/local/values-local.yaml`, `deployment/tenant/values-demo.yaml`, `tests/harness/test_chart.py`, `docs/07-operations.md` §5.
+
+- [ ] ADR-036 amendment 1 (P5-D19), header row "Amended".
+- [ ] Chart: gzip `archive_command`; `pg-backup` = base only + `START_WAL`; new `pg-wal-ship`; drill fetch filtered by `START_WAL`, `restore_command` for `.gz`; values `baseSchedule`, `walSchedule`.
+- [ ] Tests: base job writes `START_WAL` and does not touch the WAL archive; the WAL job moves (not copies) with `--immutable` and excludes `*.part`; archive and restore commands handle `.gz`; drill fetch uses `--files-from`.
+- [ ] kind: fresh `local-up`; one base, WAL ship runs (local archive drained), replication, one real restore drill passes; record compressed segment sizes in `docs/07`.
+- [ ] Commit `fix(dr): compressed WAL shipped and pruned, daily base backup, drill fetches WAL from the base's start segment (ADR-036 amendment 1)`.
+
+### Task 5.15 — Demo values without placeholders; private-registry pulls
+
+**Files:** `values.yaml` (`image.pullSecrets`), `_helpers.tpl`, `cronjob-restore-drill.yaml`, `deployment/tenant/{values-demo.yaml, README.md}`, `Makefile` (`deploy-demo`, `print-demo-secret-template`), `tests/harness/test_chart.py`.
+
+- [ ] P5-D21, P5-D22; `make deploy-demo` fails fast without `DEMO_OCI_NAMESPACE`.
+- [ ] Test: the demo render has no `REPLACE`, every `ipBlock` parses as a network, every platform-image pod carries the pull secret, and the render without the replica endpoint fails.
+- [ ] Commit `fix(tenant): demo values without placeholders, OCI namespace from a repository variable, image pull secret for the private registry`.
+
+### Task 5.16 — The deploy workflow builds and pushes the image
+
+**Files:** `.github/workflows/deploy-demo.yml`, `Makefile` (`image-push`, `IMAGE_DIGEST`, `IMAGE_PLATFORM`, `image-digest` matching the repository), `tests/harness/test_ci_wrappers.py`.
+
+- [x] P5-D20; the test asserts per-job permissions (image: `packages: write` and no `id-token`; deploy: `id-token: write` and no `packages`), `needs: image`, no `secrets.` anywhere.
+- [x] Found on the way and fixed in the same commit: `KIND` was both the kind binary and the "digest from the kind registry" flag, so `image-digest` always took the kind branch (renamed `FROM_LOCAL_REGISTRY=1`); `UV_VERSION ?= 0.11.7   # …` kept the spaces before the comment and broke the `ci-bootstrap` installer URL (a test now refuses a trailing comment on a non-empty assignment); `ci-bootstrap`'s `exit 0` sat on its own recipe line and never skipped the install, and the installed `uv` was not on `PATH` for the next step (`GITHUB_PATH`). Proven locally: `make image-push IMAGE_PLATFORM=linux/amd64` against the kind registry printed the digest and wrote `digest=sha256:…` to `GITHUB_OUTPUT`; with nothing pushed it exits 1. `/usr/bin/make` on the author's Mac is GNU Make 3.81, which ignores `.SHELLFLAGS`: the new recipe checks its own failures instead of relying on `-e`.
+- [x] Commit `fix(ci): deploy-demo builds and pushes the amd64 image with the job token and deploys that digest`.
+
+### Task 5.17 — Hand-over: docs, re-plan, GitHub remote
+
+- [ ] `deployment/own-cluster/README.md`, `deployment/tenant/README.md`, `docs/07-operations.md`, roadmap note, `docs/progress.md` entry; commit `docs(phase-5): …`.
+- [ ] `make terraform-plan-hcloud` with the current admin address (plan outside the repository).
+- [ ] `gh repo create jalalhussein1982/energy-platform --private`, push `main`, variable `DEMO_OCI_NAMESPACE`, environment `demo`; watch the first `ci` run and fix what it finds; run `deploy-demo` once to prove the image job (the deploy job then stops at "DEMO_CLUSTER_URL unset" until the cluster exists).

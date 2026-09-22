@@ -133,16 +133,36 @@ def test_banned_api_list_covers_every_egress_path() -> None:
 
 
 def test_deploy_demo_workflow_uses_oidc_and_nothing_stored() -> None:
-    """ADR-015 federation clause / V-14: id-token only; dispatch-only until push is enabled."""
+    """ADR-015 federation clause / V-14: the deploy job holds id-token only, the image job
+    packages only (plan P5-D20); nothing stored; dispatch-only until push is enabled."""
     wf = yaml.safe_load(
         (REPO / ".github" / "workflows" / "deploy-demo.yml").read_text(encoding="utf-8")
     )
     triggers = wf[True] if True in wf else wf["on"]
     assert set(triggers) == {"workflow_dispatch"}
-    assert wf["permissions"] == {"contents": "read", "id-token": "write"}
-    job = wf["jobs"]["deploy"]
-    runs = [s["run"] for s in job["steps"] if "run" in s]
-    assert runs == ["make ci-bootstrap", "make deploy-demo"]
+    assert wf["permissions"] == {"contents": "read"}
+    image, deploy = wf["jobs"]["image"], wf["jobs"]["deploy"]
+    assert image["permissions"] == {"contents": "read", "packages": "write"}
+    assert deploy["permissions"] == {"contents": "read", "id-token": "write"}
+    assert [s["run"] for s in image["steps"] if "run" in s] == ["make image-push"]
+    assert image["env"]["IMAGE_PLATFORM"] == "linux/amd64"  # the demo's cx23 nodes
+    assert "github.token" in image["env"]["REGISTRY_TOKEN"]  # the job's own; expires with it
+    assert deploy["needs"] == "image"
+    assert [s["run"] for s in deploy["steps"] if "run" in s] == [
+        "make ci-bootstrap",
+        "make deploy-demo",
+    ]
+    assert deploy["env"]["IMAGE_DIGEST"] == "${{ needs.image.outputs.digest }}"
     text = (REPO / ".github" / "workflows" / "deploy-demo.yml").read_text(encoding="utf-8")
     assert "secrets." not in text
-    assert "${{ vars.DEMO_CLUSTER_URL }}" in str(job["env"]["DEMO_CLUSTER_URL"])
+    assert "${{ vars.DEMO_CLUSTER_URL }}" in str(deploy["env"]["DEMO_CLUSTER_URL"])
+
+
+def test_makefile_values_carry_no_trailing_comment() -> None:
+    """Make keeps the spaces before a trailing `#` in a value (`UV_VERSION ?= 0.11.7   # …`
+    broke the ci-bootstrap installer URL): a non-empty assignment ends at its value."""
+    text = (REPO / "Makefile").read_text(encoding="utf-8")
+    bad = [
+        line for line in text.splitlines() if re.match(r"^[A-Z_]+\s*[?:]?=\s*\S[^#]*?\s+#", line)
+    ]
+    assert bad == [], bad

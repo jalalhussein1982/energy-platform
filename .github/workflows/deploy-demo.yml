@@ -1,5 +1,7 @@
-# Thin wrapper over Make (ADR-015). Deploys the tenant values to the demo cluster (ADR-028) with
-# the job's OIDC identity (ADR-015 federation clause, V-14): no kubeconfig, no stored token.
+# Thin wrapper over Make (ADR-015). Builds the platform image on the amd64 runner (the demo's
+# cx23 architecture), pushes it to ghcr.io with the job's own token, then deploys that digest to
+# the demo cluster (ADR-028) with the job's OIDC identity (ADR-015 federation clause, V-14): no
+# kubeconfig, no stored token. Each job holds only the permission it needs (plan P5-D20).
 # workflow_dispatch only until the author has run it once by hand and enabled `push: main`.
 name: deploy-demo
 
@@ -8,20 +10,43 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: deploy-demo
   cancel-in-progress: false
 
 jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    env:
+      IMAGE_REPO: ghcr.io/${{ github.repository }}
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_PLATFORM: linux/amd64
+      REGISTRY_USER: ${{ github.actor }}
+      REGISTRY_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - id: push
+        run: make image-push
+
   deploy:
+    needs: image
     runs-on: ubuntu-latest
     environment: demo
+    permissions:
+      contents: read
+      id-token: write
     env:
       DEMO_CLUSTER_URL: ${{ vars.DEMO_CLUSTER_URL }}
       DEMO_CLUSTER_CA: ${{ vars.DEMO_CLUSTER_CA }}
+      DEMO_OCI_NAMESPACE: ${{ vars.DEMO_OCI_NAMESPACE }}
       IMAGE_REPO: ghcr.io/${{ github.repository }}
+      IMAGE_DIGEST: ${{ needs.image.outputs.digest }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - run: make ci-bootstrap
