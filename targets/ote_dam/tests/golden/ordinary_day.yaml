@@ -1,0 +1,16 @@
+# Ordinary day 2026-09-21 at PT15M: 96 items × 4 metrics; EmergencyState absent on every item → NULL
+# (live shape, docs/06 §5). HourlyPrice repeats across each hour's four quarters.
+fixture: ordinary_day
+checked_by: "Claude, Phase 4 session 2026-09-20 (through the MCP server): each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 384
+  quality_events: [partition_status]     # "2026-09-21: complete 96/96"; PeriodInterval is declared
+  rows:
+    - {delivery_start_utc: 2026-09-21T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price, value: "79.00"}
+    - {delivery_start_utc: 2026-09-21T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: price_hourly, value: "83.00"}
+    - {delivery_start_utc: 2026-09-21T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: volume_total, value: "2517.125"}
+    - {delivery_start_utc: 2026-09-21T00:00:00+02:00, resolution: PT15M, period_index: 1, metric: emergency_state, value: null}
+    - {delivery_start_utc: 2026-09-21T00:45:00+02:00, resolution: PT15M, period_index: 4, metric: price_hourly, value: "83.00"}
+    - {delivery_start_utc: 2026-09-21T01:00:00+02:00, resolution: PT15M, period_index: 5, metric: price_hourly, value: "106.00"}
+    - {delivery_start_utc: 2026-09-21T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: price, value: "110.00"}
+    - {delivery_start_utc: 2026-09-21T23:45:00+02:00, resolution: PT15M, period_index: 96, metric: volume_total, value: "2532.000"}

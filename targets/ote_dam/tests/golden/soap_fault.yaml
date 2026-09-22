@@ -1,0 +1,5 @@
+# A SOAP Fault over HTTP 200 (e.g. a request without PeriodResolution): quarantined with the fault text.
+fixture: soap_fault
+checked_by: "Claude, Phase 4 session 2026-09-20 (through the MCP server): each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  quarantine: "SOAP Fault"

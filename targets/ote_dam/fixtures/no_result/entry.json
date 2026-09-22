@@ -1,0 +1,20 @@
+{
+  "capture_id": "ote_dam:2026-09-21T100000Z:1",
+  "target_id": "ote_dam",
+  "scheduled_for": "2026-09-21T10:00:00Z",
+  "attempt": 1,
+  "fetched_at": "2026-09-21T10:00:00Z",
+  "source_url": "https://www.ote-cr.cz/pw-data/services/PublicDataService",
+  "http_status": 200,
+  "content_type": "text/xml; charset=utf-8",
+  "payload_sha256": "16718b4c73454ca41eb22b525cdba5b38641aa9c5ab62360dd0cf77d865491cf",
+  "raw_ref": "bronze/blobs/16/16718b4c73454ca41eb22b525cdba5b38641aa9c5ab62360dd0cf77d865491cf",
+  "size": 234,
+  "content_changed": true,
+  "source_transport": "soap",
+  "source_published_at": null,
+  "tier": "hot",
+  "etag": null,
+  "last_modified": null,
+  "hops": []
+}

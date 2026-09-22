@@ -1,0 +1,6 @@
+# Empty <Result/>: the auction for that day is not published yet (a 12:00 capture before the results).
+fixture: no_result
+checked_by: "Claude, Phase 4 session 2026-09-20 (through the MCP server): each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 0
+  quality_events: []
