@@ -9,7 +9,11 @@ target from the manifests" (ADR-003 rev.) stays literally true.
 A manifest whose ``license`` starts with ``restricted`` is refused: the scheduler never runs a
 source the platform may not redistribute (P4-D11; 05 C-55). Exit 1 names the target.
 
-Usage: render_target_values.py [targets-root]   (default: targets/)
+``process`` runs on the same cadence as ``capture`` but ``--process-offset`` minutes later
+(default 3), so a process pod never races the capture of the same instant; ``recapture``
+keeps the manifest's correction cron.
+
+Usage: render_target_values.py [targets-root] [--process-offset N]   (default: targets/, 3)
 """
 
 from __future__ import annotations
@@ -27,7 +31,32 @@ from energy_platform.harness.surface import target_dirs
 RESTRICTED = "restricted"
 
 
-def target_values(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
+def shift_cron_minutes(cron: str, offset: int) -> str:
+    """Shift the minute field of a five-field cron by ``offset`` (0..59) where that keeps the
+    meaning: ``*/N`` → ``off-59/N``; ``a,b`` → each +off; ``M`` → M+off; anything that would
+    wrap past 59 or is not one of those forms is returned unchanged."""
+    fields = cron.split()
+    if len(fields) != 5 or offset <= 0:
+        return cron
+    minute = fields[0]
+    if minute == "*":
+        shifted = f"{offset}-59/1" if offset else "*"
+    elif minute.startswith("*/") and minute[2:].isdigit():
+        step = int(minute[2:])
+        if offset >= step:
+            return cron
+        shifted = f"{offset}-59/{step}"
+    elif all(part.isdigit() for part in minute.split(",")):
+        values = [int(part) + offset for part in minute.split(",")]
+        if max(values) > 59:
+            return cron
+        shifted = ",".join(str(v) for v in values)
+    else:
+        return cron
+    return " ".join([shifted, *fields[1:]])
+
+
+def target_values(root: Path, *, process_offset: int = 3) -> tuple[list[dict[str, Any]], list[str]]:
     """``(targets, problems)``: one entry per manifest, in id order."""
     targets: list[dict[str, Any]] = []
     problems: list[str] = []
@@ -50,6 +79,7 @@ def target_values(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
             "id": m.target_id,
             "manifest": f"{m.target_id}/manifest.yaml",
             "cron": m.cadence.cron,
+            "process_cron": shift_cron_minutes(m.cadence.cron, process_offset),
             "timezone": m.cadence.timezone,
             "correction": None,
             "hosts": sorted(m.allowed_hosts),
@@ -64,8 +94,13 @@ def target_values(root: Path) -> tuple[list[dict[str, Any]], list[str]]:
 
 
 def main(argv: list[str]) -> int:
-    root = Path(argv[1]) if len(argv) > 1 else Path("targets")
-    targets, problems = target_values(root)
+    args = [a for a in argv[1:] if not a.startswith("--")]
+    offset = 3
+    if "--process-offset" in argv:
+        offset = int(argv[argv.index("--process-offset") + 1])
+        args = [a for a in args if a != str(offset)]
+    root = Path(args[0]) if args else Path("targets")
+    targets, problems = target_values(root, process_offset=offset)
     if problems:
         print("render_target_values: refused:", file=sys.stderr)
         for p in problems:

@@ -2,7 +2,10 @@
 ADR-003 rev.: ONE template, rendered once per target from targets/<id>/manifest.yaml (the values
 come from scripts/render_target_values.py at deploy time, P5-D3). Per target: capture (live
 fetch, 443 egress), process (no internet), and — when the manifest declares
-cadence.correction — recapture (ADR-033 §3). concurrencyPolicy: Forbid = at most one in-flight
+cadence.correction — recapture (ADR-033 §3), and backfill (ADR-024 §5: the gap detector's
+missing_capture runs, at most schedule.backfill.limit fetches per firing so a fresh deploy
+never floods a source). process runs process_cron = the cadence shifted by a few minutes so it
+never races the capture of the same instant. concurrencyPolicy: Forbid = at most one in-flight
 request per target (ADR-033 §2); startingDeadlineSeconds and activeDeadlineSeconds bound a
 missed or stuck run; the ledger supplies idempotency and missed-run detection.
 */ -}}
@@ -14,8 +17,10 @@ missed or stuck run; the ledger supplies idempotency and missed-run detection.
 {{- $jobs := list
       (dict "verb" "capture" "role" "capture" "cron" .cron
             "args" (list "capture" "-m" $manifest "--live" "--start-jitter-seconds" $jitter))
-      (dict "verb" "process" "role" "process" "cron" .cron
-            "args" (list "process" "-m" $manifest)) -}}
+      (dict "verb" "process" "role" "process" "cron" (default .cron .process_cron)
+            "args" (list "process" "-m" $manifest))
+      (dict "verb" "backfill" "role" "backfill" "cron" $root.Values.schedule.backfill.cron
+            "args" (list "backfill" "-m" $manifest "--live" "--limit" (toString $root.Values.schedule.backfill.limit))) -}}
 {{- if .correction }}
 {{- $jobs = append $jobs (dict "verb" "recapture" "role" "recapture" "cron" .correction.cron
       "args" (list "recapture" "-m" $manifest "--days" (toString .correction.days) "--live" "--start-jitter-seconds" $jitter)) -}}

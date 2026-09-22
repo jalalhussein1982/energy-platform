@@ -26,6 +26,7 @@
           "id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
           "manifest": {"type": "string"},
           "cron": {"type": "string"},
+          "process_cron": {"type": "string"},
           "timezone": {"type": "string"},
           "correction": {
             "type": ["object", "null"],

@@ -510,6 +510,9 @@ def replay_cmd(
 def backfill_cmd(
     manifest: ManifestOpt,
     live: Annotated[bool, typer.Option("--live", help="fetch from the source (opt-in)")] = False,
+    limit: Annotated[
+        int | None, typer.Option("--limit", min=1, help="at most N fetches (the CronJob's bound)")
+    ] = None,
     dsn: DsnOpt = None,
     bronze_dir: BronzeOpt = None,
 ) -> None:
@@ -520,7 +523,7 @@ def backfill_cmd(
     rt = _runtime(
         _manifest(manifest), _store(dsn, required=True), _bronze(bronze_dir), _live_fetcher
     )
-    for report in backfill(rt):
+    for report in backfill(rt, limit=limit):
         _echo(report)
 
 

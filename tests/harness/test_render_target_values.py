@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from scripts.render_target_values import main, target_values
+from scripts.render_target_values import main, shift_cron_minutes, target_values
 
 from tests.harness.targets_builder import make_target
 
@@ -54,3 +54,27 @@ def test_main_prints_yaml_and_exits_one_on_a_refusal(
     _set_license(make_target(root, "ote_restricted"), "restricted")
     assert main(["render_target_values.py", str(root)]) == 1
     assert "ote_restricted" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("cron", "offset", "expected"),
+    [
+        ("*/15 * * * *", 3, "3-59/15 * * * *"),
+        ("0 12-23 * * *", 3, "3 12-23 * * *"),
+        ("7 * * * *", 5, "12 * * * *"),
+        ("0,30 * * * *", 3, "3,33 * * * *"),
+        ("58 * * * *", 5, "58 * * * *"),  # would wrap: unchanged
+        ("*/2 * * * *", 3, "*/2 * * * *"),  # offset >= step: unchanged
+        ("*/15 * * * *", 0, "*/15 * * * *"),
+        ("1-5 * * * *", 3, "1-5 * * * *"),  # a range: unchanged
+    ],
+)
+def test_process_cron_is_the_cadence_shifted(cron: str, offset: int, expected: str) -> None:
+    assert shift_cron_minutes(cron, offset) == expected
+
+
+def test_targets_carry_a_process_cron() -> None:
+    targets, _ = target_values(REPO / "targets", process_offset=3)
+    by_id = {t["id"]: t for t in targets}
+    assert by_id["ote_intraday_market"]["process_cron"] == "3-59/15 * * * *"
+    assert by_id["ote_dam"]["process_cron"] == "3 12-23 * * *"

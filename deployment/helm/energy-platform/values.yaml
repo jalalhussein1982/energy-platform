@@ -29,6 +29,9 @@ schedule:
   gaps:
     cron: "*/15 * * * *"                 # gap detector + freshness (ADR-031, ADR-037)
     lookbackHours: 48
+  backfill:
+    cron: "37 * * * *"                   # per target: fetch missing_capture runs (ADR-024 §5)
+    limit: 8                             # at most N fetches per firing: politeness on day one
 
 postgres:
   mode: statefulset                      # statefulset | cnpg | external (D-2, ADR-030)
