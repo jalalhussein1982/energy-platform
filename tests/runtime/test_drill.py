@@ -3,12 +3,23 @@ missing a capture or a diverging value fails; dry run writes nothing."""
 
 from __future__ import annotations
 
+import itertools
 from datetime import timedelta
 
 from energy_platform.bronze import Bronze, MemoryBlobStore, MemoryCaptureLog
 from energy_platform.runtime import capture, process, restore_drill, silver_digest
 from energy_platform.store import MemoryStore, UnavailableStore
-from tests.runtime.harness import SCHEDULED, T1, T3, Clock, runtime
+from tests.runtime.harness import DAY, SCHEDULED, T1, T3, Clock, runtime
+from tests.synthetic import ote_im_price_period_response
+
+_serial = itertools.count(1)
+
+
+def distinct_t1_payload() -> bytes:
+    """A T1 payload whose values differ per call, so every capture is its own Silver version
+    (the default synthetic payload is identical across runs and would collapse versions)."""
+    n = next(_serial)
+    return ote_im_price_period_response(DAY).replace(b"170.13", f"{100 + n}.13".encode())
 
 
 def live_system() -> tuple[MemoryStore, Bronze, Clock]:
@@ -17,7 +28,8 @@ def live_system() -> tuple[MemoryStore, Bronze, Clock]:
     store = MemoryStore()
     bronze = Bronze(MemoryBlobStore(), MemoryCaptureLog())
     for manifest in (T1, T3):
-        rt = runtime(manifest, store=store, bronze=bronze, clock=clock)
+        payload = distinct_t1_payload if manifest is T1 else None
+        rt = runtime(manifest, store=store, bronze=bronze, clock=clock, payload=payload)
         for k in range(3):
             when = SCHEDULED + timedelta(minutes=15 * k)
             clock.now = when + timedelta(minutes=1)
@@ -47,7 +59,8 @@ def test_a_replica_missing_a_capture_fails_the_drill() -> None:
     report = restore_drill((T1, T3), scratch=MemoryStore(), replica=partial, live=live, clock=clock)
     assert not report.ok
     t1, t3 = report.targets
-    assert not t1.ok and "processed runs 2 != live 3" in t1.message
+    assert not t1.ok and "processed runs 2 < live 3" in t1.message
+    assert t1.missing_versions > 0 and "missing from the rebuild" in t1.message
     assert t3.ok and t3.message.startswith("identical")
 
 
@@ -61,7 +74,8 @@ def test_a_diverging_value_in_live_is_detected_by_the_checksum() -> None:
     tampered = row.observation.model_copy(update={"value": None})
     live._rows[row.id] = type(row)(row.id, row.run_attempt_id, tampered)
     again = restore_drill((T1,), scratch=MemoryStore(), replica=replica, live=live, clock=clock)
-    assert not again.ok and "checksum differs" in again.targets[0].message
+    assert not again.ok and again.targets[0].missing_versions == 1
+    assert "missing from the rebuild" in again.targets[0].message
 
 
 def test_dry_run_reports_and_writes_nothing() -> None:
@@ -89,3 +103,17 @@ def test_without_a_live_store_the_rebuild_itself_is_the_check() -> None:
     _, replica, clock = live_system()
     report = restore_drill((T1, T3), scratch=MemoryStore(), replica=replica, clock=clock)
     assert report.ok and all(t.live is None and t.scratch is not None for t in report.targets)
+
+
+def test_rebuild_ahead_of_live_is_not_a_failure() -> None:
+    """Live has captured but not yet processed a run (its process CronJob has not fired): the
+    rebuild processes everything and is ahead; nothing live holds is missing."""
+    live, replica, clock = live_system()
+    rt = runtime(T1, store=live, bronze=replica, clock=clock, payload=distinct_t1_payload)
+    clock.now = SCHEDULED + timedelta(minutes=46)
+    assert capture(rt, SCHEDULED + timedelta(minutes=45)).outcome == "ok"  # captured, unprocessed
+    report = restore_drill((T1,), scratch=MemoryStore(), replica=replica, live=live, clock=clock)
+    t1 = report.targets[0]
+    assert report.ok and t1.ok and t1.extra_versions > 0 and t1.missing_versions == 0
+    assert t1.scratch_processed == 4 and t1.live_processed == 3
+    assert "ahead by" in t1.message

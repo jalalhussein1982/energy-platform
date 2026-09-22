@@ -4,8 +4,10 @@ Given a **scratch** store (a freshly restored or empty Postgres), the **replica*
 ADR-036 §5) and, for comparison, the **live** store: for every committed target the drill
 rebuilds the ledger by ``reconcile`` over the full replica history, processes every run (the
 replay reads blobs from the replica, which is the cold-backed read path), then compares with
-live: runs that reached ``processed``, current Silver rows for the target's transport and an
-order-independent checksum over (observation identity, value). Any difference fails the drill.
+live: the rebuild must hold at least as many ``processed`` runs and every Silver **version**
+(observation identity + payload + derivation → value) live holds for the target's transport —
+live ⊆ rebuild. The rebuild may be ahead (live still has pending captures); a version live
+holds that the rebuild lacks is data loss and fails the drill.
 ``dry_run`` only lists what the full drill would touch and checks both stores answer. Wall clock
 is reported: that number is the RTO figure the runbook quotes, never an assumption.
 """
@@ -17,6 +19,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from energy_platform.bronze import Bronze
 from energy_platform.contracts.manifest import Manifest
@@ -31,6 +34,7 @@ from energy_platform.store import Store, StoreUnavailable
 @dataclass(frozen=True, slots=True)
 class SilverDigest:
     rows: int
+    """Silver versions: every stored version of this transport's rows, not the current view."""
     checksum: str
 
 
@@ -44,6 +48,10 @@ class TargetDrillReport:
     live: SilverDigest | None
     ok: bool
     message: str
+    missing_versions: int = 0
+    """Silver versions live holds that the rebuild does not: the only data-loss signal."""
+    extra_versions: int = 0
+    """Versions the rebuild has and live does not yet (live has pending captures): informational."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,13 +71,29 @@ def _never_fetch(manifest: Manifest) -> Fetcher:
     raise RuntimeError(f"{manifest.target_id}: the restore drill never fetches (ADR-004 replay)")
 
 
+VersionKey = tuple[Any, str, str]
+
+
+def silver_versions(store: Store, manifest: Manifest) -> dict[VersionKey, str]:
+    """Every stored Silver version this target's transport produced, keyed by
+    (observation identity, payload sha256, derivation id) → value. Versions are a pure function
+    of Bronze + derivation, so a rebuild from the replica must reproduce each of them; the
+    current view is not compared because which transport wins a shared identity may depend on
+    processing order (ADR-023 §3 tie-break), and live may lag the rebuild on pending captures."""
+    transport = manifest.contract.source_transport
+    versions: dict[VersionKey, str] = {}
+    for row in store.all_rows(manifest.contract.dataset_id):
+        o = row.observation
+        if o.source_transport != transport:
+            continue
+        versions[(observation_identity(o), o.payload_sha256, o.derivation_id)] = str(o.value)
+    return versions
+
+
 def silver_digest(store: Store, manifest: Manifest) -> SilverDigest:
-    rows = store.current_rows(
-        manifest.contract.dataset_id, transport=manifest.contract.source_transport
-    )
-    lines = sorted(f"{observation_identity(r.observation)!r}|{r.value}" for r in rows)
-    digest = hashlib.sha256("\n".join(lines).encode()).hexdigest()
-    return SilverDigest(len(rows), digest)
+    versions = silver_versions(store, manifest)
+    lines = sorted(f"{key!r}|{value}" for key, value in versions.items())
+    return SilverDigest(len(versions), hashlib.sha256("\n".join(lines).encode()).hexdigest())
 
 
 def _processed(store: Store, target_id: str) -> int:
@@ -126,19 +150,28 @@ def _drill_target(
             f"rebuilt {len(reconciled)} runs, {len(reports)} processed, {len(failed)} failed "
             f"(no live store to compare)",
         )
+    live_versions = silver_versions(live, manifest)
+    scratch_versions = silver_versions(scratch, manifest)
     live_digest = silver_digest(live, manifest)
     live_processed = _processed(live, target)
+    missing = sum(1 for k, v in live_versions.items() if scratch_versions.get(k) != v)
+    extra = sum(1 for k in scratch_versions if k not in live_versions)
     problems = []
     if failed:
         problems.append(f"{len(failed)} run(s) failed to process from the replica")
-    if scratch_processed != live_processed:
-        problems.append(f"processed runs {scratch_processed} != live {live_processed}")
-    if scratch_digest != live_digest:
-        problems.append(
-            f"silver rows {scratch_digest.rows} != live {live_digest.rows}"
-            if scratch_digest.rows != live_digest.rows
-            else "silver checksum differs at equal row count"
+    if scratch_processed < live_processed:
+        problems.append(f"processed runs {scratch_processed} < live {live_processed}")
+    if missing:
+        problems.append(f"{missing} Silver version(s) live holds are missing from the rebuild")
+    if problems:
+        message = "; ".join(problems)
+    elif extra:
+        message = (
+            f"live ⊆ rebuild: {len(live_versions)} versions reproduced; the rebuild is ahead by "
+            f"{extra} (live has captures it has not processed yet)"
         )
+    else:
+        message = f"identical: {len(live_versions)} Silver versions"
     return TargetDrillReport(
         target,
         entries,
@@ -147,7 +180,9 @@ def _drill_target(
         scratch_digest,
         live_digest,
         not problems,
-        "; ".join(problems) if problems else f"identical: {live_digest.rows} rows",
+        message,
+        missing_versions=missing,
+        extra_versions=extra,
     )
 
 
