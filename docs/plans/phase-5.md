@@ -310,6 +310,6 @@ named, nothing else.
 
 ### Task 5.17 — Hand-over: docs, re-plan, GitHub remote
 
-- [ ] `deployment/own-cluster/README.md`, `deployment/tenant/README.md`, `docs/07-operations.md`, roadmap note, `docs/progress.md` entry; commit `docs(phase-5): …`.
-- [ ] `make terraform-plan-hcloud` with the current admin address (plan outside the repository).
-- [ ] `gh repo create jalalhussein1982/energy-platform --private`, push `main`, variable `DEMO_OCI_NAMESPACE`, environment `demo`; watch the first `ci` run and fix what it finds; run `deploy-demo` once to prove the image job (the deploy job then stops at "DEMO_CLUSTER_URL unset" until the cluster exists).
+- [x] `deployment/own-cluster/README.md`, `deployment/tenant/README.md`, `docs/07-operations.md`, roadmap note, `docs/progress.md` entry; commit `docs(phase-5): …`.
+- [x] `make terraform-plan-hcloud` with the current admin address (plan outside the repository). *(2026-09-23 01:11 CEST, Terraform 1.16.3 — the author had installed it; 12 to add; the old plan deleted; lock files now Terraform's; `make terraform-validate` green under both tools.)*
+- [x] `gh repo create jalalhussein1982/energy-platform --private`, push `main`, variable `DEMO_OCI_NAMESPACE`, environment `demo`; watch the first `ci` run and fix what it finds; run `deploy-demo` once to prove the image job (the deploy job then stops at "DEMO_CLUSTER_URL unset" until the cluster exists). *(First `ci` run: 11/13 green — no Terraform on the runner (`make ci-terraform`, pinned SHA-256) and a PR-bundle test without a git identity; second run 12/12 green. `deploy-demo`: image job built linux/amd64 and pushed `ghcr.io/jalalhussein1982/energy-platform@sha256:9eac77cf…`, the deploy job received it as `IMAGE_DIGEST` and stopped at "DEMO_CLUSTER_URL unset".)*
