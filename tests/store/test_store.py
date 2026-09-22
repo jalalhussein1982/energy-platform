@@ -470,6 +470,15 @@ def test_freshness_row_is_upserted_and_period_helpers_agree(store: Store) -> Non
     )
     dataset_id = obs().dataset_id
     day = T0 - timedelta(days=1)  # rows.DAY is 2026-09-17: period 1 starts 2026-09-16 22:00Z
+    # a NULL is "not yet published" (01 §5): never an observed period, never the newest
+    store.commit(
+        claim(store, captured_run(store, when=T0 + timedelta(hours=1)), now=NOW + TTL),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(period=3, value=None)],
+        now=NOW + TTL,
+    )
     assert store.count_periods(dataset_id, day, T0) == 2
     assert store.count_periods(dataset_id, day, day + timedelta(minutes=15)) == 1
     assert store.count_periods(dataset_id, day, T0, transport="xlsx") == 0

@@ -297,12 +297,17 @@ class Store(Protocol):
     def count_periods(
         self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
     ) -> int:
-        """Distinct delivery starts in the current view within ``[start, end)``."""
+        """Distinct delivery starts within ``[start, end)`` for which *this transport* delivered a
+        non-NULL value — over every stored version, not the current view: a target's freshness
+        is what the target itself delivered, even where another transport's row wins the current
+        view (ADR-023 §3), and a NULL is "not yet published" (01 §5), never an observation."""
         ...
 
     def newest_delivery_start(
         self, dataset_id: str, *, transport: Transport | None = None
-    ) -> datetime | None: ...
+    ) -> datetime | None:
+        """Newest delivery start with a non-NULL value from this transport (same rule as above)."""
+        ...
 
     def upsert_freshness(self, row: Freshness) -> None: ...
 

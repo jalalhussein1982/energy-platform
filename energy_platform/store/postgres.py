@@ -643,8 +643,9 @@ class PostgresStore:
     ) -> int:
         row = self._one(
             """
-            SELECT count(DISTINCT lower(delivery_interval)) AS n FROM observations_current
-            WHERE dataset_id = %s AND lower(delivery_interval) >= %s
+            SELECT count(DISTINCT lower(delivery_interval)) AS n FROM observations
+            WHERE dataset_id = %s AND value IS NOT NULL
+              AND lower(delivery_interval) >= %s
               AND lower(delivery_interval) < %s
               AND (%s::text IS NULL OR source_transport = %s)
             """,
@@ -658,8 +659,9 @@ class PostgresStore:
     ) -> datetime | None:
         row = self._one(
             """
-            SELECT max(lower(delivery_interval)) AS t FROM observations_current
-            WHERE dataset_id = %s AND (%s::text IS NULL OR source_transport = %s)
+            SELECT max(lower(delivery_interval)) AS t FROM observations
+            WHERE dataset_id = %s AND value IS NOT NULL
+              AND (%s::text IS NULL OR source_transport = %s)
             """,
             (dataset_id, transport, transport),
         )

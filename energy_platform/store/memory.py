@@ -378,17 +378,34 @@ class MemoryStore:
 
     # ---------------------------------------------------------------- freshness (ADR-037)
 
+    def _delivered(
+        self, dataset_id: str, transport: Transport | None
+    ) -> Iterable[EnergyObservation]:
+        for row in self._rows.values():
+            o = row.observation
+            if o.dataset_id != dataset_id or o.value is None:
+                continue
+            if transport is not None and o.source_transport != transport:
+                continue
+            yield o
+
     def count_periods(
         self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
     ) -> int:
-        rows = self.current_rows(dataset_id, start=start, end=end, transport=transport)
-        return len({r.observation.delivery_start_utc for r in rows})
+        return len(
+            {
+                o.delivery_start_utc
+                for o in self._delivered(dataset_id, transport)
+                if start <= o.delivery_start_utc < end
+            }
+        )
 
     def newest_delivery_start(
         self, dataset_id: str, *, transport: Transport | None = None
     ) -> datetime | None:
-        rows = self.current_rows(dataset_id, transport=transport)
-        return max((r.observation.delivery_start_utc for r in rows), default=None)
+        return max(
+            (o.delivery_start_utc for o in self._delivered(dataset_id, transport)), default=None
+        )
 
     def upsert_freshness(self, row: Freshness) -> None:
         self._freshness[row.target_id] = row

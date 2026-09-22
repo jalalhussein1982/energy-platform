@@ -18,7 +18,8 @@ from energy_platform.runtime import (
     process,
     record_freshness,
 )
-from tests.runtime.harness import DAY, SCHEDULED, T1, T3, Clock, runtime
+from energy_platform.store import MemoryStore
+from tests.runtime.harness import DAY, SCHEDULED, T1, T2, T3, Clock, runtime
 from tests.synthetic import ote_im_price_period_response
 
 PRAGUE = ZoneInfo("Europe/Prague")
@@ -160,3 +161,35 @@ def test_partition_day_is_the_source_civil_day() -> None:
     start, end, _ = partition_bounds(rt, datetime(2026, 9, 17, 22, 30, tzinfo=UTC))
     assert start == local("2026-09-18T00:00") and end == local("2026-09-19T00:00")
     assert date(2026, 9, 18) == start.astimezone(PRAGUE).date()
+
+
+def test_a_targets_periods_are_its_own_even_when_another_transport_wins_the_view() -> None:
+    """T1 (soap) and T2 (xlsx) deliver the same dataset; the current view keeps one row per
+    identity (ADR-023 §3) but freshness is per target: T1 counts what T1 delivered."""
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    store = MemoryStore()
+    t1 = runtime(T1, store=store, clock=clock)
+    capture(t1, SCHEDULED)
+    process(t1)
+    clock.now = SCHEDULED + timedelta(minutes=16)
+    t2 = runtime(T2, store=store, clock=clock)
+    capture(t2, SCHEDULED + timedelta(minutes=15))
+    process(t2)
+    clock.now = local("2026-09-18T10:00")
+    assert compute_freshness(t1).observed_periods == 96
+    assert compute_freshness(t2).observed_periods == 96
+
+
+def test_null_values_are_not_observed_periods() -> None:
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    rows = [(i, f"{100 + i}.00", "1.000") for i in range(1, 9)] + [
+        (i, None, None) for i in range(9, 97)
+    ]
+    rt = runtime(T1, payload=ote_im_price_period_response(DAY, rows), clock=clock)
+    capture(rt, SCHEDULED)
+    process(rt)
+    clock.now = local("2026-09-18T03:00")
+    f = compute_freshness(rt)
+    assert f.observed_periods == 8 and f.status == "partial"
+    assert f.newest_delivery_start == local("2026-09-18T01:45")
+    assert f.age is not None and f.age > timedelta(0)
