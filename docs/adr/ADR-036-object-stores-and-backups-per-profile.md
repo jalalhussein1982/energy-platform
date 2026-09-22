@@ -6,6 +6,7 @@
 | Date | 2026-09-22 |
 | Resolves | D-3 (`02-architecture-decisions.md` §4.2); amends ADR-002 "pgBackRest/WAL-G with PITR" (tooling, not the guarantee); refines ADR-021 §1 (tiering job shape) and ADR-028 §3 with the V-12/V-13 outcomes |
 | Supersedes | — |
+| Amended | 2026-09-23, amendment 1 (below): §4 `statefulset` backup footprint bounded — compressed WAL shipped and pruned, daily base backup, drill fetches WAL from the base's start segment |
 
 ## Context
 
@@ -117,6 +118,50 @@ chart change.
 - Devil's advocate: `archive_command` to a volume makes the WAL archive only as durable as that
   volume until the next backup run; the backup schedule (default every 15 min, matching the ADR-002
   Silver RPO) bounds the exposure, and Bronze — the irreplaceable tier — is not on this path.
+
+## Amendment 1 (2026-09-23) — bounded backup footprint
+
+**Context.** Reviewing the demo hand-over found that §4 as built does not bound its own
+footprint. `archive_timeout = 300` closes a 16 MiB segment every five minutes whenever anything
+was written (the ingestion CronJobs write every few minutes), about 4.5 GiB of WAL a day; the
+`wal-archive` volume was only ever copied from, never pruned, and on k3s `local-path` the 2 Gi
+request is not enforced, so the demo's shared 10 GB volume would fill in about two days and
+stop Postgres. The base backup ran every 15 minutes (96 a day). Every object shipped to store A
+carries the 90-day COMPLIANCE default retention and is mirrored to B under its retention rule,
+so none of it could be deleted for 90 days. The restore drill fetched the whole WAL history on
+every run. The local measurements (docs/07 §5: 16 segments, 192 MiB in ~25 minutes) agree;
+kind never showed the problem because nothing ran long enough and MinIO's lock there is one day.
+
+**Decision (replaces the `statefulset` bullet of §4; the guarantee — PITR, drilled — is kept).**
+
+1. `archive_command` compresses each segment with `gzip -n` (no name, no timestamp: the same
+   segment always produces the same bytes) into `<segment>.gz.part` and renames it to
+   `<segment>.gz`; if `<segment>.gz` already exists with the same content, archiving succeeds
+   (a retry after a crash), otherwise it fails. A segment closed early by `archive_timeout` is
+   mostly zero pages and compresses to a small fraction of 16 MiB.
+2. A `pg-wal-ship` CronJob (`postgres.backup.walSchedule`, default every 10 minutes) runs
+   `rclone move` from the `wal-archive` volume to `A:<backupPrefix>/wal/` with `--immutable
+   --checksum`: a segment leaves the volume only once it is in A, an object that differs at the
+   same key fails the Job, and `*.part` files are never touched. The volume holds only what is
+   not yet shipped.
+3. The `pg-backup` CronJob takes the base backup only (`postgres.backup.baseSchedule`, default
+   daily 02:15, before the 03:17 replication and the 03:30 drill) and writes a `START_WAL` marker
+   (the segment named by `backup_label`) next to `base.tar.gz`.
+4. The restore drill fetches the newest base and only the archived WAL whose name sorts at or
+   after its `START_WAL`; `restore_command` reads `<segment>.gz` or, for an archive written
+   before this amendment, the plain segment.
+5. RPO for Silver: `archive_timeout` (5 min) + `walSchedule` (10 min) = 15 min, the ADR-002
+   target. Base-backup frequency moves only the replay length, i.e. RTO, which the drill measures.
+
+**Consequences.** Base backups and WAL still live 90 days under the store-A lock and in B
+(deleting expired ones stays a documented Level 3 step), but the daily volume is one compressed
+base plus compressed WAL instead of 96 bases plus raw WAL. The devil's-advocate note in
+Consequences now reads: the WAL archive is only as durable as its volume until the next
+`pg-wal-ship` run (≤ 10 minutes). Chart values: `postgres.backup.{enabled, baseSchedule,
+walSchedule}` replace `postgres.backup.schedule`. Rejected: a shorter per-object lock on the
+backup prefix (`rclone --s3-object-lock-*`) — not verified on Hetzner's gateway, and with the
+volume bounded the 90-day lock costs little; a separate backup bucket — two more buckets and a
+second replication pair for the same effect.
 
 ## Verification refs
 

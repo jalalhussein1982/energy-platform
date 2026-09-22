@@ -286,11 +286,11 @@ named, nothing else.
 
 **Files:** `docs/adr/ADR-036-…md`, `deployment/helm/energy-platform/templates/{_postgres.tpl, cronjob-pg-backup.yaml, cronjob-pg-wal-ship.yaml, cronjob-restore-drill.yaml}`, `values.yaml`, `deployment/local/values-local.yaml`, `deployment/tenant/values-demo.yaml`, `tests/harness/test_chart.py`, `docs/07-operations.md` §5.
 
-- [ ] ADR-036 amendment 1 (P5-D19), header row "Amended".
-- [ ] Chart: gzip `archive_command`; `pg-backup` = base only + `START_WAL`; new `pg-wal-ship`; drill fetch filtered by `START_WAL`, `restore_command` for `.gz`; values `baseSchedule`, `walSchedule`.
-- [ ] Tests: base job writes `START_WAL` and does not touch the WAL archive; the WAL job moves (not copies) with `--immutable` and excludes `*.part`; archive and restore commands handle `.gz`; drill fetch uses `--files-from`.
-- [ ] kind: fresh `local-up`; one base, WAL ship runs (local archive drained), replication, one real restore drill passes; record compressed segment sizes in `docs/07`.
-- [ ] Commit `fix(dr): compressed WAL shipped and pruned, daily base backup, drill fetches WAL from the base's start segment (ADR-036 amendment 1)`.
+- [x] ADR-036 amendment 1 (P5-D19), header row "Amended".
+- [x] Chart: gzip `archive_command`; `pg-backup` = base only + `START_WAL`; new `pg-wal-ship`; drill fetch filtered by `START_WAL`, `restore_command` for `.gz`; values `baseSchedule`, `walSchedule`.
+- [x] Tests: base job writes `START_WAL` and does not touch the WAL archive; the WAL job moves (not copies) with `--immutable` and excludes `*.part`; archive and restore commands handle `.gz`; drill fetch uses `--files-from`.
+- [x] kind: fresh `local-up`; one base, WAL ship runs (local archive drained), replication, one real restore drill passes; record compressed segment sizes in `docs/07`. *(2026-09-23: gate exit 0 in 257 s; closed segments ≈ 16 KB; drill 23:20 fetched 3 of 6 WAL files and matched live — docs/07 §5.2.)*
+- [x] Commit `fix(dr): compressed WAL shipped and pruned, daily base backup, drill fetches WAL from the base's start segment (ADR-036 amendment 1)`.
 
 ### Task 5.15 — Demo values without placeholders; private-registry pulls
 

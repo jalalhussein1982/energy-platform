@@ -222,16 +222,20 @@ def test_dr_workloads_render_behind_their_flags(tmp_path: Path) -> None:
     backup = local["ep-energy-platform-pg-backup"]["spec"]["jobTemplate"]["spec"]["template"][
         "spec"
     ]
-    assert backup["initContainers"][0]["command"][0] == "pg_basebackup"
-    assert "-X" in backup["initContainers"][0]["command"]
-    assert backup["affinity"]["podAffinity"]  # pinned next to Postgres: the WAL claim is RWO
+    base = backup["initContainers"][0]["args"][0]
+    assert "pg_basebackup" in base and "-X stream" in base
+    assert "backup_label" in base and "> /backup/base/START_WAL" in base
+    assert "wal-archive" not in {v["name"] for v in backup["volumes"]}  # base only (amendment 1)
     drill = local["ep-energy-platform-restore-drill"]["spec"]["jobTemplate"]["spec"]["template"][
         "spec"
     ]
     names = [c["name"] for c in drill["initContainers"]]
     assert names == ["fetch", "prep", "scratch-postgres"]
     assert drill["initContainers"][2]["restartPolicy"] == "Always"  # native sidecar
-    assert "B:bronze-replica/backups/postgres/base/" in drill["initContainers"][0]["args"][0]
+    fetch = drill["initContainers"][0]["args"][0]
+    assert "B:bronze-replica/backups/postgres/base/" in fetch
+    assert "/restore/base/START_WAL" in fetch and "--files-from /restore/wal.list" in fetch
+    assert "gzip -dc /restore/wal/%f.gz" in drill["initContainers"][1]["args"][0]
     env = {e["name"] for e in drill["containers"][0]["env"]}
     assert {
         "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT",
@@ -243,6 +247,34 @@ def test_dr_workloads_render_behind_their_flags(tmp_path: Path) -> None:
     assert "ep-energy-platform-tier" not in flags  # lifecycle mode: the probe hook, no move job
     tenant = named(render(tmp_path, TENANT), "CronJob")
     assert "ep-energy-platform-pg-backup" in tenant and "ep-energy-platform-replicate" in tenant
+
+
+def test_wal_archive_is_compressed_shipped_and_pruned(tmp_path: Path) -> None:
+    """ADR-036 amendment 1: gzip at archive time, `rclone move` to A, the old key refused."""
+    docs = render(tmp_path, LOCAL)
+    conf = named(docs, "ConfigMap")["ep-energy-platform-postgres-config"]["data"]
+    archive = next(
+        line for line in conf["postgresql.conf"].splitlines() if "archive_command" in line
+    )
+    assert "gzip -n -c %p" in archive and '.part" && mv' in archive and "cmp -s" in archive
+    ship = named(docs, "CronJob")["ep-energy-platform-pg-wal-ship"]
+    assert ship["spec"]["schedule"] == "*/5 * * * *"
+    pod = ship["spec"]["jobTemplate"]["spec"]["template"]["spec"]
+    script = pod["containers"][0]["args"][0]
+    move = "rclone move /wal-archive A:bronze/backups/postgres/wal/ --immutable --checksum"
+    assert move in script
+    assert "--exclude '*.part'" in script and "rclone copy" not in script
+    assert pod["affinity"]["podAffinity"]  # pinned next to Postgres: the WAL claim is RWO
+    claim = next(v for v in pod["volumes"] if v["name"] == "wal-archive")
+    assert not claim["persistentVolumeClaim"].get("readOnly")  # move deletes after upload
+    old_key = tmp_path / "old-key.yaml"
+    old_key.write_text(
+        yaml.safe_dump({"postgres": {"backup": {"schedule": "*/15 * * * *"}}}), encoding="utf-8"
+    )
+    cmd = ["helm", "template", "ep", str(CHART), "--set", f"image.digest={DIGEST}"]
+    cmd += ["-f", str(_targets_file(tmp_path)), "-f", str(LOCAL), "-f", str(old_key)]
+    result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
+    assert result.returncode != 0 and "baseSchedule" in result.stderr
 
 
 def test_smoke_env_has_no_duplicate_keys_and_uses_dir_bronze(tmp_path: Path) -> None:

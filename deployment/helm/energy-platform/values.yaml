@@ -43,15 +43,16 @@ postgres:
   storageClassName: ""                   # "" = the cluster default (tenant: consume by name)
   size: 5Gi
   walArchive:
-    size: 2Gi                            # ADR-036 §4: archive_command target, shipped by pg-backup
+    size: 2Gi                            # ADR-036 §4: archive_command target, drained by pg-wal-ship
   cnpg:                                  # only rendered with mode=cnpg (operator pre-existing)
     instances: 1
     storage: 5Gi
   external:
     dsnSecretKey: ENERGY_PLATFORM_DSN    # key in secrets.existingSecret holding the full DSN
-  backup:                                # statefulset mode only (ADR-036 §4)
+  backup:                                # statefulset mode only (ADR-036 §4, amendment 1)
     enabled: false
-    schedule: "*/15 * * * *"
+    baseSchedule: "15 2 * * *"            # pg-backup: one compressed base a day (before replicate :17 and the 03:30 drill)
+    walSchedule: "*/10 * * * *"           # pg-wal-ship: RPO = archive_timeout 5 min + 10 min = 15 min (ADR-002)
 
 bronze:
   endpoint: ""                           # REQUIRED: https://host[:port] (http needs allowInsecure)
@@ -62,7 +63,7 @@ bronze:
   retention:                             # Object Lock headers on every PUT (ADR-032, V-12)
     mode: ""                             # "" | COMPLIANCE | GOVERNANCE
     days: 0
-  backupPrefix: backups/postgres         # where pg-backup ships base + WAL (ADR-036 §4)
+  backupPrefix: backups/postgres         # base/<stamp>/ (pg-backup) and wal/ (pg-wal-ship), ADR-036 §4
   tiering:                               # ADR-021 / ADR-036 §2
     mode: none                           # none | move | lifecycle (lifecycle only where probed)
     afterDays: 90

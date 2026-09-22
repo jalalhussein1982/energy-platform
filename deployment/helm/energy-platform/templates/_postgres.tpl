@@ -10,7 +10,9 @@ postgresql.conf: |
   log_timezone = 'UTC'
   wal_level = replica
   archive_mode = on
-  archive_command = 'test ! -f /wal-archive/%f && cp %p /wal-archive/%f'
+  # ADR-036 amendment 1: gzip -n (same segment, same bytes) via .part + rename; a segment already
+  # archived with identical content is success (a retry), different content fails
+  archive_command = 'f=/wal-archive/%f.gz; if [ -f "$f" ]; then gzip -dc "$f" | cmp -s - %p; else gzip -n -c %p > "$f.part" && mv "$f.part" "$f"; fi'
   archive_timeout = 300
   unix_socket_directories = '/var/run/postgresql'
 pg_hba.conf: |

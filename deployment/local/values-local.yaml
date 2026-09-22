@@ -10,7 +10,8 @@ postgres:
     size: 512Mi
   backup:
     enabled: true
-    schedule: "*/5 * * * *"
+    baseSchedule: "*/10 * * * *"
+    walSchedule: "*/5 * * * *"
 bronze:
   endpoint: http://energy-platform-minio-a:9000
   bucket: bronze

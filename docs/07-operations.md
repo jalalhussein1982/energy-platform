@@ -91,7 +91,7 @@ the demo cluster once it exists):
 
 | Job | Result |
 |---|---|
-| `pg-backup` (every 5 min locally; `*/15` by default = the ADR-002 Silver RPO) | `pg_basebackup -Ft -z -X stream` + `rclone copy --immutable` of base and WAL archive: 96 MiB shipped in ~4 s to `A:bronze/backups/postgres/{base/<stamp>,wal}` |
+| `pg-backup` (2026-09-22 shape: every 5 min locally, `*/15` by default; superseded by ADR-036 amendment 1, §5.2) | `pg_basebackup -Ft -z -X stream` + `rclone copy --immutable` of base and WAL archive: 96 MiB shipped in ~4 s to `A:bronze/backups/postgres/{base/<stamp>,wal}` |
 | `replicate` (`rclone copy --immutable --checksum` then `check --one-way --min-age 5m`) | first run: 1 difference — a capture had landed between copy and check, hence `--min-age`; then `0 differences found, 3 matching files` |
 | `restore-drill` | see below |
 
@@ -143,6 +143,32 @@ one-week campaign (06 §6) will show, and the alert's `for: 30m` is the slack un
 RTO figures measured on kind, 05:50 run: fetch from B 12 s, recovery to end of archive < 1 s
 after start-up, `energyctl restore-drill` 7 s for four targets (≈ 1,800 Silver versions). The
 demo cluster's cross-provider numbers are what its own drill CronJob will record.
+
+### 5.2 Bounded backup footprint — ADR-036 amendment 1 (2026-09-23)
+
+The 2026-09-22 shape shipped raw 16 MiB segments (`archive_timeout = 300`: one per five minutes
+whenever anything was written, ≈ 4.5 GiB/day), never pruned the `wal-archive` volume (k3s
+`local-path` does not enforce its 2 Gi request) and took 96 base backups a day, all under the
+90-day lock on A and mirrored to B. Now: `archive_command` gzips each segment (`gzip -n`, via
+`.part` + rename, an identical retry is success), `pg-wal-ship` (`walSchedule`, default every
+10 min) `rclone move`s the archive to `A:<backupPrefix>/wal/` so the volume keeps only what is
+not in A yet, `pg-backup` takes the base only (`baseSchedule`, default daily 02:15) with a
+`START_WAL` marker, and the restore drill fetches only the WAL from that segment on.
+
+Measured on kind, 2026-09-23 23:01–23:20 UTC (clean `make local-down && make local-up && make
+smoke-test`: exit 0 in 257 s; local schedules: base every 10 min, WAL every 5, replication every
+5, drill every 10):
+
+| What | Result |
+|---|---|
+| Compressed segments in A | `…01` 2.4 MB (initdb + migrations), `…02` 575 KB (first captures), `…03`–`…05` **≈ 16 KB each** (closed by `archive_timeout`, 16 MiB raw), a `.backup` history file 201 B |
+| `pg-wal-ship` | `000000010000000000000001.gz: Copied (new)` then `Deleted`; "0 segments left on the volume" after each run; the volume never held more than the segments of the last five minutes |
+| `pg-backup` | base ≈ 4.3 MiB (`base.tar.gz`, `pg_wal.tar.gz`, `backup_manifest`, `START_WAL` = `000000010000000000000004`) |
+| `restore-drill` 23:10 | failed loudly, "no base backup under B:…/base/ yet" — base, WAL ship and replication fired in the same minute (first-run behaviour, as on 2026-09-22) |
+| `restore-drill` 23:20 | fetched base `20260922T231007Z` and **3 of 6** archived WAL files (from `…04`); `restored log file "000000010000000000000004" from archive` (the `.gz` path of `restore_command`), archive recovery complete; restored database and Bronze-only rebuild both **identical** to live (4 targets, 690 Silver versions); 31 s wall clock |
+
+Demo projection (not a measurement): one base a day plus about 12 closed segments an hour at
+16–150 KB each — tens of MB a day into A and B instead of ≈ 4.5 GiB of WAL plus 96 bases.
 
 ## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
 

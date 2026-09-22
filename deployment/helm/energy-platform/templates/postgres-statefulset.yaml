@@ -1,6 +1,6 @@
 {{- /*
 postgres.mode=statefulset (D-2 default for local and tenant): the official image by digest,
-uid 999, PGDATA in a subdirectory, WAL archiving to a shared volume that pg-backup ships
+uid 999, PGDATA in a subdirectory, WAL archiving to a shared volume that pg-wal-ship drains
 (ADR-036 §4). Restricted PSS with emptyDirs for the paths Postgres writes outside PGDATA.
 */ -}}
 {{- if eq .Values.postgres.mode "statefulset" }}

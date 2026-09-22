@@ -75,7 +75,7 @@
       "title": "Drills and replication: failed Jobs (kube-state-metrics)",
       "gridPos": {"x": 0, "y": 25, "w": 24, "h": 6},
       "targets": [
-        {"expr": "max by (job_name) (kube_job_status_failed{job_name=~\".*(restore-drill|replicate|pg-backup).*\"})", "legendFormat": "{{job_name}}"}
+        {"expr": "max by (job_name) (kube_job_status_failed{job_name=~\".*(restore-drill|replicate|pg-backup|pg-wal-ship).*\"})", "legendFormat": "{{job_name}}"}
       ]
     }
   ]

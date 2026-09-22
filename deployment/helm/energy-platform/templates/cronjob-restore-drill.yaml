@@ -1,7 +1,8 @@
 {{- /*
 ADR-002 restore drill / ADR-036 §5 / ADR-024 §2 / ADR-021 §5 — a backup that has never been
 restored is a hypothesis. Every run:
-  1. fetch  (rclone)   newest base backup + the WAL archive from STORE B (the independent copy);
+  1. fetch  (rclone)   newest base backup + the archived WAL from its START_WAL on, from STORE B
+                       (the independent copy; ADR-036 amendment 1);
   2. prep   (postgres) untar base + pg_wal into a scratch PGDATA, recovery.signal,
                        restore_command from the fetched archive (PITR to the end of the archive);
   3. scratch-postgres  a native sidecar (init container, restartPolicy Always) serving the
@@ -17,7 +18,23 @@ restored is a hypothesis. Every run:
 */ -}}
 {{- if .Values.drills.restore.enabled }}
 {{- $fullname := include "energy-platform.fullname" . -}}
-{{- $fetch := printf "LATEST=$(rclone lsf B:%s/%s/base/ --dirs-only 2>/dev/null | sort | tail -1)\nif [ -z \"$LATEST\" ]; then\n  case \" $RESTORE_DRILL_ARGS \" in *\" --dry-run \"*) echo \"restore-drill: dry run — no base backup under B:%s/%s/base/ yet; the scratch cluster will start empty\"; exit 0;; esac\n  echo \"restore-drill: no base backup under B:%s/%s/base/ yet\"; exit 1\nfi\nrclone copy \"B:%s/%s/base/$LATEST\" /restore/base --stats-one-line -v\nrclone copy B:%s/%s/wal /restore/wal --stats-one-line -v\necho \"restore-drill: fetched base $LATEST and $(ls /restore/wal | wc -l) WAL files from store B\"" .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix -}}
+{{- $b := printf "B:%s/%s" .Values.bronze.replica.bucket .Values.bronze.backupPrefix -}}
+{{- /* ADR-036 amendment 1: only the archived WAL at or after the base's START_WAL is fetched
+(string comparison: segment names sort in LSN order within a timeline; a base from before the
+amendment has no marker and gets the whole archive). An absent wal/ prefix is an empty archive. */ -}}
+{{- $fetch := `LATEST=$(rclone lsf @B@/base/ --dirs-only 2>/dev/null | sort | tail -1)
+if [ -z "$LATEST" ]; then
+  case " $RESTORE_DRILL_ARGS " in *" --dry-run "*) echo "restore-drill: dry run — no base backup under @B@/base/ yet; the scratch cluster will start empty"; exit 0;; esac
+  echo "restore-drill: no base backup under @B@/base/ yet"; exit 1
+fi
+rclone copy "@B@/base/$LATEST" /restore/base --stats-one-line -v
+START=$(cat /restore/base/START_WAL 2>/dev/null || true)
+if ! rclone lsf @B@/wal/ --files-only > /restore/wal-all.list 2> /restore/lsf.err; then
+  grep -q "directory not found" /restore/lsf.err || { cat /restore/lsf.err; exit 1; }
+fi
+awk -v s="$START" '{ n = $0; sub(/\.gz$/, "", n); if (s == "" || (n "") >= (s "")) print }' /restore/wal-all.list > /restore/wal.list
+rclone copy @B@/wal /restore/wal --files-from /restore/wal.list --no-traverse --stats-one-line -v
+echo "restore-drill: fetched base $LATEST and $(wc -l < /restore/wal.list) of $(wc -l < /restore/wal-all.list) archived WAL files (from ${START:-the beginning}) from store B"` | replace "@B@" $b -}}
 {{- $fetchEnv := printf "%s\n- name: RESTORE_DRILL_ARGS\n  value: \"\"" (include "energy-platform.rcloneEnv" (dict "root" . "alias" "B" "store" .Values.bronze.replica "secret" "BRONZE_REPLICA")) -}}
 {{- $fetchMounts := list (dict "name" "restore" "mountPath" "/restore") -}}
 {{- $fetchContainer := include "energy-platform.rcloneContainer" (dict "root" . "name" "fetch" "script" $fetch "env" $fetchEnv "mounts" $fetchMounts) -}}
@@ -75,7 +92,7 @@ spec:
                   rm -f /restore/pgdata/postmaster.pid /restore/pgdata/recovery.conf
                   chmod 0700 /restore/pgdata
                   cat >> /restore/pgdata/postgresql.auto.conf <<'EOF'
-                  restore_command = 'cp /restore/wal/%f %p'
+                  restore_command = 'if [ -f /restore/wal/%f.gz ]; then gzip -dc /restore/wal/%f.gz > %p; else cp /restore/wal/%f %p; fi'
                   archive_mode = off
                   listen_addresses = '127.0.0.1'
                   unix_socket_directories = '/var/run/postgresql'

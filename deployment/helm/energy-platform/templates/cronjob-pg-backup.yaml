@@ -1,16 +1,20 @@
 {{- /*
-ADR-036 §4, postgres.mode=statefulset: base backup + continuous WAL archive = PITR without a
-custom Postgres image. init container: pg_basebackup (tar, gzip, WAL streamed into the backup so
-it is self-consistent) into an emptyDir; container: rclone ships the base under
-<backupPrefix>/base/<timestamp>/ and the archive_command target (the wal-archive volume, mounted
-read-only) under <backupPrefix>/wal/, both --immutable. The pod is pinned next to the Postgres
-pod because the wal-archive claim is ReadWriteOnce. The replication job mirrors the prefix to B.
+ADR-036 §4 as amended (amendment 1), postgres.mode=statefulset: base backup + continuous WAL
+archive = PITR without a custom Postgres image. This CronJob takes the BASE only
+(postgres.backup.baseSchedule, daily by default): init container pg_basebackup (tar, gzip, WAL
+streamed into the backup so it is self-consistent) into an emptyDir, plus a START_WAL marker read
+from backup_label (the restore drill fetches only the archived WAL from that segment on);
+container: rclone ships it under <backupPrefix>/base/<timestamp>/ with --immutable. The WAL
+archive is shipped by pg-wal-ship; the replication job mirrors the prefix to B.
 */ -}}
 {{- if and (eq .Values.postgres.mode "statefulset") .Values.postgres.backup.enabled }}
+{{- if hasKey .Values.postgres.backup "schedule" }}
+{{- fail "postgres.backup.schedule was replaced by postgres.backup.baseSchedule and postgres.backup.walSchedule (ADR-036 amendment 1)" }}
+{{- end }}
 {{- $fullname := include "energy-platform.fullname" . -}}
-{{- $script := printf "STAMP=$(date -u +%%Y%%m%%dT%%H%%M%%SZ)\nrclone copy /backup/base A:%s/%s/base/$STAMP/ --immutable --s3-no-check-bucket --stats-one-line -v\nrclone copy /wal-archive A:%s/%s/wal/ --immutable --checksum --s3-no-check-bucket --stats-one-line -v\necho \"pg-backup: base $STAMP and WAL archive shipped to A:%s/%s\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
+{{- $script := printf "STAMP=$(date -u +%%Y%%m%%dT%%H%%M%%SZ)\nrclone copy /backup/base A:%s/%s/base/$STAMP/ --immutable --s3-no-check-bucket --stats-one-line -v\necho \"pg-backup: base $STAMP (WAL from $(cat /backup/base/START_WAL)) shipped to A:%s/%s/base/\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
 {{- $env := include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE") -}}
-{{- $mounts := list (dict "name" "backup" "mountPath" "/backup" "readOnly" true) (dict "name" "wal-archive" "mountPath" "/wal-archive" "readOnly" true) -}}
+{{- $mounts := list (dict "name" "backup" "mountPath" "/backup" "readOnly" true) -}}
 {{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "ship" "script" $script "env" $env "mounts" $mounts) -}}
 apiVersion: batch/v1
 kind: CronJob
@@ -20,7 +24,7 @@ metadata:
 {{ include "energy-platform.labels" . | indent 4 }}
     energy-platform.io/role: backup
 spec:
-  schedule: {{ .Values.postgres.backup.schedule | quote }}
+  schedule: {{ .Values.postgres.backup.baseSchedule | quote }}
   timeZone: {{ .Values.schedule.timezone | quote }}
   concurrencyPolicy: Forbid
   startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
@@ -41,18 +45,16 @@ spec:
           automountServiceAccountToken: false
           securityContext:
 {{ include "energy-platform.podSecurity" (dict "uid" 999) | indent 12 }}
-          affinity:
-            podAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                - topologyKey: kubernetes.io/hostname
-                  labelSelector:
-                    matchLabels:
-{{ include "energy-platform.selectorLabels" . | indent 22 }}
-                      energy-platform.io/role: postgres
           initContainers:
             - name: pg-basebackup
               image: {{ include "energy-platform.thirdPartyImage" .Values.postgres.image }}
-              command: ["pg_basebackup", "-h", "{{ $fullname }}-postgres", "-U", {{ .Values.postgres.user | quote }}, "-D", "/backup/base", "-Ft", "-z", "-X", "stream", "--checkpoint=fast", "--no-password", "-v"]
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  pg_basebackup -h {{ $fullname }}-postgres -U {{ .Values.postgres.user }} -D /backup/base -Ft -z -X stream --checkpoint=fast --no-password -v
+                  tar -xzOf /backup/base/base.tar.gz backup_label | sed -n 's/^START WAL LOCATION: .* (file \([0-9A-F]\{24\}\))$/\1/p' > /backup/base/START_WAL
+                  test -s /backup/base/START_WAL
+                  echo "pg-backup: base taken, WAL from $(cat /backup/base/START_WAL)"
               env:
                 - name: PGPASSWORD
                   valueFrom:
@@ -77,8 +79,4 @@ spec:
               emptyDir: {}
             - name: tmp
               emptyDir: {}
-            - name: wal-archive
-              persistentVolumeClaim:
-                claimName: {{ $fullname }}-postgres-wal-archive
-                readOnly: true
 {{- end }}

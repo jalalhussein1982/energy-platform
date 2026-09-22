@@ -11,7 +11,8 @@ postgres:
     size: 2Gi
   backup:
     enabled: true
-    schedule: "*/15 * * * *"
+    baseSchedule: "15 2 * * *"          # ADR-036 amendment 1: one base a day
+    walSchedule: "*/10 * * * *"         # RPO 15 min with archive_timeout 300
 bronze:
   endpoint: https://nbg1.your-objectstorage.com        # store A (V-12)
   bucket: energy-platform-bronze                       # roots/hcloud output bucket_a

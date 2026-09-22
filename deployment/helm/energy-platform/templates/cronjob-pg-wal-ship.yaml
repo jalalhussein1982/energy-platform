@@ -1,0 +1,61 @@
+{{- /*
+ADR-036 amendment 1: the WAL archive leaves the wal-archive volume only once it is in store A.
+`rclone move --immutable --checksum` uploads each compressed segment to <backupPrefix>/wal/ and
+deletes the local file after the upload (or when an identical object is already there); an
+object that differs at the same key fails the Job instead of being overwritten. `*.part` files
+are segments archive_command is still writing; lost+found exists on block-device volumes and is
+not ours. RPO = archive_timeout (5 min) + walSchedule. The pod is pinned next to the Postgres pod
+because the wal-archive claim is ReadWriteOnce.
+*/ -}}
+{{- if and (eq .Values.postgres.mode "statefulset") .Values.postgres.backup.enabled }}
+{{- $fullname := include "energy-platform.fullname" . -}}
+{{- $script := printf "rclone move /wal-archive A:%s/%s/wal/ --immutable --checksum --exclude '*.part' --exclude 'lost+found/**' --s3-no-check-bucket --stats-one-line -v\necho \"pg-wal-ship: shipped to A:%s/%s/wal/; $(find /wal-archive -maxdepth 1 -name '*.gz' | wc -l) segments left on the volume\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
+{{- $env := include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE") -}}
+{{- $mounts := list (dict "name" "wal-archive" "mountPath" "/wal-archive") -}}
+{{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "ship" "script" $script "env" $env "mounts" $mounts) -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-pg-wal-ship
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: backup
+spec:
+  schedule: {{ .Values.postgres.backup.walSchedule | quote }}
+  timeZone: {{ .Values.schedule.timezone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: {{ .Values.schedule.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ .Values.schedule.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.schedule.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+{{ include "energy-platform.selectorLabels" . | indent 12 }}
+            energy-platform.io/role: backup
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ $fullname }}
+          automountServiceAccountToken: false
+          securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 999) | indent 12 }}
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 22 }}
+                      energy-platform.io/role: postgres
+          containers:
+{{ $container | indent 12 }}
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            - name: wal-archive
+              persistentVolumeClaim:
+                claimName: {{ $fullname }}-postgres-wal-archive
+{{- end }}
