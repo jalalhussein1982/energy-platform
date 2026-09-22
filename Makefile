@@ -25,7 +25,7 @@ IMAGE_DIGEST   ?=                        # sha256:… of a pushed image; deploy-
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
         harness-check pr-surface live-smoke image image-push image-digest target-values \
         local-cluster local-registry local-cni local-image local-secrets deploy-local local-egress-test terraform-plan-hcloud \
-        deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template rollback-drill ci-kind-tools
+        deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template rollback-drill ci-kind-tools ci-terraform
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -270,6 +270,18 @@ rollback-drill: ## ADR-016 §6 / ADR-025 §5: two failing upgrades (smoke, stora
 
 KIND_VERSION ?= v0.33.0
 HELM_VERSION ?= v4.3.0
+# Terraform for the terraform-validate CI job: GitHub's ubuntu-latest ships neither terraform nor
+# tofu (first CI run, 2026-09-23). The version is the author's, whose plans are Terraform's; the
+# SHA-256 is from releases.hashicorp.com terraform_1.16.3_SHA256SUMS, re-checked on the download.
+CI_TERRAFORM_VERSION := 1.16.3
+CI_TERRAFORM_SHA256  := 093b6ae9a2228af5029c41606bc96eb583553528aad1bfe7e0b4d62fc91e25d8
+
+ci-terraform: ## CI only: install Terraform $(CI_TERRAFORM_VERSION) (linux_amd64), checksum-verified
+	curl -fsSLo /tmp/terraform.zip https://releases.hashicorp.com/terraform/$(CI_TERRAFORM_VERSION)/terraform_$(CI_TERRAFORM_VERSION)_linux_amd64.zip
+	echo "$(CI_TERRAFORM_SHA256)  /tmp/terraform.zip" | sha256sum -c -
+	unzip -o -q /tmp/terraform.zip terraform -d /tmp && sudo mv /tmp/terraform /usr/local/bin/terraform
+	terraform version
+
 ci-kind-tools: ## CI only: install kind and helm at pinned versions (the runner has docker and kubectl)
 	curl -fsSLo /tmp/kind https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-linux-amd64 && chmod +x /tmp/kind && sudo mv /tmp/kind /usr/local/bin/kind
 	curl -fsSL https://get.helm.sh/helm-$(HELM_VERSION)-linux-amd64.tar.gz | tar -xzO linux-amd64/helm > /tmp/helm && chmod +x /tmp/helm && sudo mv /tmp/helm /usr/local/bin/helm

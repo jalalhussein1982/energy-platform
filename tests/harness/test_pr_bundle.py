@@ -94,6 +94,9 @@ def test_apply_never_touches_main(tmp_path: Path) -> None:
     checkout = tmp_path / "checkout"
     checkout.mkdir()
     _git(checkout, "init", "-q", "-b", "main")
+    # apply() commits with the caller's git identity; a CI runner has no global one
+    _git(checkout, "config", "user.name", "t")
+    _git(checkout, "config", "user.email", "t@x")
     (checkout / "README.md").write_text("x\n")
     _git(checkout, "add", ".")
     _git(checkout, "commit", "-q", "-m", "base")
