@@ -1,0 +1,82 @@
+{
+  "title": "energy-platform — freshness (ADR-012 / ADR-037)",
+  "uid": "energy-platform-freshness",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": {"from": "now-24h", "to": "now"},
+  "templating": {
+    "list": [
+      {
+        "name": "target",
+        "type": "query",
+        "datasource": {"type": "prometheus"},
+        "query": "label_values(energy_platform_freshness_age_seconds, target)",
+        "includeAll": true,
+        "multi": true,
+        "current": {"text": "All", "value": "$__all"}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Freshness state per target",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 4},
+      "targets": [
+        {"expr": "max by (target) (energy_platform_freshness_status_active{target=~\"$target\"} * on (target, status) group_left label_replace(vector(1), \"status\", \"late\", \"\", \"\")) ", "legendFormat": "{{target}}", "hide": true},
+        {"expr": "sum by (target, status) (energy_platform_freshness_status_active{target=~\"$target\"} == 1)", "legendFormat": "{{target}}: {{status}}"}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "textMode": "name", "colorMode": "background"},
+      "fieldConfig": {"defaults": {"mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}}
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Age of the newest observation (seconds) — the SLI",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [{"expr": "energy_platform_freshness_age_seconds{target=~\"$target\"}", "legendFormat": "{{target}}"}],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Observed vs expected periods in the partition",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [{"expr": "energy_platform_freshness_periods_count{target=~\"$target\"}", "legendFormat": "{{target}} {{kind}}"}]
+    },
+    {
+      "id": 4,
+      "type": "state-timeline",
+      "title": "Status timeline (pending / partial / late / complete)",
+      "gridPos": {"x": 0, "y": 12, "w": 24, "h": 6},
+      "targets": [{"expr": "sum by (target, status) (energy_platform_freshness_status_active{target=~\"$target\"} == 1)", "legendFormat": "{{target}}: {{status}}"}]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "source_unavailable (theirs) vs pipeline_failed (ours)",
+      "gridPos": {"x": 0, "y": 18, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "energy_platform_source_unavailable{target=~\"$target\"}", "legendFormat": "{{target}} source_unavailable"},
+        {"expr": "energy_platform_pipeline_failed{target=~\"$target\"}", "legendFormat": "{{target}} pipeline_failed"}
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Runs by ledger state",
+      "gridPos": {"x": 12, "y": 18, "w": 12, "h": 7},
+      "targets": [{"expr": "energy_platform_runs_total{target=~\"$target\"}", "legendFormat": "{{target}} {{state}}"}]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Drills and replication: failed Jobs (kube-state-metrics)",
+      "gridPos": {"x": 0, "y": 25, "w": 24, "h": 6},
+      "targets": [
+        {"expr": "max by (job_name) (kube_job_status_failed{job_name=~\".*(restore-drill|replicate|pg-backup).*\"})", "legendFormat": "{{job_name}}"}
+      ]
+    }
+  ]
+}

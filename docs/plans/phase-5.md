@@ -229,11 +229,11 @@ docs/07-operations.md                         # deploy, drills, restore, rollbac
 
 **Files:** `deployment/helm/energy-platform/templates/{metrics-deployment.yaml, metrics-configmap.yaml, metrics-service.yaml, podmonitor.yaml, prometheusrule.yaml, alerts-configmap.yaml}`, `deployment/helm/energy-platform/dashboards/freshness.json`, `tests/harness/test_chart.py` additions (PodMonitor/PrometheusRule absent by default, present with the flag; the queries ConfigMap names every ADR-037 metric), `docs/07-operations.md` §7.
 
-- [ ] Exporter Deployment (P5-D8): `postgres_exporter` by digest, `DATA_SOURCE_NAME` from the secret, `--disable-default-metrics`, `--extend.query-path`, port 9187, annotations `prometheus.io/scrape: "true"`, `prometheus.io/port: "9187"`, `prometheus.io/path: /metrics`; NetworkPolicy: egress to Postgres only, ingress on 9187 from `metrics.scrapeFrom` (namespace selector, default: same namespace).
-- [ ] Alert rules (both the `PrometheusRule` and the plain ConfigMap carry the same YAML): `EnergyPlatformTargetLate` (`energy_platform_freshness_status{status="late"} == 1` for 2 cadences), `EnergyPlatformPipelineFailed` (`energy_platform_pipeline_failed == 1`), `EnergyPlatformSourceUnavailable` (warning; `for: 1h`), `EnergyPlatformNoFreshnessRow` (exporter up but no row for a committed target for 30 min), `EnergyPlatformRestoreDrillFailed` (`kube_job_status_failed{job_name=~"restore-drill.*"} > 0`, documented as needing kube-state-metrics).
-- [ ] Dashboard JSON: freshness age per target, status timeline, runs by state, drill outcomes.
-- [ ] Local: port-forward the exporter and assert `energy_platform_freshness_age_seconds{target="ote_intraday_market"}` present (this is the `make smoke-test` freshness check).
-- [ ] Commit `feat(observability): freshness exporter, alert rules, PodMonitor/PrometheusRule behind the operator flag, Grafana dashboard (ADR-037 / ADR-012, D-6)`.
+- [x] Exporter Deployment (P5-D8): `postgres_exporter` by digest, `DATA_SOURCE_NAME` from the secret, `--disable-default-metrics`, `--extend.query-path`, port 9187, annotations `prometheus.io/scrape: "true"`, `prometheus.io/port: "9187"`, `prometheus.io/path: /metrics`; NetworkPolicy: egress to Postgres only, ingress on 9187 from `metrics.scrapeFrom` (namespace selector, default: same namespace).
+- [x] Alert rules (both the `PrometheusRule` and the plain ConfigMap carry the same YAML): `EnergyPlatformTargetLate` (`energy_platform_freshness_status{status="late"} == 1` for 2 cadences), `EnergyPlatformPipelineFailed` (`energy_platform_pipeline_failed == 1`), `EnergyPlatformSourceUnavailable` (warning; `for: 1h`), `EnergyPlatformNoFreshnessRow` (exporter up but no row for a committed target for 30 min), `EnergyPlatformRestoreDrillFailed` (`kube_job_status_failed{job_name=~"restore-drill.*"} > 0`, documented as needing kube-state-metrics).
+- [x] Dashboard JSON: freshness age per target, status timeline, runs by state, drill outcomes.
+- [x] Local: port-forward the exporter and assert `energy_platform_freshness_age_seconds{target="ote_intraday_market"}` present (this is the `make smoke-test` freshness check).
+- [x] Commit `feat(observability): freshness exporter, alert rules, PodMonitor/PrometheusRule behind the operator flag, Grafana dashboard (ADR-037 / ADR-012, D-6)`.
 
 ### Task 5.13 — `make smoke-test`, docs, roadmap, progress
 

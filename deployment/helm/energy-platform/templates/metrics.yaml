@@ -1,0 +1,217 @@
+{{- /*
+ADR-037 §3 / D-6: the freshness SLI is a table (target_freshness, written by the gaps CronJob);
+a stock postgres_exporter (image by digest, default metrics off) turns it into Prometheus
+metrics. Annotations by default; PodMonitor / PrometheusRule only behind metrics.operator.enabled
+(CRDs, never in the tenant default render). The rules also ship as a plain ConfigMap.
+Metric names as exported (postgres_exporter appends the column to the query name):
+  energy_platform_freshness_age_seconds{target}          now() - newest_delivery_start
+  energy_platform_freshness_status_active{target,status} 1 for the current 01 §5 state
+  energy_platform_freshness_periods_count{target,kind}   observed | expected
+  energy_platform_source_unavailable{target}             0/1  (the source's incident)
+  energy_platform_pipeline_failed{target}                0/1  (ours)
+  energy_platform_stale_fetch_streak{target}
+  energy_platform_freshness_computed_age_seconds{target} now() - computed_at (dead gap detector)
+  energy_platform_runs_total{target,state}
+*/ -}}
+{{- if .Values.metrics.enabled }}
+{{- $fullname := include "energy-platform.fullname" . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-metrics-queries
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+data:
+  queries.yaml: |
+    energy_platform_freshness:
+      query: >-
+        SELECT target_id AS target,
+               EXTRACT(EPOCH FROM (now() - newest_delivery_start)) AS age_seconds,
+               EXTRACT(EPOCH FROM (now() - computed_at)) AS computed_age_seconds
+        FROM target_freshness
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - age_seconds: {usage: "GAUGE", description: "age of the newest observation (ADR-012 SLI)"}
+        - computed_age_seconds: {usage: "GAUGE", description: "age of the freshness row itself"}
+    energy_platform_freshness_status:
+      query: >-
+        SELECT f.target_id AS target, s.status,
+               (f.status = s.status)::int AS active
+        FROM target_freshness f
+        CROSS JOIN (VALUES ('pending'), ('partial'), ('late'), ('complete')) AS s(status)
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - status: {usage: "LABEL", description: "pending | partial | late | complete (01 §5)"}
+        - active: {usage: "GAUGE", description: "1 when this is the target's current state"}
+    energy_platform_freshness_periods:
+      query: >-
+        SELECT target_id AS target, 'observed' AS kind, observed_periods AS count FROM target_freshness
+        UNION ALL
+        SELECT target_id AS target, 'expected' AS kind, expected_periods AS count FROM target_freshness
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - kind: {usage: "LABEL", description: "observed | expected"}
+        - count: {usage: "GAUGE", description: "periods in the partition"}
+    energy_platform:
+      query: >-
+        SELECT target_id AS target, source_unavailable::int AS source_unavailable,
+               pipeline_failed::int AS pipeline_failed, stale_fetch_streak
+        FROM target_freshness
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - source_unavailable: {usage: "GAUGE", description: "newest attempt failed in the fetch layer"}
+        - pipeline_failed: {usage: "GAUGE", description: "newest attempt failed after Bronze"}
+        - stale_fetch_streak: {usage: "GAUGE", description: "consecutive unchanged captures"}
+    energy_platform_runs:
+      query: >-
+        SELECT target_id AS target, state, count(*) AS total FROM runs GROUP BY 1, 2
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - state: {usage: "LABEL", description: "ledger run state (ADR-024 §3)"}
+        - total: {usage: "GAUGE", description: "runs in this state"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-metrics
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: metrics
+spec:
+  selector:
+{{ include "energy-platform.selectorLabels" . | indent 4 }}
+    energy-platform.io/role: metrics
+  ports:
+    - name: metrics
+      port: 9187
+      targetPort: metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-metrics
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: metrics
+  template:
+    metadata:
+      labels:
+{{ include "energy-platform.selectorLabels" . | indent 8 }}
+        energy-platform.io/role: metrics
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: {{ $fullname }}
+      automountServiceAccountToken: false
+      securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 65534) | indent 8 }}
+      containers:
+        - name: exporter
+          image: {{ include "energy-platform.thirdPartyImage" .Values.metrics.image }}
+          args:
+            - --disable-default-metrics
+            - --extend.query-path=/etc/exporter/queries.yaml
+            - --web.listen-address=:9187
+          env:
+{{ include "energy-platform.dsnEnv" . | indent 12 }}
+            # lib/pq defaults to sslmode=require; the chart's own Postgres speaks plain TCP inside
+            # the namespace (NetworkPolicy-scoped), so statefulset mode disables it explicitly.
+            - name: DATA_SOURCE_NAME
+              value: {{ ternary "$(ENERGY_PLATFORM_DSN)?sslmode=disable" "$(ENERGY_PLATFORM_DSN)" (eq .Values.postgres.mode "statefulset") | quote }}
+          ports:
+            - name: metrics
+              containerPort: 9187
+          securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 12 }}
+          resources:
+{{ toYaml .Values.resources.exporter | indent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: queries
+              mountPath: /etc/exporter
+              readOnly: true
+      volumes:
+        - name: queries
+          configMap:
+            name: {{ $fullname }}-metrics-queries
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-metrics-ingress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: metrics
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+{{- if .Values.metrics.scrapeFrom.namespaceSelector }}
+        - namespaceSelector:
+{{ toYaml .Values.metrics.scrapeFrom.namespaceSelector | indent 12 }}
+{{- else }}
+        - podSelector: {}
+{{- end }}
+      ports:
+        - protocol: TCP
+          port: 9187
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-alert-rules
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+data:
+  energy-platform.rules.yaml: |
+{{ include "energy-platform.alertRules" . | indent 4 }}
+{{- if .Values.metrics.operator.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ $fullname }}
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+{{- with .Values.metrics.operator.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  selector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: metrics
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 60s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullname }}
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+{{- with .Values.metrics.operator.labels }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+{{ include "energy-platform.alertRules" . | indent 2 }}
+{{- end }}
+{{- end }}

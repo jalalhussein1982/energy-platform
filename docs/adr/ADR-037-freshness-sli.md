@@ -48,14 +48,16 @@ platform does not serve HTTP itself.
    | Metric | Labels | Source |
    |---|---|---|
    | `energy_platform_freshness_age_seconds` | `target` | `now() − newest_delivery_start` |
-   | `energy_platform_freshness_status` (0/1) | `target`, `status` | `status` |
-   | `energy_platform_freshness_periods` | `target`, `kind=observed\|expected` | the two counts |
+   | `energy_platform_freshness_status_active` (0/1) | `target`, `status` | `status` (one series per 01 §5 state) |
+   | `energy_platform_freshness_periods_count` | `target`, `kind=observed\|expected` | the two counts |
    | `energy_platform_source_unavailable` (0/1) | `target` | `source_unavailable` |
    | `energy_platform_pipeline_failed` (0/1) | `target` | `pipeline_failed` |
    | `energy_platform_stale_fetch_streak` | `target` | `stale_fetch_streak` |
-   | `energy_platform_runs` | `target`, `state` | `count(*) from runs group by` |
+   | `energy_platform_runs_total` | `target`, `state` | `count(*) from runs group by` |
    | `energy_platform_freshness_computed_age_seconds` | `target` | `now() − computed_at` (detects a dead gap detector) |
 
+   (Names as exported: `postgres_exporter` appends the column name to the query name, hence
+   `_active`, `_count`, `_total`; recorded 2026-09-22 when the exporter was built.)
    The pod carries `prometheus.io/scrape`, `prometheus.io/port`, `prometheus.io/path`
    annotations (D-6 default). `PodMonitor` and `PrometheusRule` render **only** behind
    `metrics.operator.enabled`; the same rules ship as a plain ConfigMap for scrapers without the
@@ -63,7 +65,7 @@ platform does not serve HTTP itself.
    from `metrics.scrapeFrom`.
 
 4. **Alert rules** (the SLO per target is the cadence; values are chart defaults):
-   - `EnergyPlatformTargetLate` — `energy_platform_freshness_status{status="late"} == 1` for
+   - `EnergyPlatformTargetLate` — `energy_platform_freshness_status_active{status="late"} == 1` for
      2 × cadence: **page** — the source is late *and* we have not caught up;
    - `EnergyPlatformPipelineFailed` — `energy_platform_pipeline_failed == 1` for 1 cadence:
      **page** — our incident;

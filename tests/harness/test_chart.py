@@ -256,3 +256,53 @@ def test_smoke_env_has_no_duplicate_keys_and_uses_dir_bronze(tmp_path: Path) -> 
         )["ENERGY_PLATFORM_BRONZE"]
         == "dir"
     )
+
+
+def test_observability_renders_per_adr_037(tmp_path: Path) -> None:
+    docs = render(tmp_path, TENANT)
+    queries = named(docs, "ConfigMap")["ep-energy-platform-metrics-queries"]["data"]["queries.yaml"]
+    parsed = yaml.safe_load(queries)
+    exported = {
+        f"{name}_{next(iter(col))}"
+        for name, q in parsed.items()
+        for col in q["metrics"]
+        if next(iter(col.values()))["usage"] == "GAUGE"
+    }
+    assert {
+        "energy_platform_freshness_age_seconds",
+        "energy_platform_freshness_computed_age_seconds",
+        "energy_platform_freshness_status_active",
+        "energy_platform_freshness_periods_count",
+        "energy_platform_source_unavailable",
+        "energy_platform_pipeline_failed",
+        "energy_platform_stale_fetch_streak",
+        "energy_platform_runs_total",
+    } <= exported
+    rules = yaml.safe_load(
+        named(docs, "ConfigMap")["ep-energy-platform-alert-rules"]["data"][
+            "energy-platform.rules.yaml"
+        ]
+    )
+    names = {r["alert"] for g in rules["groups"] for r in g["rules"]}
+    assert {
+        "EnergyPlatformTargetLate",
+        "EnergyPlatformPipelineFailed",
+        "EnergyPlatformSourceUnavailable",
+        "EnergyPlatformFreshnessStale",
+        "EnergyPlatformRestoreDrillFailed",
+    } <= names
+    exporter = named(docs, "Deployment")["ep-energy-platform-metrics"]
+    annotations = exporter["spec"]["template"]["metadata"]["annotations"]
+    assert (
+        annotations["prometheus.io/scrape"] == "true"
+        and annotations["prometheus.io/port"] == "9187"
+    )
+    env = {
+        e["name"]: e.get("value")
+        for e in exporter["spec"]["template"]["spec"]["containers"][0]["env"]
+    }
+    assert env["DATA_SOURCE_NAME"].endswith("?sslmode=disable")  # statefulset mode
+    assert "PodMonitor" not in kinds(docs) and "PrometheusRule" not in kinds(docs)
+    flagged = kinds(render(tmp_path, ALL_FLAGS))
+    assert flagged["PodMonitor"] == 1 and flagged["PrometheusRule"] == 1
+    assert (CHART / "dashboards" / "freshness.json").is_file()
