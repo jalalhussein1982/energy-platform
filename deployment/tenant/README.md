@@ -28,23 +28,39 @@ can be applied there to prove it (the same three assertions as `make local-egres
 
 ## Demo deploy identity (V-14, ADR-015)
 
-The workflow has `id-token: write` and nothing else. `scripts/oidc_kube_context.sh` asks
+`.github/workflows/deploy-demo.yml` has two jobs, each with one permission (plan P5-D20):
+`image` (`packages: write`) runs `make image-push` on the amd64 runner — the `cx23` nodes'
+architecture — and pushes `ghcr.io/<owner>/<repo>` with the job's own `github.token`; `deploy`
+(`id-token: write`) takes that digest as `IMAGE_DIGEST`. `scripts/oidc_kube_context.sh` asks
 GitHub for a token with audience `energy-platform-demo`, builds a kubeconfig from it and the
 public cluster CA, and the API server maps it to `gha:<owner>/<repo>` with the namespace Role
-from cloud-init. Repository **variables** (not secrets, both public): `DEMO_CLUSTER_URL`,
-`DEMO_CLUSTER_CA`.
+from cloud-init. Repository **variables** (not secrets, all public or non-sensitive):
+`DEMO_CLUSTER_URL`, `DEMO_CLUSTER_CA`, `DEMO_OCI_NAMESPACE` (store B's endpoint is built from it;
+the tenancy namespace is not committed). Nothing long-lived is stored in GitHub.
+
+The demo values carry no placeholders (plan P5-D22): the object-store egress CIDRs are the
+providers' published ranges (see the comments in `values-demo.yaml`), and the render fails
+loudly if `DEMO_OCI_NAMESPACE` is missing. The package is private like the repository, so the
+pods pull with `image.pullSecrets: [ghcr-pull]` (P5-D21).
 
 ## Author checklist before the first demo deploy (Level 3 items)
 
-1. `terraform apply` the `hcloud` root (`deployment/own-cluster/README.md`), then read
+1. `terraform apply` the `hcloud` plan (`deployment/own-cluster/README.md`), then read
    `terraform output demo_cluster_url` and fetch the CA from the server.
-2. Create the GitHub repository for this checkout and push `main` (this working copy has no
-   remote yet); set the two repository variables; create the `demo` environment.
-3. Build and push the platform image to `ghcr.io/<owner>/energy-platform` (the workflow's
-   `IMAGE_REPO`), by digest: `make image IMAGE_REPO=ghcr.io/<owner>/energy-platform && docker push …`.
-4. In the namespace, create the Secret from the Terraform outputs and the V-12/V-13 keys:
-   `POSTGRES_PASSWORD`, `BRONZE_ACCESS_KEY_ID`, `BRONZE_SECRET_ACCESS_KEY`,
-   `BRONZE_REPLICA_ACCESS_KEY_ID`, `BRONZE_REPLICA_SECRET_ACCESS_KEY` (`make print-demo-secret-template`).
-5. Replace the `REPLACE_*` placeholders in `values-demo.yaml` (OCI namespace, the two stores'
-   address ranges) with `--set` at deploy time or a values file outside the repository.
-6. Run the `deploy-demo` workflow once by hand; then switch it to `push: main`.
+2. Repository variables `DEMO_CLUSTER_URL` and `DEMO_CLUSTER_CA` from step 1
+   (`gh variable set DEMO_CLUSTER_URL --body …`; `gh variable set DEMO_CLUSTER_CA < ca.crt`).
+   The repository, the `demo` environment and `DEMO_OCI_NAMESPACE` exist already (2026-09-23).
+3. With the admin kubeconfig (`ssh root@<server> cat /etc/rancher/k3s/k3s.yaml`, server address
+   replaced by the public one), create the two Secrets in the namespace
+   (`make print-demo-secret-template` prints both commands): `energy-platform` with
+   `POSTGRES_PASSWORD` (new, e.g. `openssl rand -hex 16`), `BRONZE_ACCESS_KEY_ID` /
+   `BRONZE_SECRET_ACCESS_KEY` (Hetzner S3 keys, `verify.env`), `BRONZE_REPLICA_ACCESS_KEY_ID` /
+   `BRONZE_REPLICA_SECRET_ACCESS_KEY` (OCI customer secret key, `verify.env`); and `ghcr-pull`
+   from a classic GitHub PAT with `read:packages` only (set an expiry).
+4. Run the `deploy-demo` workflow once by hand (`gh workflow run deploy-demo`); then switch it
+   to `push: main`.
+
+The image build needs nothing from you: the workflow pushes it. A deploy from the laptop with
+the admin kubeconfig is `make deploy-tenant ENV=demo KUBECONFIG=… DEMO_OCI_NAMESPACE=…
+IMAGE_REPO=ghcr.io/<owner>/<repo> IMAGE_DIGEST=sha256:…` (the digest of an image the workflow
+pushed; a laptop build would be arm64).

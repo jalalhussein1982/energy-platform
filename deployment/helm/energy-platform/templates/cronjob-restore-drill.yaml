@@ -66,6 +66,9 @@ spec:
           restartPolicy: Never
           serviceAccountName: {{ $fullname }}
           automountServiceAccountToken: false
+{{- with include "energy-platform.imagePullSecrets" . }}
+{{ . | indent 10 }}
+{{- end }}
           # uid 999 = the postgres image's user: initdb and postgres need their uid in /etc/passwd;
           # rclone and the platform image run as any non-root uid
           securityContext:

@@ -296,9 +296,9 @@ named, nothing else.
 
 **Files:** `values.yaml` (`image.pullSecrets`), `_helpers.tpl`, `cronjob-restore-drill.yaml`, `deployment/tenant/{values-demo.yaml, README.md}`, `Makefile` (`deploy-demo`, `print-demo-secret-template`), `tests/harness/test_chart.py`.
 
-- [ ] P5-D21, P5-D22; `make deploy-demo` fails fast without `DEMO_OCI_NAMESPACE`.
-- [ ] Test: the demo render has no `REPLACE`, every `ipBlock` parses as a network, every platform-image pod carries the pull secret, and the render without the replica endpoint fails.
-- [ ] Commit `fix(tenant): demo values without placeholders, OCI namespace from a repository variable, image pull secret for the private registry`.
+- [x] P5-D21, P5-D22; `make deploy-demo` fails fast without `DEMO_OCI_NAMESPACE`.
+- [x] Test: the demo render has no `REPLACE`, every `ipBlock` parses as a network, every platform-image pod carries the pull secret, and the render without the replica endpoint fails.
+- [x] Commit `fix(tenant): demo values without placeholders, OCI namespace from a repository variable, image pull secret for the private registry`.
 
 ### Task 5.16 — The deploy workflow builds and pushes the image
 

@@ -4,6 +4,7 @@ is the gate that runs the same renders through the two checker scripts)."""
 
 from __future__ import annotations
 
+import ipaddress
 import shutil
 import subprocess
 from collections import Counter
@@ -66,6 +67,7 @@ def named(docs: list[dict[str, Any]], kind: str) -> dict[str, dict[str, Any]]:
 
 
 TENANT = REPO / "deployment" / "tenant" / "values-tenant.yaml"
+DEMO = REPO / "deployment" / "tenant" / "values-demo.yaml"
 LOCAL = REPO / "deployment" / "local" / "values-local.yaml"
 ALL_FLAGS = CHART / "ci" / "all-flags-values.yaml"
 
@@ -275,6 +277,46 @@ def test_wal_archive_is_compressed_shipped_and_pruned(tmp_path: Path) -> None:
     cmd += ["-f", str(_targets_file(tmp_path)), "-f", str(LOCAL), "-f", str(old_key)]
     result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
     assert result.returncode != 0 and "baseSchedule" in result.stderr
+
+
+def _pod_spec(doc: dict[str, Any]) -> dict[str, Any] | None:
+    if doc["kind"] == "CronJob":
+        return dict(doc["spec"]["jobTemplate"]["spec"]["template"]["spec"])
+    if doc["kind"] in {"Job", "StatefulSet", "Deployment"}:
+        return dict(doc["spec"]["template"]["spec"])
+    return None
+
+
+def test_demo_values_render_without_placeholders(tmp_path: Path) -> None:
+    """Plan P5-D21/P5-D22: the demo render is complete once the deploy supplies the OCI
+    namespace; every egress CIDR is a network; every platform-image pod can pull privately."""
+    endpoint = ("--set", "bronze.replica.endpoint=https://ns.compat.example.invalid")
+    docs = render(tmp_path, TENANT, DEMO, extra=endpoint)
+    assert "REPLACE" not in yaml.safe_dump_all(docs)
+    assert check_k8s_documents(docs, DEMO.name) == []
+    assert check_documents(docs, DEMO.name) == []
+    blocks = [
+        to["ipBlock"]["cidr"]
+        for d in docs
+        if d["kind"] == "NetworkPolicy"
+        for rule in d["spec"].get("egress", [])
+        for to in rule.get("to", [])
+        if "ipBlock" in to
+    ]
+    assert {"88.198.120.0/25", "134.70.40.0/21", "134.70.48.0/22"} <= set(blocks)
+    for cidr in blocks:
+        ipaddress.ip_network(cidr)  # strict: raises on a placeholder or host bits
+    platform = [s for s in map(_pod_spec, docs) if s is not None]
+    platform = [s for s in platform if any(DIGEST in c["image"] for c in s.get("containers", []))]
+    assert platform
+    for spec in platform:
+        assert spec.get("imagePullSecrets") == [{"name": "ghcr-pull"}]
+    tenant = [s for s in map(_pod_spec, render(tmp_path, TENANT)) if s is not None]
+    assert all("imagePullSecrets" not in s for s in tenant)  # nothing rendered by default
+    cmd = ["helm", "template", "ep", str(CHART), "--set", f"image.digest={DIGEST}"]
+    cmd += ["-f", str(_targets_file(tmp_path)), "-f", str(TENANT), "-f", str(DEMO)]
+    result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
+    assert result.returncode != 0 and "endpoint is required" in result.stderr
 
 
 def test_smoke_env_has_no_duplicate_keys_and_uses_dir_bronze(tmp_path: Path) -> None:

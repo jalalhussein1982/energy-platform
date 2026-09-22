@@ -44,6 +44,17 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s@%s" .Values.image.repository $d -}}
 {{- end -}}
 
+{{/* imagePullSecrets for pods that run the platform image (image.pullSecrets; P5-D21, a private
+     registry such as the demo's ghcr.io package). Renders nothing when the list is empty. */}}
+{{- define "energy-platform.imagePullSecrets" -}}
+{{- with .Values.image.pullSecrets }}
+imagePullSecrets:
+{{- range . }}
+  - name: {{ . }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
 {{/* a third-party image from a {repository, digest} block: include "energy-platform.thirdPartyImage" .Values.postgres.image */}}
 {{- define "energy-platform.thirdPartyImage" -}}
 {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" (default "" .digest)) -}}
@@ -184,6 +195,9 @@ spec:
   restartPolicy: Never
   serviceAccountName: {{ include "energy-platform.fullname" .root }}
   automountServiceAccountToken: false
+{{- with include "energy-platform.imagePullSecrets" .root }}
+{{ . | indent 2 }}
+{{- end }}
   securityContext:
 {{ include "energy-platform.podSecurity" (dict "uid" 10001) | indent 4 }}
   containers:

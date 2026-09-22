@@ -3,6 +3,11 @@
 # path). Layer on top of values-tenant.yaml: `make deploy-tenant ENV=demo`.
 # Residency is declared honestly: DE for the cluster and both stores (ADR-028 §4, ADR-036 §6).
 residency: DE
+image:
+  # The package ghcr.io/<owner>/energy-platform is private (the repository is): the author creates
+  # this docker-registry Secret in the namespace from a classic PAT with read:packages only
+  # (`make print-demo-secret-template`; plan P5-D21).
+  pullSecrets: [ghcr-pull]
 postgres:
   mode: statefulset
   storageClassName: local-path          # k3s default provisioner, backed by the Postgres volume
@@ -24,11 +29,11 @@ bronze:
     mode: none                                         # never lifecycle on this gateway (V-12)
   replica:
     enabled: true
-    # OCI S3-compatible endpoint: <namespace>.compat.objectstorage.eu-frankfurt-1.oraclecloud.com
-    # The namespace is `oci os ns get`; set it per deploy (--set bronze.replica.endpoint=…) or
-    # in a values-demo-secret.yaml kept outside the repository. It is not a secret, only a
-    # tenancy identifier the repository does not carry.
-    endpoint: https://REPLACE_OCI_NAMESPACE.compat.objectstorage.eu-frankfurt-1.oraclecloud.com
+    # OCI S3-compatible endpoint https://<namespace>.compat.objectstorage.eu-frankfurt-1.oraclecloud.com.
+    # The namespace (`oci os ns get`) is a tenancy identifier the repository does not carry:
+    # `make deploy-tenant ENV=demo` builds the endpoint from DEMO_OCI_NAMESPACE (a GitHub
+    # repository variable in the deploy workflow). Left empty here, the render fails loudly.
+    endpoint: ""
     bucket: energy-platform-bronze-replica             # roots/hcloud output bucket_b (retention rule, V-13)
     region: eu-frankfurt-1
     schedule: "17 * * * *"
@@ -43,9 +48,13 @@ egress:
   objectStore:
     # Object-store endpoints are public addresses: capture pods reach them through the 443 rule
     # already (public ranges); process/gaps/hook/drill/backup/replicate pods need this explicit
-    # rule. Resolve once and set per deploy (dig +short nbg1.your-objectstorage.com; the OCI
-    # endpoint likewise); a CDN-fronted endpoint needs its published ranges.
-    cidrs: [REPLACE_STORE_A_CIDR, REPLACE_STORE_B_CIDR]
+    # rule (plan P5-D22, provider facts as of 2026-09-23):
+    # - store A: nbg1.your-objectstorage.com resolves to 88.198.120.0, RIPE netblock
+    #   88.198.120.0/25 (maintained by Hetzner, mnt-by HOS-GUN);
+    # - store B: Oracle's public_ip_ranges.json, tag OBJECT_STORAGE, region eu-frankfurt-1
+    #   (https://docs.oracle.com/en-us/iaas/tools/public_ip_ranges.json).
+    # A provider renumbering shows up as failing process/backup Jobs, never as silent loss.
+    cidrs: [88.198.120.0/25, 134.70.40.0/21, 134.70.48.0/22]
     ports: [443]
 smoke:
   manifest: ote_intraday_market/manifest.yaml

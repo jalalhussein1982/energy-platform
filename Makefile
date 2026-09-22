@@ -235,6 +235,10 @@ local-egress-test: ## ADR-026 §4: capture pod reaches 443; metadata/private blo
 ENV ?= demo
 OIDC_KUBECONFIG := /tmp/ep-oidc-kubeconfig
 DEMO_SECRET_KEYS := POSTGRES_PASSWORD BRONZE_ACCESS_KEY_ID BRONZE_SECRET_ACCESS_KEY BRONZE_REPLICA_ACCESS_KEY_ID BRONZE_REPLICA_SECRET_ACCESS_KEY
+# Store B's endpoint for ENV=demo: the OCI tenancy namespace (`oci os ns get`) stays out of the
+# repository and comes from DEMO_OCI_NAMESPACE (a repository variable in CI; plan P5-D22).
+DEMO_OCI_NAMESPACE ?=
+DEMO_OCI_ENDPOINT = https://$(DEMO_OCI_NAMESPACE).compat.objectstorage.eu-frankfurt-1.oraclecloud.com
 
 deploy-tenant: target-values ## helm upgrade --install with tenant values + values-$(ENV).yaml (KUBECONFIG = a namespace-scoped kubeconfig); IMAGE_DIGEST, or IMAGE with a RepoDigest
 	@test -f deployment/tenant/values-$(ENV).yaml || { echo "deploy-tenant: deployment/tenant/values-$(ENV).yaml does not exist"; exit 1; }
@@ -242,18 +246,24 @@ deploy-tenant: target-values ## helm upgrade --install with tenant values + valu
 	  -f deployment/tenant/values-tenant.yaml -f deployment/tenant/values-$(ENV).yaml -f $(TARGET_VALUES) \
 	  --set image.repository=$(IMAGE_REPO) \
 	  --set image.digest=$(or $(IMAGE_DIGEST),$$(make -s image-digest | sed 's/.*@//')) \
+	  $(if $(and $(filter demo,$(ENV)),$(DEMO_OCI_NAMESPACE)),--set bronze.replica.endpoint=$(DEMO_OCI_ENDPOINT)) \
 	  $(HELM_ATOMIC) --timeout $(HELM_TIMEOUT) $(HELM_EXTRA)
 
 kubeconfig-oidc: ## Inside GitHub Actions: kubeconfig from the job's OIDC token + the public cluster CA (no stored credential)
 	scripts/oidc_kube_context.sh $(OIDC_KUBECONFIG)
 
-deploy-demo: kubeconfig-oidc ## OIDC kubeconfig → deploy-tenant ENV=demo (the deploy-demo workflow's only step)
+deploy-demo: ## Inside GitHub Actions: DEMO_OCI_NAMESPACE check → OIDC kubeconfig → deploy-tenant ENV=demo (the deploy-demo workflow's deploy step)
+	@test -n "$(DEMO_OCI_NAMESPACE)" || { echo "deploy-demo: DEMO_OCI_NAMESPACE unset (repository variable: the OCI tenancy namespace, oci os ns get)"; exit 1; }
+	$(MAKE) kubeconfig-oidc
 	$(MAKE) deploy-tenant ENV=demo KUBECONFIG=$(OIDC_KUBECONFIG)
 
 print-demo-secret-template: ## The kubectl command shape for the demo Secret (values come from the Terraform outputs and verify.env, never from the repo)
 	@echo "kubectl -n $(NAMESPACE) create secret generic $(RELEASE) \\"
 	@for k in $(DEMO_SECRET_KEYS); do echo "  --from-literal=$$k=... \\"; done
 	@echo "  --dry-run=client -o yaml | kubectl apply -f -"
+	@echo "# image pull secret for the private ghcr.io package (values-demo.yaml image.pullSecrets; a classic PAT with read:packages only):"
+	@echo "kubectl -n $(NAMESPACE) create secret docker-registry ghcr-pull --docker-server=ghcr.io \\"
+	@echo "  --docker-username=<github user> --docker-password=<PAT> --dry-run=client -o yaml | kubectl apply -f -"
 
 rollback-drill: ## ADR-016 §6 / ADR-025 §5: two failing upgrades (smoke, storage probe) must roll back with schema and production data untouched
 	KIND_CONTEXT=$(KIND_CONTEXT) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) HELM=$(HELM) KUBECTL=$(KUBECTL) deployment/local/drills/rollback.sh

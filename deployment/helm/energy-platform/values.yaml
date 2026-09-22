@@ -9,6 +9,7 @@ image:
   repository: energy-platform            # the platform runtime image (deployment/image/Dockerfile)
   digest: ""                             # REQUIRED: sha256:<64 hex>; every deploy target sets it
   pullPolicy: IfNotPresent
+  pullSecrets: []                        # docker-registry Secret names for a private registry (P5-D21)
 
 # ADR-036 §6 / ADR-028 §4: declared on every workload as a label; CZ for production, DE for the
 # demo, local for kind. REQUIRED so the deviation is visible, never hidden.
