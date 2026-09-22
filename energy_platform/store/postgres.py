@@ -30,6 +30,7 @@ from energy_platform.store.protocol import (
     CommitResult,
     CurrentRow,
     Derivation,
+    Freshness,
     Run,
     RunAttempt,
     RunOrigin,
@@ -621,8 +622,8 @@ class PostgresStore:
         """Empty every table (tests only). Sequences restart."""
         with self._conn.cursor() as cur:
             cur.execute(
-                "TRUNCATE quality_events, observations, run_attempts, runs, derivations "
-                "RESTART IDENTITY CASCADE"
+                "TRUNCATE quality_events, observations, run_attempts, runs, derivations, "
+                "target_freshness RESTART IDENTITY CASCADE"
             )
         self._conn.commit()
 
@@ -634,3 +635,100 @@ class PostgresStore:
         )
         self._conn.rollback()
         return tuple(cast(str, r["table_name"]) for r in rows)
+
+    # ---------------------------------------------------------------- freshness (ADR-037)
+
+    def count_periods(
+        self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
+    ) -> int:
+        row = self._one(
+            """
+            SELECT count(DISTINCT lower(delivery_interval)) AS n FROM observations_current
+            WHERE dataset_id = %s AND lower(delivery_interval) >= %s
+              AND lower(delivery_interval) < %s
+              AND (%s::text IS NULL OR source_transport = %s)
+            """,
+            (dataset_id, start, end, transport, transport),
+        )
+        self._conn.rollback()
+        return int(row["n"]) if row else 0
+
+    def newest_delivery_start(
+        self, dataset_id: str, *, transport: Transport | None = None
+    ) -> datetime | None:
+        row = self._one(
+            """
+            SELECT max(lower(delivery_interval)) AS t FROM observations_current
+            WHERE dataset_id = %s AND (%s::text IS NULL OR source_transport = %s)
+            """,
+            (dataset_id, transport, transport),
+        )
+        self._conn.rollback()
+        value = row["t"] if row else None
+        return cast(datetime | None, value)
+
+    def upsert_freshness(self, row: Freshness) -> None:
+        with self._conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO target_freshness (target_id, computed_at, partition_start,
+                    partition_end, expected_by, status, observed_periods, expected_periods,
+                    newest_delivery_start, last_capture_at, last_capture_outcome,
+                    stale_fetch_streak, source_unavailable, pipeline_failed)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (target_id) DO UPDATE SET
+                    computed_at = EXCLUDED.computed_at,
+                    partition_start = EXCLUDED.partition_start,
+                    partition_end = EXCLUDED.partition_end,
+                    expected_by = EXCLUDED.expected_by,
+                    status = EXCLUDED.status,
+                    observed_periods = EXCLUDED.observed_periods,
+                    expected_periods = EXCLUDED.expected_periods,
+                    newest_delivery_start = EXCLUDED.newest_delivery_start,
+                    last_capture_at = EXCLUDED.last_capture_at,
+                    last_capture_outcome = EXCLUDED.last_capture_outcome,
+                    stale_fetch_streak = EXCLUDED.stale_fetch_streak,
+                    source_unavailable = EXCLUDED.source_unavailable,
+                    pipeline_failed = EXCLUDED.pipeline_failed
+                """,
+                (
+                    row.target_id,
+                    row.computed_at,
+                    row.partition_start,
+                    row.partition_end,
+                    row.expected_by,
+                    row.status,
+                    row.observed_periods,
+                    row.expected_periods,
+                    row.newest_delivery_start,
+                    row.last_capture_at,
+                    row.last_capture_outcome,
+                    row.stale_fetch_streak,
+                    row.source_unavailable,
+                    row.pipeline_failed,
+                ),
+            )
+        self._conn.commit()
+
+    def freshness_rows(self) -> tuple[Freshness, ...]:
+        rows = self._all("SELECT * FROM target_freshness ORDER BY target_id", ())
+        self._conn.rollback()
+        return tuple(
+            Freshness(
+                target_id=r["target_id"],
+                computed_at=r["computed_at"],
+                partition_start=r["partition_start"],
+                partition_end=r["partition_end"],
+                expected_by=r["expected_by"],
+                status=r["status"],
+                observed_periods=r["observed_periods"],
+                expected_periods=r["expected_periods"],
+                newest_delivery_start=r["newest_delivery_start"],
+                last_capture_at=r["last_capture_at"],
+                last_capture_outcome=r["last_capture_outcome"],
+                stale_fetch_streak=r["stale_fetch_streak"],
+                source_unavailable=r["source_unavailable"],
+                pipeline_failed=r["pipeline_failed"],
+            )
+            for r in rows
+        )

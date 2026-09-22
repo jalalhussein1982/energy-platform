@@ -6,11 +6,12 @@ on ``PostgresStore`` when ``make db-test`` provides a server.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from energy_platform.mapping.quality import QualityEvent
-from energy_platform.store import Claim, Store
+from energy_platform.store import Claim, Freshness, Store
 from tests.store.rows import D_A, D_B, FETCH_1, FETCH_2, SHA_1, SHA_2, T0, obs
 
 NOW = datetime(2026, 9, 18, 0, 10, tzinfo=UTC)
@@ -453,3 +454,45 @@ def test_mark_recaptured_lowers_a_processed_run_to_captured(store: Store) -> Non
     assert [r.id for r in store.pending_runs("ote_idm_soap")] == [run_id]
     c = claim(store, run_id, now=NOW + 2 * TTL)
     assert c.attempt.capture_id == "c2"  # the new attempt is what gets processed
+
+
+def test_freshness_row_is_upserted_and_period_helpers_agree(store: Store) -> None:
+    """ADR-037: one row per target; count_periods / newest_delivery_start over the current view."""
+    run_id = captured_run(store)
+    c = claim(store, run_id)
+    store.commit(
+        c,
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(), obs(period=2)],
+        now=NOW,
+    )
+    dataset_id = obs().dataset_id
+    day = T0 - timedelta(days=1)  # rows.DAY is 2026-09-17: period 1 starts 2026-09-16 22:00Z
+    assert store.count_periods(dataset_id, day, T0) == 2
+    assert store.count_periods(dataset_id, day, day + timedelta(minutes=15)) == 1
+    assert store.count_periods(dataset_id, day, T0, transport="xlsx") == 0
+    assert store.newest_delivery_start(dataset_id) == day + timedelta(minutes=15)
+    assert store.newest_delivery_start("nope") is None
+    row = Freshness(
+        target_id="ote_idm_soap",
+        computed_at=NOW,
+        partition_start=T0,
+        partition_end=T0 + timedelta(days=1),
+        expected_by=T0 + timedelta(days=1, minutes=30),
+        status="partial",
+        observed_periods=2,
+        expected_periods=96,
+        newest_delivery_start=day + timedelta(minutes=15),
+        last_capture_at=NOW,
+        last_capture_outcome="ok",
+        stale_fetch_streak=0,
+        source_unavailable=False,
+        pipeline_failed=False,
+    )
+    store.upsert_freshness(row)
+    store.upsert_freshness(replace(row, status="late", computed_at=NOW + TTL))
+    rows = store.freshness_rows()
+    assert len(rows) == 1 and rows[0].status == "late" and rows[0].computed_at == NOW + TTL
+    assert rows[0].age == NOW + TTL - (day + timedelta(minutes=15))

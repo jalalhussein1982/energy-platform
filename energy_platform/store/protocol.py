@@ -31,6 +31,7 @@ RunState = Literal[
 RunOrigin = Literal["scheduled", "reconciled", "backfill", "replay", "manual"]
 AttemptKind = Literal["capture", "process", "backfill", "replay"]
 AttemptOutcome = Literal["ok", "failed", "lost_lease", "quarantined", "noop", "source_unavailable"]
+FreshnessStatus = Literal["pending", "partial", "late", "complete"]
 
 
 class StoreUnavailable(Exception):
@@ -130,6 +131,33 @@ class CurrentRow:
     @property
     def value(self) -> Decimal | None:
         return self.observation.value
+
+
+@dataclass(frozen=True, slots=True)
+class Freshness:
+    """One ``target_freshness`` row (ADR-037): the SLI the exporter reads, rewritten per gap run."""
+
+    target_id: str
+    computed_at: datetime
+    partition_start: datetime
+    partition_end: datetime
+    expected_by: datetime
+    status: FreshnessStatus
+    observed_periods: int
+    expected_periods: int
+    newest_delivery_start: datetime | None
+    last_capture_at: datetime | None
+    last_capture_outcome: str | None
+    stale_fetch_streak: int
+    source_unavailable: bool
+    pipeline_failed: bool
+
+    @property
+    def age(self) -> timedelta | None:
+        """Age of the newest observation at ``computed_at`` (the SLI, ADR-012)."""
+        if self.newest_delivery_start is None:
+            return None
+        return self.computed_at - self.newest_delivery_start
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,3 +292,18 @@ class Store(Protocol):
     def quality_events(
         self, target_id: str | None = None, *, kind: str | None = None
     ) -> tuple[StoredEvent, ...]: ...
+
+    # ---------------------------------------------------------------- freshness (ADR-037)
+    def count_periods(
+        self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
+    ) -> int:
+        """Distinct delivery starts in the current view within ``[start, end)``."""
+        ...
+
+    def newest_delivery_start(
+        self, dataset_id: str, *, transport: Transport | None = None
+    ) -> datetime | None: ...
+
+    def upsert_freshness(self, row: Freshness) -> None: ...
+
+    def freshness_rows(self) -> tuple[Freshness, ...]: ...

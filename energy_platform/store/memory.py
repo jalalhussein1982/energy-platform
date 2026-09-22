@@ -25,6 +25,7 @@ from energy_platform.store.protocol import (
     CommitResult,
     CurrentRow,
     Derivation,
+    Freshness,
     Run,
     RunAttempt,
     RunOrigin,
@@ -43,6 +44,7 @@ class MemoryStore:
         self._derivations: dict[str, Derivation] = {}
         self._rows: dict[int, StoredObservation] = {}
         self._events: dict[int, StoredEvent] = {}
+        self._freshness: dict[str, Freshness] = {}
         self._seq = {"runs": 0, "attempts": 0, "rows": 0, "events": 0}
 
     def _next(self, table: str) -> int:
@@ -373,3 +375,23 @@ class MemoryStore:
             for e in self._events.values()
             if (target_id is None or e.target_id == target_id) and (kind is None or e.kind == kind)
         )
+
+    # ---------------------------------------------------------------- freshness (ADR-037)
+
+    def count_periods(
+        self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
+    ) -> int:
+        rows = self.current_rows(dataset_id, start=start, end=end, transport=transport)
+        return len({r.observation.delivery_start_utc for r in rows})
+
+    def newest_delivery_start(
+        self, dataset_id: str, *, transport: Transport | None = None
+    ) -> datetime | None:
+        rows = self.current_rows(dataset_id, transport=transport)
+        return max((r.observation.delivery_start_utc for r in rows), default=None)
+
+    def upsert_freshness(self, row: Freshness) -> None:
+        self._freshness[row.target_id] = row
+
+    def freshness_rows(self) -> tuple[Freshness, ...]:
+        return tuple(self._freshness[k] for k in sorted(self._freshness))

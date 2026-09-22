@@ -36,6 +36,9 @@ class MetricSpec:
     """Which transport is the system of record when several deliver the metric (01 §3 rules)."""
 
 
+Partition = Literal["day", "hour"]
+
+
 @dataclass(frozen=True, slots=True)
 class DatasetContract:
     dataset_id: str
@@ -50,6 +53,8 @@ class DatasetContract:
     )
     """Constrained free dimensions (e.g. ``aggregation_function`` ∈ {AVG}); the manifest supplies
     one constant value per key."""
+    partition: Partition = "day"
+    """Freshness partition (01 §5, ADR-037): a delivery day, or a delivery hour (ČEPS load)."""
 
     def metric(self, name: str) -> MetricSpec | None:
         return self.metrics.get(name)
@@ -117,6 +122,7 @@ _CEPS_LOAD = DatasetContract(
     # only AVG is live-verified (01 §3 T3); other functions are [UNVERIFIED] and not admitted
     allowed_dimension_values=MappingProxyType({"aggregation_function": ("AVG",)}),
     resolutions=("PT15M",),
+    partition="hour",
     metrics=_metrics(
         MetricSpec(
             "load_incl_pumping", "MW", None, "non_negative_expected", "missing sample", "soap"

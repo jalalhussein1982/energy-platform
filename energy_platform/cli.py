@@ -54,6 +54,7 @@ from energy_platform.runtime import (
     fixture_fetcher_factory,
     process,
     recapture,
+    record_freshness,
     replay_derivation,
     replay_range,
     smoke,
@@ -69,7 +70,7 @@ app = typer.Typer(
     name="energyctl",
     help=(
         "energy-platform command line: validate, capture, recapture, process, replay, gaps, "
-        "smoke, storage-probe, demo; new-target, record-fixture, run-target-tests, "
+        "freshness, smoke, storage-probe, demo; new-target, record-fixture, run-target-tests, "
         "admission-request, pr-bundle, mcp-serve"
     ),
     no_args_is_help=True,
@@ -450,6 +451,9 @@ def backfill_cmd(
 def gaps_cmd(
     manifest: ManifestOpt,
     lookback_hours: Annotated[int, typer.Option("--lookback-hours")] = 48,
+    with_freshness: Annotated[
+        bool, typer.Option("--with-freshness", help="then write the ADR-037 freshness row")
+    ] = False,
     dsn: DsnOpt = None,
     bronze_dir: BronzeOpt = None,
 ) -> None:
@@ -459,6 +463,17 @@ def gaps_cmd(
     )
     for gap in detect_gaps(rt, lookback=timedelta(hours=lookback_hours)):
         _echo(gap)
+    if with_freshness:
+        _echo(record_freshness(rt))
+
+
+@app.command("freshness")
+def freshness_cmd(manifest: ManifestOpt, dsn: DsnOpt = None, bronze_dir: BronzeOpt = None) -> None:
+    """Compute and store the target's freshness row (ADR-037 / ADR-012; 01 §5 states)."""
+    rt = _runtime(
+        _manifest(manifest), _store(dsn, required=True), _bronze(bronze_dir), _live_fetcher
+    )
+    _echo(record_freshness(rt))
 
 
 # ---------------------------------------------------------------------------- harness (Phase 3)

@@ -12,6 +12,7 @@ from energy_platform.runtime.backfill import backfill
 from energy_platform.runtime.capture import CaptureReport, capture
 from energy_platform.runtime.context import Runtime, delivery_day_for
 from energy_platform.runtime.cron import CronExpression, cron_instants
+from energy_platform.runtime.freshness import compute_freshness, partition_bounds, record_freshness
 from energy_platform.runtime.gaps import Gap, detect_gaps, max_age_cutoff
 from energy_platform.runtime.probe import ProbeReport, storage_probe
 from energy_platform.runtime.process import ProcessReport, process, process_one
@@ -31,16 +32,19 @@ __all__ = [
     "SmokeReport",
     "backfill",
     "capture",
+    "compute_freshness",
     "cron_instants",
     "delivery_day_for",
     "detect_gaps",
     "fixture_fetcher_factory",
     "last_run_of_day",
     "max_age_cutoff",
+    "partition_bounds",
     "process",
     "process_one",
     "recapture",
     "reconcile",
+    "record_freshness",
     "replay_derivation",
     "replay_range",
     "smoke",

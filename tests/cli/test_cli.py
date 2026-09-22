@@ -213,3 +213,35 @@ def test_smoke_with_a_dsn_uses_and_drops_a_throwaway_schema(tmp_path: Path) -> N
         assert schemas == []
         public_rows = conn.execute("SELECT count(*) FROM observations").fetchone()
         assert public_rows is not None and public_rows[0] == 0
+
+
+@pytest.mark.db
+def test_gaps_with_freshness_writes_the_sli_row(tmp_path: Path) -> None:
+    dsn = os.environ.get("ENERGY_PLATFORM_TEST_DSN")
+    if not dsn:
+        pytest.skip("ENERGY_PLATFORM_TEST_DSN not set; run `make db-test`")
+    manifest = str(EX / "manifests/ote_idm_soap.yaml")
+    common = ["--dsn", dsn, "--bronze-dir", str(tmp_path)]
+    cap = runner.invoke(
+        app, ["capture", "-m", manifest, "--fixture", str(EX / "fixtures/ote_idm_soap"), *common]
+    )
+    assert cap.exit_code == 0, cap.output
+    assert runner.invoke(app, ["process", "-m", manifest, *common]).exit_code == 0
+    gaps = runner.invoke(app, ["gaps", "-m", manifest, "--with-freshness", *common])
+    assert gaps.exit_code == 0, gaps.output
+    last = json.loads(gaps.stdout.strip().splitlines()[-1])
+    assert last["target_id"] == "ote_idm_soap" and last["expected_periods"] == 96
+    fresh = runner.invoke(app, ["freshness", "-m", manifest, *common])
+    assert fresh.exit_code == 0 and json.loads(fresh.stdout)["status"] in {
+        "complete",
+        "partial",
+        "late",
+        "pending",
+    }
+    store = PostgresStore(dsn)
+    try:
+        rows = store.freshness_rows()
+        assert len(rows) == 1 and rows[0].target_id == "ote_idm_soap"
+    finally:
+        store.truncate_all()
+        store.close()
