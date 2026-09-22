@@ -1,0 +1,6 @@
+# A decimal-comma string where the manifest declares a dot: the whole document is quarantined,
+# nothing is coerced (01 §9). Item 1 carries <Price>124,58</Price>.
+fixture: decimal_comma
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  quarantine: "not a decimal under the dot rule"

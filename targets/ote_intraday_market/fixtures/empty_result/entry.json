@@ -1,0 +1,20 @@
+{
+  "capture_id": "ote_intraday_market:2026-09-20T221500Z:1",
+  "target_id": "ote_intraday_market",
+  "scheduled_for": "2026-09-20T22:15:00Z",
+  "attempt": 1,
+  "fetched_at": "2026-09-20T22:15:00Z",
+  "source_url": "https://www.ote-cr.cz/pw-data/services/PublicDataService",
+  "http_status": 200,
+  "content_type": "text/xml; charset=utf-8",
+  "payload_sha256": "ded53c9971be807c207ddccb82b1e1118aa1d2b53a9e9e6998dabe3d8bd9c5a4",
+  "raw_ref": "bronze/blobs/de/ded53c9971be807c207ddccb82b1e1118aa1d2b53a9e9e6998dabe3d8bd9c5a4",
+  "size": 314,
+  "content_changed": true,
+  "source_transport": "soap",
+  "source_published_at": null,
+  "tier": "hot",
+  "etag": null,
+  "last_modified": null,
+  "hops": []
+}

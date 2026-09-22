@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <GetImPricePeriodEResponse xmlns="http://www.ote-cr.cz/schema/service/public">
+    <Result>
+      <Item>
+        <Date>2026-09-19</Date>
+        <PeriodResolution>PT15M</PeriodResolution>
+        <PeriodIndex>1</PeriodIndex>
+        <Price>124,58</Price>
+        <Volume>101.650</Volume>
+      </Item>
+      <Item>
+        <Date>2026-09-19</Date>
+        <PeriodResolution>PT15M</PeriodResolution>
+        <PeriodIndex>2</PeriodIndex>
+        <Price>116.78</Price>
+        <Volume>91.025</Volume>
+      </Item>
+    </Result>
+    </GetImPricePeriodEResponse>
+  </soapenv:Body>
+</soapenv:Envelope>

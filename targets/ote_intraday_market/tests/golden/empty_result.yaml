@@ -1,0 +1,7 @@
+# Empty <Result/> (a day not yet published): a well-formed document with no observation and no
+# quarantine; zero rows, no event (01 §9; plan P4-D6).
+fixture: empty_result
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 0
+  quality_events: []

@@ -1,0 +1,12 @@
+# Native hourly sample (2024-06-30, before the PT15M switch; docs/06 row 19): 24 items at PT60M.
+# The resolution comes from the document; one hourly price never becomes four quarter-hours (01 §7).
+fixture: hourly_native
+checked_by: "Claude, Phase 4 session 2026-09-20: each value read back from fixtures/<fixture>/blob with grep, UTC instants derived by hand from the Europe/Prague offset; human sign-off pending (Route A review, ADR-022)"
+expect:
+  row_count: 48
+  quality_events: [partition_status]     # "2024-06-30: complete 24/24"
+  rows:
+    - {delivery_start_utc: 2024-06-30T00:00:00+02:00, resolution: PT60M, period_index: 1, metric: price_vwap, value: "117.10"}
+    - {delivery_start_utc: 2024-06-30T00:00:00+02:00, resolution: PT60M, period_index: 1, metric: volume_total, value: "93.125"}
+    - {delivery_start_utc: 2024-06-30T23:00:00+02:00, resolution: PT60M, period_index: 24, metric: price_vwap, value: "188.30"}
+    - {delivery_start_utc: 2024-06-30T23:00:00+02:00, resolution: PT60M, period_index: 24, metric: volume_total, value: "52.000"}

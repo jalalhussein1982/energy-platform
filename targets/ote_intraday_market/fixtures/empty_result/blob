@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <GetImPricePeriodEResponse xmlns="http://www.ote-cr.cz/schema/service/public">
+    <Result>
+    </Result>
+    </GetImPricePeriodEResponse>
+  </soapenv:Body>
+</soapenv:Envelope>
