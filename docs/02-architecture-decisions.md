@@ -160,7 +160,7 @@ Blob store and capture log are separate: an unchanged page produces a new captur
 | Asset | Protection |
 |---|---|
 | Bronze | immutable/versioned + independent replication |
-| PostgreSQL | WAL-G/pgBackRest + PITR |
+| PostgreSQL | base backup + WAL archive shipped by `rclone` (`statefulset`), CNPG Barman (`cnpg`), provider PITR (`external`); drilled *(2026-09-22, ADR-036; was "WAL-G/pgBackRest + PITR")* |
 | Gold / Parquet | rebuild from Silver |
 | Git / configuration | Git remote |
 | Secrets | external secret management; never in backups in plaintext |
@@ -374,7 +374,7 @@ Direction fixed:
 
 ---
 
-### ADR-012 — Availability as freshness *(locked in principle, unwritten)*
+### ADR-012 — Availability as freshness *(locked in principle; written 2026-09-22 as `docs/adr/ADR-037-freshness-sli.md`)*
 
 Direction fixed:
 - SLI = age of the newest observation per target relative to its **expected publication** (01 §5 freshness contract: `pending` / `partial` / `late` / `complete`, and `stale fetch` for an unchanged 200).
@@ -428,6 +428,11 @@ Direction fixed: declarative, versioned JSON Schema, one file per target, mandat
 | ADR-030-postgres-engine-plain | D-2 engine: plain PostgreSQL ≥ 16 | ACCEPTED *(2026-09-20)* |
 | ADR-031-gap-detector-defaults | D-4 | ACCEPTED *(2026-09-20)* |
 | ADR-032-object-store-client | Bronze S3 client (amends ADR-019, ADR-027 §3) | ACCEPTED *(2026-09-20, Option B: SigV4 over httpx in `fetch/`)* |
+| ADR-033-polling-cadence-and-correction-window | D-5 | ACCEPTED *(2026-09-20)* |
+| ADR-034-mapping-ignore-fields | `mapping.ignore_fields` (04 §5 question) | ACCEPTED *(2026-09-20)* |
+| ADR-035-own-cluster-stack | D-1 stack details; amends ADR-028 §2 (API port) | ACCEPTED *(2026-09-22)* |
+| ADR-036-object-stores-and-backups-per-profile | D-3; amends ADR-002 backup tooling; refines ADR-021 §1, ADR-028 §3 | ACCEPTED *(2026-09-22)* |
+| ADR-037-freshness-sli | writes ADR-012; D-6 mechanics | ACCEPTED *(2026-09-22)* |
 
 ---
 
@@ -461,9 +466,9 @@ Harness before code. Step 4 is the harness's own first test.
 
 | ID | Item | Options | Default |
 |---|---|---|---|
-| D-1 | Kubernetes bootstrap on an IaaS | Magnum vs Terraform VMs + cloud-init k3s/RKE2 | VMs + cloud-init k3s/RKE2 (Magnum not universal) *(2026-09-19, ADR-028: two Terraform roots over shared modules — `openstack` reference, `terraform test` with mocks; `hcloud` demo, applied by the author, never by the agent)* |
+| D-1 | Kubernetes bootstrap on an IaaS | Magnum vs Terraform VMs + cloud-init k3s/RKE2 | VMs + cloud-init k3s/RKE2 (Magnum not universal) *(2026-09-19, ADR-028: two Terraform roots over shared modules — `openstack` reference, `terraform test` with mocks; `hcloud` demo, applied by the author, never by the agent)* *(2026-09-22: stack details resolved by ADR-035 — k3s pinned, four modules, structured authentication, `cx23`)* |
 | D-2 | Postgres as a **DSN contract** (changed 2026-09-19, `00` §6; was "engine and HA") | chart takes a DSN; profiles provide Postgres via `postgres.mode` = `statefulset` \| `cnpg` \| `external`; engine (plain vs TimescaleDB) still open | `statefulset` for local/tenant, `cnpg` for own-cluster (and for tenant where the operator pre-exists, `00` V-10), `external` for managed; engine decided by ADR before the Phase 2 schema *(2026-09-20: resolved by ADR-030 — plain PostgreSQL ≥ 16, no extension)* |
-| D-3 | Object storage per profile | MinIO local; Ceph RGW / Swift on OpenStack; what is the "independent copy" in each profile | MinIO (2 instances local); RGW + Swift on the reference environment (V-6); **demo: A = Hetzner Object Storage, B = OCI Object Storage via the S3-compatible endpoint with a retention rule** (ADR-028, V-12/V-13) |
+| D-3 | Object storage per profile | MinIO local; Ceph RGW / Swift on OpenStack; what is the "independent copy" in each profile | MinIO (2 instances local); RGW + Swift on the reference environment (V-6); **demo: A = Hetzner Object Storage, B = OCI Object Storage via the S3-compatible endpoint with a retention rule** (ADR-028, V-12/V-13) *(2026-09-22: resolved by ADR-036 — per-profile table, `rclone copy --immutable` replication, backups per `postgres.mode`)* |
 | D-4 | Gap detector internals | expected-interval calendars per target; tolerance windows; where it runs | `CronJob` every cadence; tolerance = 2× cadence; emits `missing_capture` vs `unprocessed_capture` (ADR-024) *(2026-09-19: "CronWorkflow" was residual Argo wording)* *(2026-09-20: resolved by ADR-031)* |
 | D-5 | Polling cadence and politeness | per-target intervals; jitter; backoff caps; conditional requests (ETag/If-Modified-Since) | intervals from 01 §5 (T1/T2: 15 min during the delivery day, hourly for D-1..D-3; T3: 15 min; E1: hourly from 12:00 CET on D-1); jitter ±10%; capped exponential backoff; conditional where supported; one-week observation campaign before any latency is quoted *(2026-09-19: "5 min OTE IM" replaced by the 01 v1.0 values)* |
 | D-6 | Observability stack (changed 2026-09-19, `00` §6) | metrics exposure: `/metrics` + annotations vs `PodMonitor`; stack in local profile | **annotations by default; `PodMonitor` behind `metrics.operator.enabled`** (core chart needs no CRD); full stack only in `own-cluster`, minimal in local |
