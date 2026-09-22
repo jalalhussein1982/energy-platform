@@ -21,7 +21,7 @@ IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
         harness-check pr-surface live-smoke image image-digest target-values \
         local-cluster local-registry local-cni local-image local-secrets deploy-local local-egress-test terraform-plan-hcloud \
-        deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template
+        deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template rollback-drill ci-kind-tools
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -239,11 +239,39 @@ print-demo-secret-template: ## The kubectl command shape for the demo Secret (va
 	@for k in $(DEMO_SECRET_KEYS); do echo "  --from-literal=$$k=... \\"; done
 	@echo "  --dry-run=client -o yaml | kubectl apply -f -"
 
+rollback-drill: ## ADR-016 §6 / ADR-025 §5: two failing upgrades (smoke, storage probe) must roll back with schema and production data untouched
+	KIND_CONTEXT=$(KIND_CONTEXT) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) HELM=$(HELM) KUBECTL=$(KUBECTL) deployment/local/drills/rollback.sh
+
+KIND_VERSION ?= v0.33.0
+HELM_VERSION ?= v4.3.0
+ci-kind-tools: ## CI only: install kind and helm at pinned versions (the runner has docker and kubectl)
+	curl -fsSLo /tmp/kind https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-linux-amd64 && chmod +x /tmp/kind && sudo mv /tmp/kind /usr/local/bin/kind
+	curl -fsSL https://get.helm.sh/helm-$(HELM_VERSION)-linux-amd64.tar.gz | tar -xzO linux-amd64/helm > /tmp/helm && chmod +x /tmp/helm && sudo mv /tmp/helm /usr/local/bin/helm
+	kind version && helm version --short
+
 local-down: ## Tear the kind cluster down
 	$(KIND) delete cluster --name $(KIND_NAME)
 
-smoke-test: ## One capture+process on a fixture target, freshness metric present, restore-drill dry-run
-	@echo "smoke-test: not implemented until Task 5.13"; exit 1
+smoke-test: ## helm test (the smoke hook again) → freshness metric present → restore-drill dry run as a one-off Job
+	$(HELM_KIND) test $(RELEASE) -n $(NAMESPACE) --logs --timeout 10m
+	@$(KUBE) -n $(NAMESPACE) port-forward svc/$(RELEASE)-metrics 19187:9187 >/dev/null 2>&1 & pf=$$!; sleep 3; \
+	  metrics="$$(curl -s --max-time 10 http://127.0.0.1:19187/metrics)"; kill $$pf 2>/dev/null; wait $$pf 2>/dev/null; \
+	  echo "$$metrics" | grep -E '^energy_platform_freshness_age_seconds\{.*target="ote_intraday_market"' \
+	    || { echo "smoke-test: FAIL — no freshness metric for ote_intraday_market (is the gaps CronJob running?)"; exit 1; }; \
+	  echo "smoke-test: freshness metric present"
+	$(KUBE) -n $(NAMESPACE) delete job restore-drill-dry-run --ignore-not-found >/dev/null
+	$(KUBE) -n $(NAMESPACE) create job restore-drill-dry-run --from=cronjob/$(RELEASE)-restore-drill --dry-run=client -o json \
+	  | python3 -c 'import json,sys; j=json.load(sys.stdin); c=j["spec"]["template"]["spec"]["containers"][0]; c["env"]=[{"name":"RESTORE_DRILL_ARGS","value":"--dry-run"} if e["name"]=="RESTORE_DRILL_ARGS" else e for e in c["env"]]; print(json.dumps(j))' \
+	  | $(KUBE) -n $(NAMESPACE) apply -f - >/dev/null
+	@for i in $$(seq 1 120); do \
+	  state="$$($(KUBE) -n $(NAMESPACE) get job restore-drill-dry-run -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{end}' 2>/dev/null)"; \
+	  case "$$state" in \
+	    *Complete*) break;; \
+	    *Failed*) $(KUBE) -n $(NAMESPACE) logs job/restore-drill-dry-run -c drill | tail -20; echo "smoke-test: FAIL — restore-drill dry run"; exit 1;; \
+	  esac; sleep 5; \
+	done; test -n "$$state" || { echo "smoke-test: FAIL — restore-drill dry run did not finish in 10 min"; exit 1; }
+	$(KUBE) -n $(NAMESPACE) logs job/restore-drill-dry-run -c drill | tail -4
+	@echo "smoke-test: OK (smoke hook, freshness metric, restore-drill dry run)"
 
 demo: sync ## fixture → capture → Bronze → parse → map → Postgres → query, offline (ephemeral PostgreSQL unless ENERGY_PLATFORM_DSN is set)
 	scripts/with_postgres.sh $(RUN) python -m energy_platform.cli demo

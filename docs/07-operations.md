@@ -143,3 +143,27 @@ one-week campaign (06 §6) will show, and the alert's `for: 30m` is the slack un
 RTO figures measured on kind, 05:50 run: fetch from B 12 s, recovery to end of archive < 1 s
 after start-up, `energyctl restore-drill` 7 s for four targets (≈ 1,800 Silver versions). The
 demo cluster's cross-provider numbers are what its own drill CronJob will record.
+
+## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
+
+`make rollback-drill` on kind, 2026-09-22 06:02–06:04 (`deployment/local/drills/rollback.sh`;
+the platform's CronJobs are suspended for the drill and resumed by a trap):
+
+```text
+baseline: fixture=<default> tiering=none schema=0003_freshness runs=615 observations=3330 cronjobs=20
+attempt failing-smoke (--set smoke.fixture=ceps_load/fixtures/ordinary_day)
+  helm: post-upgrade hooks failed: Job energy-platform-smoke … Failed → rolled back (--rollback-on-failure)
+  PASS release deployed · smoke.fixture restored · tiering.mode restored · schema 0003_freshness unchanged
+  PASS runs 615 unchanged · observations 3330 unchanged · CronJobs 20 · no smoke_* schema left behind
+attempt failing-storage-probe (--set bronze.tiering.mode=lifecycle --set bronze.tiering.storageClass=COLD)
+  helm: post-upgrade hooks failed: Job energy-platform-storage-probe … Failed → rolled back
+  PASS the same nine assertions
+rollback-drill: PASS
+```
+
+Each failed attempt is one Helm revision marked `failed` followed by a `Rollback to N`
+revision: the release never spent a second on the bad values. ADR-025 §5's "captures of the
+failed attempt present and reconciled" is asserted as "production ledger and Bronze untouched"
+because the smoke never writes production Bronze (P5-D5). `.github/workflows/weekly-drills.yml`
+runs the same drill on a kind cluster in CI every Monday (`make ci-kind-tools` installs pinned
+kind and Helm on the runner).

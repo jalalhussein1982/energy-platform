@@ -221,9 +221,9 @@ docs/07-operations.md                         # deploy, drills, restore, rollbac
 
 **Files:** `deployment/local/drills/rollback.sh`, `Makefile` (`rollback-drill`), `.github/workflows/weekly-drills.yml` (`schedule` weekly + `workflow_dispatch`; steps `make ci-bootstrap`, `make local-up`, `make rollback-drill`, `make local-down`), `tests/harness/test_ci_wrappers.py` (the drills workflow is schedule/dispatch only), `docs/07-operations.md` §6.
 
-- [ ] `rollback.sh` per P5-D13: records `helm history` revision N, `alembic current` (via `energyctl migrate --current`), capture-log entry count; runs N+1 with the wrong fixture, expects `helm upgrade` to exit non-zero, asserts revision N is `deployed` and N+1 `failed`, schema revision unchanged, capture-log count grew by one (the failed smoke's capture) and `energyctl gaps` reconciles it (ledger row exists with `origin=reconciled`); then N+1 with `bronze.tiering.mode=lifecycle`, `storageClass=COLD` → the probe hook fails → same assertions. Every assertion prints `PASS`/`FAIL` and the script exits 1 on any FAIL.
-- [ ] Run on kind; paste the transcript summary into `docs/07-operations.md`.
-- [ ] Commit `feat(drills): rollback drill under --atomic with a failing smoke and a failing storage probe; weekly drills workflow (ADR-016 §6, ADR-025 §5)`.
+- [x] `rollback.sh` per P5-D13: records `helm history` revision N, `alembic current` (via `energyctl migrate --current`), capture-log entry count; runs N+1 with the wrong fixture, expects `helm upgrade` to exit non-zero, asserts revision N is `deployed` and N+1 `failed`, schema revision unchanged, capture-log count grew by one (the failed smoke's capture) and `energyctl gaps` reconciles it (ledger row exists with `origin=reconciled`); then N+1 with `bronze.tiering.mode=lifecycle`, `storageClass=COLD` → the probe hook fails → same assertions. Every assertion prints `PASS`/`FAIL` and the script exits 1 on any FAIL.
+- [x] Run on kind; paste the transcript summary into `docs/07-operations.md`.
+- [x] Commit `feat(drills): rollback drill under --atomic with a failing smoke and a failing storage probe; weekly drills workflow (ADR-016 §6, ADR-025 §5)`.
 
 ### Task 5.12 — Observability: exporter, alert rules, dashboard
 
