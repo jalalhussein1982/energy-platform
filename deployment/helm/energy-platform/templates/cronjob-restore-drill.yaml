@@ -17,8 +17,8 @@ restored is a hypothesis. Every run:
 */ -}}
 {{- if .Values.drills.restore.enabled }}
 {{- $fullname := include "energy-platform.fullname" . -}}
-{{- $fetch := printf "LATEST=$(rclone lsf B:%s/%s/base/ --dirs-only 2>/dev/null | sort | tail -1)\ntest -n \"$LATEST\" || { echo \"restore-drill: no base backup under B:%s/%s/base/ yet\"; exit 1; }\nrclone copy \"B:%s/%s/base/$LATEST\" /restore/base --stats-one-line -v\nrclone copy B:%s/%s/wal /restore/wal --stats-one-line -v\necho \"restore-drill: fetched base $LATEST and $(ls /restore/wal | wc -l) WAL files from store B\"" .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix -}}
-{{- $fetchEnv := include "energy-platform.rcloneEnv" (dict "root" . "alias" "B" "store" .Values.bronze.replica "secret" "BRONZE_REPLICA") -}}
+{{- $fetch := printf "LATEST=$(rclone lsf B:%s/%s/base/ --dirs-only 2>/dev/null | sort | tail -1)\nif [ -z \"$LATEST\" ]; then\n  case \" $RESTORE_DRILL_ARGS \" in *\" --dry-run \"*) echo \"restore-drill: dry run — no base backup under B:%s/%s/base/ yet; the scratch cluster will start empty\"; exit 0;; esac\n  echo \"restore-drill: no base backup under B:%s/%s/base/ yet\"; exit 1\nfi\nrclone copy \"B:%s/%s/base/$LATEST\" /restore/base --stats-one-line -v\nrclone copy B:%s/%s/wal /restore/wal --stats-one-line -v\necho \"restore-drill: fetched base $LATEST and $(ls /restore/wal | wc -l) WAL files from store B\"" .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix .Values.bronze.replica.bucket .Values.bronze.backupPrefix -}}
+{{- $fetchEnv := printf "%s\n- name: RESTORE_DRILL_ARGS\n  value: \"\"" (include "energy-platform.rcloneEnv" (dict "root" . "alias" "B" "store" .Values.bronze.replica "secret" "BRONZE_REPLICA")) -}}
 {{- $fetchMounts := list (dict "name" "restore" "mountPath" "/restore") -}}
 {{- $fetchContainer := include "energy-platform.rcloneContainer" (dict "root" . "name" "fetch" "script" $fetch "env" $fetchEnv "mounts" $fetchMounts) -}}
 {{- $replicaEnv := include "energy-platform.s3Env" (dict "root" . "prefix" "ENERGY_PLATFORM_S3_REPLICA" "secret" "BRONZE_REPLICA" "store" .Values.bronze.replica) -}}
@@ -58,6 +58,15 @@ spec:
               command: ["/bin/sh", "-ec"]
               args:
                 - |
+                  if [ ! -f /restore/base/base.tar.gz ]; then
+                    # dry run on a cluster with no backup yet: an empty scratch cluster so the
+                    # drill verb can still reach a server (the fetch step said why)
+                    initdb -U {{ .Values.postgres.user }} --auth=trust -D /restore/pgdata >/dev/null
+                    printf "listen_addresses = '127.0.0.1'\nunix_socket_directories = '/var/run/postgresql'\n" >> /restore/pgdata/postgresql.auto.conf
+                    printf 'local all all trust\nhost all all 127.0.0.1/32 trust\n' > /restore/pgdata/pg_hba.conf
+                    echo "restore-drill: empty scratch cluster initialised (nothing to restore yet)"
+                    exit 0
+                  fi
                   mkdir -p /restore/pgdata /restore/pgdata/pg_wal
                   tar -xzf /restore/base/base.tar.gz -C /restore/pgdata
                   tar -xzf /restore/base/pg_wal.tar.gz -C /restore/pgdata/pg_wal
@@ -111,7 +120,8 @@ spec:
               command: ["/bin/sh", "-ec"]
               args:
                 - |
-                  SCRATCH="postgresql://{{ .Values.postgres.user }}:$POSTGRES_PASSWORD@127.0.0.1:5432/{{ .Values.postgres.database }}"
+                  DB={{ .Values.postgres.database }}; case " $RESTORE_DRILL_ARGS " in *" --dry-run "*) [ -d /restore/base ] && [ -f /restore/base/base.tar.gz ] || DB=postgres;; esac
+                  SCRATCH="postgresql://{{ .Values.postgres.user }}:$POSTGRES_PASSWORD@127.0.0.1:5432/$DB"
                   echo "== restore-drill: against the RESTORED database (backups)"
                   /app/.venv/bin/python -m energy_platform.cli restore-drill --scratch-dsn "$SCRATCH" $RESTORE_DRILL_ARGS
                   echo "== restore-drill: Bronze-only rebuild into a fresh schema (ADR-024 §2)"
@@ -128,6 +138,9 @@ spec:
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
+                - name: restore
+                  mountPath: /restore
+                  readOnly: true
           volumes:
             - name: restore
               emptyDir: {}

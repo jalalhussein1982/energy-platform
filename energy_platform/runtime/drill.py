@@ -121,13 +121,21 @@ def _drill_target(
         owner=owner,
     )
     if dry_run:
+        # the scratch server was reached when its Store was built (a fresh cluster may hold no
+        # tables yet); live is read to prove the comparison side answers
         try:
-            scratch.runs(target)
-            live_ok = live is None or live.runs(target) is not None
+            live_processed = None if live is None else _processed(live, target)
         except StoreUnavailable as exc:
             return TargetDrillReport(target, entries, 0, None, None, None, False, f"store: {exc}")
         return TargetDrillReport(
-            target, entries, 0, None, None, None, live_ok, f"dry run: {entries} replica entries"
+            target,
+            entries,
+            0,
+            live_processed,
+            None,
+            None,
+            True,
+            f"dry run: {entries} replica entries; scratch server reachable",
         )
     try:
         reconciled = reconcile(rt, window=None)

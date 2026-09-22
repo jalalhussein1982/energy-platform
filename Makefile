@@ -266,7 +266,7 @@ smoke-test: ## helm test (the smoke hook again) → one gaps+freshness run → f
 	  echo "smoke-test: freshness metric present"
 	$(KUBE) -n $(NAMESPACE) delete job restore-drill-dry-run --ignore-not-found >/dev/null
 	$(KUBE) -n $(NAMESPACE) create job restore-drill-dry-run --from=cronjob/$(RELEASE)-restore-drill --dry-run=client -o json \
-	  | python3 -c 'import json,sys; j=json.load(sys.stdin); c=j["spec"]["template"]["spec"]["containers"][0]; c["env"]=[{"name":"RESTORE_DRILL_ARGS","value":"--dry-run"} if e["name"]=="RESTORE_DRILL_ARGS" else e for e in c["env"]]; print(json.dumps(j))' \
+	  | python3 -c 'import json,sys; j=json.load(sys.stdin); s=j["spec"]["template"]["spec"]; [c.__setitem__("env",[{"name":"RESTORE_DRILL_ARGS","value":"--dry-run"} if e["name"]=="RESTORE_DRILL_ARGS" else e for e in c.get("env",[])]) for c in s["containers"]+s.get("initContainers",[])]; print(json.dumps(j))' \
 	  | $(KUBE) -n $(NAMESPACE) apply -f - >/dev/null
 	@for i in $$(seq 1 120); do \
 	  state="$$($(KUBE) -n $(NAMESPACE) get job restore-drill-dry-run -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{end}' 2>/dev/null)"; \

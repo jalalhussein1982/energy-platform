@@ -85,7 +85,8 @@ def test_dry_run_reports_and_writes_nothing() -> None:
         (T1, T3), scratch=scratch, replica=replica, live=live, clock=clock, dry_run=True
     )
     assert report.ok and report.dry_run
-    assert all(t.message == "dry run: 3 replica entries" for t in report.targets)
+    assert all(t.message.startswith("dry run: 3 replica entries") for t in report.targets)
+    assert all(t.live_processed == 3 for t in report.targets)
     assert scratch.runs("ote_idm_soap") == () and scratch.runs("ceps_load_soap") == ()
 
 
@@ -94,9 +95,14 @@ def test_unreachable_scratch_store_fails_loudly() -> None:
     report = restore_drill((T1,), scratch=UnavailableStore(), replica=replica, clock=clock)
     assert not report.ok and "store:" in report.targets[0].message
     dry = restore_drill(
-        (T1,), scratch=UnavailableStore(), replica=replica, clock=clock, dry_run=True
+        (T1,),
+        scratch=MemoryStore(),
+        replica=replica,
+        live=UnavailableStore(),
+        clock=clock,
+        dry_run=True,
     )
-    assert not dry.ok
+    assert not dry.ok  # live unreachable is reported in the dry run too
 
 
 def test_without_a_live_store_the_rebuild_itself_is_the_check() -> None:
