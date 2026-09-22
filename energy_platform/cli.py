@@ -14,7 +14,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import random
+import secrets
 import tempfile
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
@@ -26,6 +30,7 @@ import typer
 from pydantic import ValidationError
 
 from energy_platform.bronze import Bronze, FileBlobStore, FileCaptureLog, load_fixture
+from energy_platform.bronze.config import BronzeConfigError, bronze_from_env, object_store_from_env
 from energy_platform.contracts.manifest import (
     Manifest,
     ManifestSyntaxError,
@@ -33,7 +38,7 @@ from energy_platform.contracts.manifest import (
     load_manifest,
     validate_manifest,
 )
-from energy_platform.fetch import EnvSecretResolver, Fetcher, FixtureTransport
+from energy_platform.fetch import EnvSecretResolver, Fetcher, ObjectStoreError
 from energy_platform.harness.admission import write_request
 from energy_platform.harness.fixtures import FixtureError, record_from_file, record_live
 from energy_platform.harness.pr import BundleRefused, prepare_bundle
@@ -46,20 +51,26 @@ from energy_platform.runtime import (
     backfill,
     capture,
     detect_gaps,
+    fixture_fetcher_factory,
     process,
+    recapture,
     replay_derivation,
     replay_range,
+    smoke,
+    storage_probe,
 )
 from energy_platform.silver import downgrade, upgrade
-from energy_platform.store import Store, StoreUnavailable
+from energy_platform.silver.migrate import create_schema, drop_schema
+from energy_platform.store import MemoryStore, Store, StoreUnavailable
 from energy_platform.store.postgres import PostgresStore
 from energy_platform.store.unavailable import UnavailableStore
 
 app = typer.Typer(
     name="energyctl",
     help=(
-        "energy-platform command line: validate, capture, process, replay, gaps, demo; "
-        "new-target, record-fixture, run-target-tests, admission-request, pr-bundle, mcp-serve"
+        "energy-platform command line: validate, capture, recapture, process, replay, gaps, "
+        "smoke, storage-probe, demo; new-target, record-fixture, run-target-tests, "
+        "admission-request, pr-bundle, mcp-serve"
     ),
     no_args_is_help=True,
     pretty_exceptions_enable=False,
@@ -80,7 +91,15 @@ BronzeOpt = Annotated[
     typer.Option(
         "--bronze-dir",
         envvar="ENERGY_PLATFORM_BRONZE_DIR",
-        help="Bronze directory (blobs + capture log)",
+        help="Bronze directory (blobs + capture log); ENERGY_PLATFORM_BRONZE=s3 selects S3",
+    ),
+]
+JitterOpt = Annotated[
+    float,
+    typer.Option(
+        "--start-jitter-seconds",
+        min=0.0,
+        help="sleep a uniform random 0..N s before fetching (D-5 start jitter; a chart value)",
     ),
 ]
 
@@ -145,26 +164,26 @@ def _store(dsn: str | None, *, required: bool) -> Store:
 
 
 def _bronze(bronze_dir: Path | None) -> Bronze:
-    root = bronze_dir or Path(".bronze")
-    return Bronze(FileBlobStore(root), FileCaptureLog(root))
+    """``--bronze-dir`` wins; otherwise the environment decides (P5-D4: ``dir`` or ``s3``)."""
+    if bronze_dir is not None:
+        return Bronze(FileBlobStore(bronze_dir), FileCaptureLog(bronze_dir))
+    try:
+        return bronze_from_env(os.environ)
+    except (BronzeConfigError, ObjectStoreError) as exc:
+        typer.echo(f"bronze: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
 
 
 def _live_fetcher(manifest: Manifest) -> Fetcher:
     return Fetcher(allowed_hosts=manifest.allowed_hosts, allow_insecure=manifest.allow_insecure)
 
 
-def _fixture_factory(payload: bytes, content_type: str | None = None) -> Any:
-    def factory(manifest: Manifest) -> Fetcher:
-        return Fetcher(
-            allowed_hosts=manifest.allowed_hosts,
-            allow_insecure=manifest.allow_insecure,
-            transport=FixtureTransport(
-                payload, content_type=content_type or "application/octet-stream"
-            ),
-            offline=True,
-        )
+_fixture_factory = fixture_fetcher_factory
 
-    return factory
+
+def _jitter(seconds: float) -> None:
+    if seconds > 0:
+        time.sleep(random.SystemRandom().uniform(0.0, seconds))
 
 
 def _runtime(manifest: Manifest, store: Store, bronze: Bronze, fetcher_factory: Any) -> Runtime:
@@ -258,6 +277,7 @@ def capture_cmd(
     ] = None,
     live: Annotated[bool, typer.Option("--live", help="fetch from the source (opt-in)")] = False,
     force: Annotated[bool, typer.Option("--force", help="capture again (new attempt)")] = False,
+    start_jitter: JitterOpt = 0.0,
     dsn: DsnOpt = None,
     bronze_dir: BronzeOpt = None,
 ) -> None:
@@ -269,14 +289,106 @@ def capture_cmd(
     if fixture is not None:
         entry, payload = load_fixture(fixture)
         when = _instant(scheduled_for) if scheduled_for else entry.scheduled_for
-        factory = _fixture_factory(payload, entry.content_type)
+        factory: Any = _fixture_factory(payload, entry.content_type)
     else:
         when = _instant(scheduled_for) if scheduled_for else datetime.now(UTC)
         factory = _live_fetcher
     rt = _runtime(m, _store(dsn, required=False), _bronze(bronze_dir), factory)
+    _jitter(start_jitter)
     report = capture(rt, when, force=force)
     _echo(report)
     raise typer.Exit(code=0 if report.outcome in {"ok", "noop"} else 1)
+
+
+@app.command("recapture")
+def recapture_cmd(
+    manifest: ManifestOpt,
+    days: Annotated[
+        int, typer.Option("--days", min=1, help="re-capture the last run of D-1 … D-N (ADR-033)")
+    ],
+    live: Annotated[bool, typer.Option("--live", help="fetch from the source (opt-in)")] = False,
+    start_jitter: JitterOpt = 0.0,
+    dsn: DsnOpt = None,
+    bronze_dir: BronzeOpt = None,
+) -> None:
+    """Correction re-poll (ADR-033 §3): a forced new attempt on each past day's last run; only a
+    changed payload makes the run pending again. Live by definition, so --live is required."""
+    if not live:
+        typer.echo("recapture fetches from the source: pass --live (05 C-50)", err=True)
+        raise typer.Exit(code=1)
+    rt = _runtime(
+        _manifest(manifest), _store(dsn, required=False), _bronze(bronze_dir), _live_fetcher
+    )
+    _jitter(start_jitter)
+    failed = False
+    for report in recapture(rt, days=days):
+        _echo(report)
+        if report.capture is not None and report.capture.outcome not in {"ok", "noop"}:
+            failed = True
+    raise typer.Exit(code=1 if failed else 0)
+
+
+@app.command("smoke")
+def smoke_cmd(
+    manifest: ManifestOpt,
+    fixture: Annotated[Path, typer.Option("--fixture", help="Bronze fixture dir to run")],
+    dsn: DsnOpt = None,
+    bronze_dir: BronzeOpt = None,
+) -> None:
+    """ADR-025 upgrade gate: one fixture capture+process against this image, in a throwaway
+    Postgres schema (or in memory without a DSN) and a throwaway Bronze; never production data."""
+    m = _manifest(manifest)
+    store: Store
+    schema: str | None = None
+    if dsn is None:
+        typer.echo("smoke: no ENERGY_PLATFORM_DSN — pipeline only, in memory", err=True)
+        store = MemoryStore()
+    else:
+        schema = f"smoke_{secrets.token_hex(4)}"
+        try:
+            create_schema(dsn, schema)
+            upgrade(dsn, schema=schema)
+            store = PostgresStore(dsn, schema=schema)
+        except (StoreUnavailable, OSError, RuntimeError) as exc:
+            typer.echo(f"smoke: cannot prepare schema {schema}: {exc}", err=True)
+            drop_schema(dsn, schema)
+            raise typer.Exit(code=1) from exc
+    try:
+        with _demo_bronze(bronze_dir) as bronze:
+            report = smoke(m, fixture, store=store, bronze=bronze)
+    finally:
+        if isinstance(store, PostgresStore):
+            store.close()
+        if dsn is not None and schema is not None:
+            drop_schema(dsn, schema)
+    _echo(report)
+    raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command("storage-probe")
+def storage_probe_cmd(
+    storage_class: Annotated[
+        str | None,
+        typer.Option(
+            "--storage-class",
+            envvar="ENERGY_PLATFORM_S3_STORAGE_CLASS",
+            help="the class bronze.tiering.lifecycle would transition to",
+        ),
+    ] = None,
+) -> None:
+    """ADR-021 §3: PUT one object with the class and HEAD it back; exit 1 unless the gateway
+    reports exactly that class. Store from the ENERGY_PLATFORM_S3_* environment (P5-D4)."""
+    if not storage_class:
+        typer.echo("storage-probe: --storage-class or ENERGY_PLATFORM_S3_STORAGE_CLASS", err=True)
+        raise typer.Exit(code=1)
+    try:
+        store = object_store_from_env(os.environ)
+    except (BronzeConfigError, ObjectStoreError) as exc:
+        typer.echo(f"storage-probe: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    report = storage_probe(store, storage_class)
+    _echo(report)
+    raise typer.Exit(code=0 if report.ok else 1)
 
 
 @app.command("process")

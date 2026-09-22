@@ -37,6 +37,7 @@ class StoredObject:
     content_type: str
     lock_mode: str | None = None
     retain_until: str | None = None
+    storage_class: str | None = None
 
     @property
     def etag(self) -> str:
@@ -55,6 +56,9 @@ class FakeS3:
     requests: list[Request] = field(default_factory=list)
     faults: list[int | None] = field(default_factory=list)
     """Consumed first: an HTTP status to answer with, or ``None`` for a connection error."""
+    storage_classes: frozenset[str] = frozenset({"STANDARD"})
+    """Classes the gateway implements. Any other ``x-amz-storage-class`` on a PUT answers
+    ``400 InvalidArgument`` with an **empty** ``<Message>``, as Ceph RGW does (V-6, V-12)."""
 
     def transport(self) -> Transport:
         return mock_transport(self.handle)
@@ -116,11 +120,15 @@ class FakeS3:
         retain_until = request.headers.get("x-amz-object-lock-retain-until-date")
         if (lock_mode or retain_until) and "content-md5" not in request.headers:
             return _error(400, "InvalidRequest", "Content-MD5 is required with Object Lock")
+        storage_class = request.headers.get("x-amz-storage-class")
+        if storage_class is not None and storage_class not in self.storage_classes:
+            return _error(400, "InvalidArgument", "")
         obj = StoredObject(
             body=bytes(request.content),
             content_type=request.headers.get("content-type", "binary/octet-stream"),
             lock_mode=lock_mode,
             retain_until=retain_until,
+            storage_class=storage_class,
         )
         self.objects[key] = obj
         return response(200, b"", {"etag": obj.etag})
@@ -175,6 +183,8 @@ def _object_headers(obj: StoredObject) -> dict[str, str]:
         headers["x-amz-object-lock-mode"] = obj.lock_mode
     if obj.retain_until:
         headers["x-amz-object-lock-retain-until-date"] = obj.retain_until
+    if obj.storage_class and obj.storage_class != "STANDARD":
+        headers["x-amz-storage-class"] = obj.storage_class
     return headers
 
 

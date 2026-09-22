@@ -105,3 +105,111 @@ def test_demo_end_to_end(tmp_path: Path) -> None:
     finally:
         store.truncate_all()
         store.close()
+
+
+def test_recapture_is_live_only() -> None:
+    result = runner.invoke(
+        app, ["recapture", "-m", str(EX / "manifests/ote_idm_soap.yaml"), "--days", "3"]
+    )
+    assert result.exit_code == 1 and "--live" in result.output
+
+
+def test_smoke_without_a_dsn_runs_the_pipeline_in_memory(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "smoke",
+            "-m",
+            str(EX / "manifests/ote_idm_soap.yaml"),
+            "--fixture",
+            str(EX / "fixtures/ote_idm_soap"),
+            "--bronze-dir",
+            str(tmp_path),
+        ],
+        env={"ENERGY_PLATFORM_DSN": ""},
+    )
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.stdout)
+    assert report["ok"] is True and report["silver_rows"] == 192
+    assert "in memory" in result.stderr
+
+
+def test_smoke_fails_on_a_fixture_of_another_target(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "smoke",
+            "-m",
+            str(EX / "manifests/ote_idm_soap.yaml"),
+            "--fixture",
+            str(EX / "fixtures/ceps_load_soap"),
+            "--bronze-dir",
+            str(tmp_path),
+        ],
+        env={"ENERGY_PLATFORM_DSN": ""},
+    )
+    assert result.exit_code == 1
+    assert json.loads(result.stdout)["ok"] is False
+
+
+def test_storage_probe_needs_a_class_and_an_endpoint() -> None:
+    no_class = runner.invoke(app, ["storage-probe"], env={"ENERGY_PLATFORM_S3_STORAGE_CLASS": ""})
+    assert no_class.exit_code == 1 and "--storage-class" in no_class.output
+    no_store = runner.invoke(
+        app,
+        ["storage-probe", "--storage-class", "COLD"],
+        env={"ENERGY_PLATFORM_S3_ENDPOINT": ""},
+    )
+    assert no_store.exit_code == 1 and "ENERGY_PLATFORM_S3_ENDPOINT" in no_store.output
+
+
+def test_bronze_env_error_is_reported_not_raised(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "capture",
+            "-m",
+            str(EX / "manifests/ote_idm_soap.yaml"),
+            "--fixture",
+            str(EX / "fixtures/ote_idm_soap"),
+        ],
+        env={
+            "ENERGY_PLATFORM_DSN": "",
+            "ENERGY_PLATFORM_BRONZE": "s3",
+            "ENERGY_PLATFORM_BRONZE_DIR": "",
+        },
+    )
+    assert result.exit_code == 1 and "ENERGY_PLATFORM_S3_ENDPOINT" in result.output
+
+
+@pytest.mark.db
+def test_smoke_with_a_dsn_uses_and_drops_a_throwaway_schema(tmp_path: Path) -> None:
+    """P5-D5: synthetic fixture rows never reach the real tables."""
+    dsn = os.environ.get("ENERGY_PLATFORM_TEST_DSN")
+    if not dsn:
+        pytest.skip("ENERGY_PLATFORM_TEST_DSN not set; run `make db-test`")
+    import psycopg
+
+    result = runner.invoke(
+        app,
+        [
+            "smoke",
+            "-m",
+            str(EX / "manifests/ote_idm_soap.yaml"),
+            "--fixture",
+            str(EX / "fixtures/ote_idm_soap"),
+            "--dsn",
+            dsn,
+            "--bronze-dir",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["ok"] is True
+    with psycopg.connect(dsn) as conn:
+        schemas = conn.execute(
+            "SELECT nspname FROM pg_namespace WHERE nspname LIKE 'smoke_%'"
+        ).fetchall()
+        assert schemas == []
+        public_rows = conn.execute("SELECT count(*) FROM observations").fetchone()
+        assert public_rows is not None and public_rows[0] == 0

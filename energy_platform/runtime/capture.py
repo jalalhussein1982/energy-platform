@@ -86,7 +86,16 @@ def capture(
         updated = _ack(rt, scheduled_for, origin, kind, "failed", None, str(exc))
         return CaptureReport(scheduled_for, "failed", None, False, str(exc), updated)
 
-    updated = _ack(rt, scheduled_for, origin, kind, "ok", outcome.entry.capture_id, None)
+    updated = _ack(
+        rt,
+        scheduled_for,
+        origin,
+        kind,
+        "ok",
+        outcome.entry.capture_id,
+        None,
+        recaptured=force and outcome.created and outcome.entry.content_changed,
+    )
     return CaptureReport(scheduled_for, "ok", outcome.entry, outcome.created, None, updated)
 
 
@@ -98,14 +107,20 @@ def _ack(
     outcome: AttemptOutcome,
     capture_id: str | None,
     error: str | None,
+    *,
+    recaptured: bool = False,
 ) -> bool:
-    """Ledger bookkeeping after Bronze; a store outage never fails the capture (ADR-024 §1)."""
+    """Ledger bookkeeping after Bronze; a store outage never fails the capture (ADR-024 §1).
+    ``recaptured`` (ADR-033 §3, P5-D6): a forced attempt whose payload changed lowers the run to
+    ``captured`` so the next ``process`` claims it; an unchanged forced attempt is a poll."""
     now = rt.clock()
     try:
         state: RunState = "captured" if capture_id is not None else "scheduled"
         run = rt.store.ensure_run(
             rt.target_id, scheduled_for, state=state, origin=origin, capture_id=capture_id, now=now
         )
+        if recaptured and capture_id is not None and run.capture_id != capture_id:
+            run = rt.store.mark_recaptured(run.id, capture_id, now=now)
         if outcome != "noop":
             rt.store.record_attempt(
                 run.id, kind, outcome=outcome, capture_id=capture_id, error=error, now=now

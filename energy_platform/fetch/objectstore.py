@@ -231,6 +231,8 @@ class ObjectInfo:
     etag: str | None
     content_type: str | None = None
     last_modified: str | None = None
+    storage_class: str | None = None
+    """From ``x-amz-storage-class``; gateways omit it for ``STANDARD`` (ADR-021 §3 probe)."""
 
 
 def _local(el: etree._Element) -> str:
@@ -284,8 +286,16 @@ class ObjectStore:
     def bucket(self) -> str:
         return self._config.bucket
 
-    def put(self, key: str, data: bytes, *, content_type: str = "application/octet-stream") -> str:
-        """Write one object and return its ETag; object-lock headers when retention is set."""
+    def put(
+        self,
+        key: str,
+        data: bytes,
+        *,
+        content_type: str = "application/octet-stream",
+        storage_class: str | None = None,
+    ) -> str:
+        """Write one object and return its ETag; object-lock headers when retention is set;
+        ``x-amz-storage-class`` only when asked (the ADR-021 §3 probe)."""
         headers = {
             "content-type": content_type,
             "content-md5": base64.b64encode(
@@ -297,6 +307,8 @@ class ObjectStore:
             until = self._clock().astimezone(UTC) + timedelta(days=retention.days)
             headers["x-amz-object-lock-mode"] = retention.mode
             headers["x-amz-object-lock-retain-until-date"] = until.strftime(_RETAIN_UNTIL)
+        if storage_class is not None:
+            headers["x-amz-storage-class"] = storage_class
         response = self._request("PUT", self._object_url(key), headers=headers, body=data)
         self._raise_unless(response, {200}, key)
         return str(response.headers.get("etag", ""))
@@ -320,6 +332,7 @@ class ObjectStore:
             etag=response.headers.get("etag"),
             content_type=response.headers.get("content-type"),
             last_modified=response.headers.get("last-modified"),
+            storage_class=response.headers.get("x-amz-storage-class"),
         )
 
     def list(self, prefix: str, *, page_size: int = 1000) -> Iterator[ObjectInfo]:

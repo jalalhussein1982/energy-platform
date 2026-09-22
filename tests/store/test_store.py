@@ -441,3 +441,15 @@ def test_derivation_registration_is_idempotent_and_keeps_the_first_time(store: S
     assert store.derivation(D_A.derivation_id) == first
     assert store.derivation("0000000000000000") is None
     assert first.mapping_block == {"m": "a"} and first.parser_ref == "generic:soap@0.0.1"
+
+
+def test_mark_recaptured_lowers_a_processed_run_to_captured(store: Store) -> None:
+    """ADR-033 §3 / P5-D6: a changed forced attempt makes the run pending again."""
+    run_id = captured_run(store)
+    store.commit(claim(store, run_id), state="processed", outcome="ok", derivation=D_A, now=NOW)
+    assert store.pending_runs("ote_idm_soap") == ()
+    run = store.mark_recaptured(run_id, "c2", now=NOW + TTL)
+    assert run.state == "captured" and run.capture_id == "c2" and run.updated_at == NOW + TTL
+    assert [r.id for r in store.pending_runs("ote_idm_soap")] == [run_id]
+    c = claim(store, run_id, now=NOW + 2 * TTL)
+    assert c.attempt.capture_id == "c2"  # the new attempt is what gets processed

@@ -173,6 +173,12 @@ class Store(Protocol):
         ``unrecoverable`` (runs that nobody holds)."""
         ...
 
+    def mark_recaptured(self, run_id: int, capture_id: str, *, now: datetime) -> Run:
+        """ADR-033 §3: a forced re-capture whose payload changed makes the run pending again —
+        ``state = captured`` and ``capture_id`` pointing at the new attempt, whatever the state
+        was (a ``processed`` run is lowered on purpose: the new content must be processed)."""
+        ...
+
     # ---------------------------------------------------------------- ledger: attempts
     def claim(self, run_id: int, owner: str, ttl: timedelta, *, now: datetime) -> Claim | None:
         """ADR-024 §4: bump the fence and take the lease if it is free or expired; adopt a

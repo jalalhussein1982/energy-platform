@@ -9,6 +9,7 @@ the new state. The current view is ``observations_current`` from migration 0002.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any, cast
@@ -39,6 +40,15 @@ from energy_platform.store.protocol import (
 )
 
 MIN_SERVER_VERSION = 160000  # ADR-030
+_SCHEMA_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+def _schema_name(name: str) -> str:
+    """A schema name safe to interpolate into ``search_path`` (no quoting available there)."""
+    if not _SCHEMA_NAME.match(name):
+        raise ValueError(f"{name!r} is not a plain lowercase schema name")
+    return name
+
 
 _OBS_COLUMNS = (
     "source_id, dataset_id, source_transport, contract_version, derivation_id, raw_ref, "
@@ -61,11 +71,16 @@ _OBS_SELECT = (
 
 
 class PostgresStore:
-    def __init__(self, dsn: str) -> None:
+    def __init__(self, dsn: str, *, schema: str | None = None) -> None:
+        """``schema`` scopes every statement to one schema (``search_path``); the smoke hook
+        uses a throwaway schema so synthetic fixture rows never reach the real tables."""
         self._dsn = dsn
+        options = "-c timezone=UTC"
+        if schema is not None:
+            options += f" -c search_path={_schema_name(schema)}"
         try:
             self._conn = psycopg.connect(
-                dsn, row_factory=dict_row, autocommit=False, options="-c timezone=UTC"
+                dsn, row_factory=dict_row, autocommit=False, options=options
             )
         except psycopg.OperationalError as exc:
             raise StoreUnavailable(f"cannot connect: {exc}") from exc
@@ -237,6 +252,17 @@ class PostgresStore:
         row = self._one(
             "UPDATE runs SET state = %s, updated_at = %s WHERE id = %s RETURNING *",
             (state, now, run_id),
+        )
+        self._conn.commit()
+        if row is None:
+            raise KeyError(f"run {run_id} does not exist")
+        return self._run(row)
+
+    def mark_recaptured(self, run_id: int, capture_id: str, *, now: datetime) -> Run:
+        row = self._one(
+            "UPDATE runs SET state = 'captured', capture_id = %s, updated_at = %s "
+            "WHERE id = %s RETURNING *",
+            (capture_id, now, run_id),
         )
         self._conn.commit()
         if row is None:

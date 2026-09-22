@@ -114,6 +114,11 @@ class MemoryStore:
         self._runs[run_id] = run
         return run
 
+    def mark_recaptured(self, run_id: int, capture_id: str, *, now: datetime) -> Run:
+        run = replace(self._runs[run_id], state="captured", capture_id=capture_id, updated_at=now)
+        self._runs[run_id] = run
+        return run
+
     # ---------------------------------------------------------------- attempts
 
     def claim(self, run_id: int, owner: str, ttl: timedelta, *, now: datetime) -> Claim | None:
