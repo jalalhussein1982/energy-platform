@@ -259,6 +259,89 @@ Access used: kubeconfig for the e-INFRA Rancher cluster (`rancher.cloud.e-infra.
     $ curl https://api.github.com/repos/CERIT-SC/rancher-apps/contents/charts | jq -r '.[].name'
     _common ansys bioda blender code-server cplex dataspecer desktop3d filebrowser grafana knime langflow logging-subscriber loki matlab matrix-hermes maxquant minio monitoring moodle mpijob n8n neo4j open-notebook orthovenn overleaf-cep owncloud paraview pgadmin phpmyadmin pycharm ridom-seqsphere rstudio samba scipion shinysom textgen-ui vmd wave
     $ ssh skirit 'command -v helm'   → MISSING ; local: helm MISSING
+
+2026-09-22  V-12  CONFIRMED  Hetzner Object Storage (nbg1, Ceph RGW behind `nbg1.your-objectstorage.com`): versioning Enabled; bucket-level Object Lock accepted and enforced — COMPLIANCE default retention refuses delete-object --version-id even with --bypass-governance-retention, explicit GOVERNANCE refuses without the bypass and allows it with; storage classes: STANDARD only, every other class → HTTP 400 InvalidArgument with an empty Message; lifecycle accepted without validation (a bogus transition class is stored); a deny-DeleteObject bucket policy is stored but NOT enforced against the owning credentials   ADR-028 §3: **Object Lock on store A is the control** — the ADR-021 compensating control is not needed and its bucket-policy half would not work here (one S3 credential set per project, owner bypasses the policy). Demo values: `bronze.tiering.mode` = `none` or `move` (never `lifecycle`; the `storage-probe` hook must probe by put-object, as on V-6, because lifecycle acceptance proves nothing). The platform S3 client must tolerate `<Message></Message>` (aws CLI v2 crashes on it). Scratch bucket `energy-platform-verify-20260922` LEFT IN PLACE (COMPLIANCE lock until 2026-09-23T01:09Z; deletion is Level 3). Raw log: ~/.config/energy-platform/evidence/2026-09-22/V-12-hetzner-object-storage.log
+    $ curl -sI https://nbg1.your-objectstorage.com   → HTTP/2 200 ; x-amz-request-id: tx…-nbg1-prod1-ceph3   (Ceph RGW)
+    $ aws --endpoint-url $S3_A s3api list-buckets --query 'Buckets[].Name'   (region nbg1 signs correctly)
+    ["jalalhussein"]   (pre-existing, untouched)
+    $ aws s3api create-bucket --bucket energy-platform-verify-20260922 --object-lock-enabled-for-bucket   → {"Location": "/energy-platform-verify-20260922"}
+    $ aws s3api get-bucket-versioning   → aws: [ERROR]: argument of type 'NoneType' is not a container or iterable   (empty element; CLI bug, same as V-6)
+    $ aws s3api put-bucket-versioning --versioning-configuration Status=Enabled   → exit 0
+    $ aws s3api get-bucket-versioning   → {"Status": "Enabled", "MFADelete": "Disabled"}
+    $ aws s3api get-object-lock-configuration   → {"ObjectLockConfiguration": {"ObjectLockEnabled": "Enabled"}}
+    $ aws s3api put-object-lock-configuration … '{"ObjectLockEnabled":"Enabled","Rule":{"DefaultRetention":{"Mode":"COMPLIANCE","Days":1}}}'   → exit 0
+    $ aws s3api get-object-lock-configuration   → {…"Rule":{"DefaultRetention":{"Mode":"COMPLIANCE","Days":1}}}
+    $ aws s3api put-object --key bronze/blobs/test   → {"VersionId": "6ceLLvaajr5q6KeiQfVYhjkQQTKFvtO"}
+    $ aws s3api head-object   → {"ObjectLockMode": "COMPLIANCE", "ObjectLockRetainUntilDate": "2026-09-23T01:09:43.405743+00:00", "ContentLength": 38}
+    $ aws s3api delete-object --version-id 6ceLL…   (no bypass)
+    An error occurred (AccessDenied) when calling the DeleteObject operation: forbidden by object lock
+    $ aws s3api delete-object --version-id 6ceLL… --bypass-governance-retention
+    An error occurred (AccessDenied) when calling the DeleteObject operation: forbidden by object lock   (COMPLIANCE ignores the bypass — correct)
+    $ aws s3api put-object --key bronze/blobs/test (overwrite by key, 3 bytes)   → list-object-versions: [{IsLatest:true,Size:3},{IsLatest:false,Size:38}]
+    $ aws s3api put-object --key gov/test --object-lock-mode GOVERNANCE --object-lock-retain-until-date +3min   → exit 0 ; head-object: {"Mode":"GOVERNANCE","Until":"2026-09-22T01:12:45+00:00","Class":null}
+    $ aws s3api delete-object --version-id iea93…   → AccessDenied: forbidden by object lock
+    $ aws s3api delete-object --version-id iea93… --bypass-governance-retention   → {"VersionId": "iea93…"}   (removed)
+    --- storage-class probe
+    $ for sc in STANDARD STANDARD_IA ONEZONE_IA INTELLIGENT_TIERING GLACIER GLACIER_IR DEEP_ARCHIVE REDUCED_REDUNDANCY COLD; do aws s3api put-object --key classes/$sc --storage-class $sc; done
+    STANDARD → accepted, head-object StorageClass=STANDARD ; every other class → HTTP 400 <Code>InvalidArgument</Code><Message></Message>   (aws CLI v2 crashes on the empty Message, as on V-6)
+    --- lifecycle
+    $ aws s3api put-bucket-lifecycle-configuration … Transitions:[{Days:1,StorageClass:"DEFINITELY_NOT_A_CLASS"}]   → exit 0 ; get-bucket-lifecycle-configuration echoes the bogus class (no validation)
+    $ aws s3api put-bucket-lifecycle-configuration … NoncurrentVersionExpiration 365 on bronze/ + Expiration 2 days on classes/   → exit 0 ; get echoes both rules (left in place so the class probes expire after the lock)
+    --- bucket policy (the ADR-028 §3 fallback shape)
+    $ aws s3api put-bucket-policy … Deny Principal:* s3:DeleteObject,s3:DeleteObjectVersion on the bucket   → exit 0 ; get-bucket-policy echoes it
+    $ aws s3api delete-object --key classes/STANDARD   (no version id, same credentials)   → {"DeleteMarker": true, …}   (NOT denied: owner credentials bypass the policy)
+    $ aws s3api delete-bucket-policy   → exit 0
+    $ hcloud --help | grep -i object   → (none) ; hcloud 1.68.0 manages Storage Box only — Object Storage credentials come from the console, buckets from the S3 API
+
+2026-09-22  V-13  CONFIRMED  OCI Object Storage, Frankfurt, S3-compatible endpoint `<namespace>.compat.objectstorage.eu-frankfurt-1.oraclecloud.com` (namespace from `oci os ns get`; home region eu-frankfurt-1): versioning Enabled over the S3 API; S3 Object Lock → NotFound (not offered); the OCI-native **retention rule is enforced** — delete and overwrite inside the window both fail with RetentionRuleViolation over the S3 API and over the native API; **versioning and retention rules are mutually exclusive** (403 BucketVersioningEnabled); the endpoint rejects `aws-chunked` uploads (NotImplemented); `rclone sync` A → B on the 6-object fixture set (41 KiB) completed in ~1 s and `rclone check --download` reports 0 differences from A and from the local source   ADR-002/ADR-021 §4 independent copy holds on the demo pair. **Store B design = retention rule, versioning OFF** (Bronze blobs are content-addressed, never overwritten by key; the ledger carries history — versioning on B adds nothing, the retention rule is the immutability control). Restore drill reads from B. The platform S3 client already signs a whole-payload `x-amz-content-sha256` (no aws-chunked) — keep it that way; aws CLI needs `AWS_REQUEST_CHECKSUM_CALCULATION=when_required` against OCI; rclone provider `Other` works as-is. Wall-clock and egress cost at demo volume: not measurable on 41 KiB — measure in the Phase 5 replication CronJob on a real Bronze day. Scratch buckets LEFT IN PLACE (Level 3): `energy-platform-verify-b-20260922` (versioned, holds `fixtures/`) and `energy-platform-verify-b-ret-20260922` (1-day unlocked retention rule; its one object is protected until 2026-09-23T01:44Z). Raw log: ~/.config/energy-platform/evidence/2026-09-22/V-13-oci-object-storage.log
+    $ oci os ns get   → {"data": "frzhqg…"} ; oci iam region-subscription list → eu-frankfurt-1 is-home-region=True (eu-stockholm-1, us-ashburn-1 subscribed)
+    $ oci iam customer-secret-key list --user-id …   → 1 key "cze" ACTIVE (its id is the S3 access key; the console shows it once)
+    $ aws --endpoint-url $S3_B s3api list-buckets --query 'Buckets[].Name'   (region eu-frankfurt-1)   → []
+    $ aws s3api create-bucket --bucket energy-platform-verify-b-20260922   → {"Location": "/energy-platform-verify-b-20260922"}
+    $ aws s3api get-bucket-versioning   → (empty) ; put-bucket-versioning Status=Enabled → exit 0 ; get → {"Status": "Enabled"}
+    $ oci os bucket get   → {"versioning": "Enabled", "storage-tier": "Standard", "compartment": ocid1.tenancy…}   (bucket lands in the root compartment)
+    $ aws s3api get-object-lock-configuration   → {"ObjectLockConfiguration": {}}
+    $ aws s3api put-object-lock-configuration … COMPLIANCE 1 day   → An error occurred (NotFound) when calling the PutObjectLockConfiguration operation: Not Found
+    $ oci os retention-rule create --bucket-name energy-platform-verify-b-20260922 --time-amount 1 --time-unit DAYS
+    ServiceError 403 "code": "BucketVersioningEnabled", "message": "Cannot create retention rule since this bucket has versioning enabled."
+    $ aws s3api create-bucket --bucket energy-platform-verify-b-ret-20260922   (versioning off)   → ok
+    $ oci os retention-rule create --bucket-name energy-platform-verify-b-ret-20260922 --display-name bronze-1d --time-amount 1 --time-unit DAYS   → {"duration": {"time-amount": 1, "time-unit": "DAYS"}, "locked": null}
+    $ aws s3api put-object --key bronze/blobs/test   (aws CLI 2.36 default)
+    An error occurred (NotImplemented) when calling the PutObject operation: AWS chunked encoding not supported.
+    $ AWS_REQUEST_CHECKSUM_CALCULATION=when_required aws s3api put-object --key bronze/blobs/test   → {"ETag": "\"df0d31bb…\"", "ServerSideEncryption": "AES256", "VersionId": "1aa7d6d7-…"}
+    $ aws s3api delete-object --key bronze/blobs/test
+    An error occurred (RetentionRuleViolation) when calling the DeleteObject operation: The operation was blocked by a retention rule.
+    $ aws s3api put-object --key bronze/blobs/test (overwrite)
+    An error occurred (RetentionRuleViolation) when calling the PutObject operation: The operation was blocked by a retention rule.
+    $ oci os object delete --bucket-name energy-platform-verify-b-ret-20260922 --name bronze/blobs/test --force   → ServiceError 403 "code": "RetentionRuleViolation"
+    $ aws s3api head-object   → {"Len": 24, "ETag": "\"df0d31bb…\""}   (object intact)
+    --- cross-provider copy (rclone 1.75.1, remotes from env: A = Ceph/nbg1, B = Other/eu-frankfurt-1)
+    $ rclone copy examples/fixtures A:energy-platform-verify-20260922/fixtures   → 6 files, 41.187 KiB   (store A default COMPLIANCE lock applies to them)
+    $ time rclone sync A:…/fixtures B:energy-platform-verify-b-20260922/fixtures   → 6 Copied (new), 41.187 KiB, wall-clock < 1 s
+    $ rclone check A:…/fixtures B:…/fixtures --download --one-way   → 0 differences found ; 6 matching files
+    $ rclone check examples/fixtures B:…/fixtures --download --one-way   → 0 differences found ; 6 matching files
+    $ rclone hashsum MD5 B:…/fixtures   → 2e228608… ceps_load_soap/blob ; de74847e… ceps_load_soap/entry.json ; 7c678c4f… ote_idm_soap/blob ; 822d1a3c… ote_idm_xlsx/blob ; 950382c2… ote_idm_xlsx/entry.json ; 9a0fe65b… ote_idm_soap/entry.json
+
+2026-09-22  V-14  CONFIRMED  k3s v1.36.4+k3s1 (throwaway cx23 in nbg1, deleted after the probe) with `--kube-apiserver-arg authentication-config=…` pointing at an `apiserver.config.k8s.io/v1` AuthenticationConfiguration that trusts `https://token.actions.githubusercontent.com` (audience `energy-platform-demo`, username = `'gha:' + claims.repository`, claim validation on `repository` and `ref == refs/heads/main`): a GitHub Actions job with only `id-token: write` exchanged its job token for an ID token, built a kubeconfig from that token and the cluster CA alone, and `kubectl auth whoami` returned the mapped user; `kubectl auth can-i --list -n energy-platform` shows exactly the Role's namespace verbs; `can-i create namespaces` → no, `can-i list nodes` → no, `get nodes`/`get ns` → Forbidden at the cluster scope; a token minted on another branch was refused with 401 and the apiserver logged the failing validation rule   ADR-015 federation clause holds on the demo cluster: no long-lived kubeconfig or ServiceAccount token in CI; the CI secret set gains only the cluster URL and CA (both public). k3s warns it does not set `anonymous-auth` when an `authentication-config` is given — the Terraform root's cloud-init sets `anonymous: {enabled: false}` in the config explicitly. The probe workflow, `authn.yaml` and the node install script are in ~/.config/energy-platform/evidence/2026-09-22/v14/ (private probe repo `jalalhussein1982/energy-platform-v14-probe`, workflow only, no platform code).
+    $ hcloud server create --name energy-platform-v14 --type cx23 --image ubuntu-24.04 --location nbg1 --ssh-key energy-platform-v14   → Server 166889629 created, IPv4 2.28.229.205   (cx22 no longer exists on Hetzner; cx23 = 2 vCPU / 4 GB / 40 GB)
+    $ (on the node) config.yaml: tls-san [IP]; kube-apiserver-arg [authentication-config=/etc/rancher/k3s/authn.yaml] ; curl -sfL https://get.k3s.io | sh -   → v1.36.4+k3s1 ; Server Version v1.36.4+k3s1
+    journalctl: level=warning msg="Not setting kube-apiserver 'anonymous-auth' flag due to user-provided 'authentication-config' file."
+    node annotation k3s.io/node-args: ["server","--tls-san","2.28.229.205","--kube-apiserver-arg","authentication-config=/etc/rancher/k3s/authn.yaml"]
+    $ kubectl create namespace energy-platform ; create role deployer --verb=get,list,watch,create,update,patch,delete --resource=cronjobs,jobs,pods,pods/log,configmaps,secrets,services,networkpolicies,serviceaccounts ; create rolebinding deployer --role=deployer --user='gha:jalalhussein1982/energy-platform-v14-probe'
+    --- GitHub Actions run 35677570174 (workflow_dispatch on main; permissions: id-token: write, contents: read; no repository secret)
+    ID token claims: {"iss": "https://token.actions.githubusercontent.com", "aud": "energy-platform-demo", "sub": "repo:jalalhussein1982@…/energy-platform-v14-probe@…:ref:refs/heads/main", "repository": "jalalhussein1982/energy-platform-v14-probe", "ref": "refs/heads/main"}
+    $ kubectl config set-cluster v14 --server=https://2.28.229.205:6443 --certificate-authority=ca.crt ; set-credentials gha --token=$ID_TOKEN
+    $ kubectl auth whoami
+    Username   gha:jalalhussein1982/energy-platform-v14-probe ; UID 1380736771 ; Groups [gha system:authenticated] ; Extra credential-id [JTI=33a887ab-…]
+    $ kubectl auth can-i --list -n energy-platform
+    configmaps, pods, pods/log, secrets, serviceaccounts, services, cronjobs.batch, jobs.batch, networkpolicies.networking.k8s.io   [get list watch create update patch delete] ; selfsubject*reviews [create] ; non-resource /api /apis /healthz /livez /readyz /openapi /version [get]
+    $ kubectl auth can-i create namespaces   → no ; kubectl auth can-i list nodes → no ; kubectl auth can-i create cronjobs -n energy-platform → yes
+    $ kubectl get nodes   → Error from server (Forbidden): nodes is forbidden: User "gha:jalalhussein1982/energy-platform-v14-probe" cannot list resource "nodes" in API group "" at the cluster scope
+    $ kubectl get ns   → Error from server (Forbidden): namespaces is forbidden: … at the cluster scope
+    --- run 35677610355 (same workflow dispatched on branch not-main)
+    ID token: "ref": "refs/heads/not-main" ; kubectl auth whoami → error: You must be logged in to the server (Unauthorized)
+    journalctl: E0922 01:56:30 authentication.go:75] "Unable to authenticate the request" err="[invalid bearer token, oidc: error evaluating claim validation expression: validation expression 'claims.ref == 'refs/heads/main'' failed: only the main branch may authenticate]"
+    cleanup: hcloud server delete energy-platform-v14 ; hcloud ssh-key delete energy-platform-v14 ; probe branch not-main deleted
 ```
 
 ---
