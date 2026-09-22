@@ -130,3 +130,19 @@ def test_banned_api_list_covers_every_egress_path() -> None:
     ignores = cfg["tool"]["ruff"]["lint"]["per-file-ignores"]
     exempt = {k for k, v in ignores.items() if "TID251" in v}
     assert exempt == {"scripts/**", "conftest.py", "tests/harness/**", "energy_platform/fetch/**"}
+
+
+def test_deploy_demo_workflow_uses_oidc_and_nothing_stored() -> None:
+    """ADR-015 federation clause / V-14: id-token only; dispatch-only until push is enabled."""
+    wf = yaml.safe_load(
+        (REPO / ".github" / "workflows" / "deploy-demo.yml").read_text(encoding="utf-8")
+    )
+    triggers = wf[True] if True in wf else wf["on"]
+    assert set(triggers) == {"workflow_dispatch"}
+    assert wf["permissions"] == {"contents": "read", "id-token": "write"}
+    job = wf["jobs"]["deploy"]
+    runs = [s["run"] for s in job["steps"] if "run" in s]
+    assert runs == ["make ci-bootstrap", "make deploy-demo"]
+    text = (REPO / ".github" / "workflows" / "deploy-demo.yml").read_text(encoding="utf-8")
+    assert "secrets." not in text
+    assert "${{ vars.DEMO_CLUSTER_URL }}" in str(job["env"]["DEMO_CLUSTER_URL"])

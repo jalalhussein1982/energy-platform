@@ -1,0 +1,55 @@
+# Demo environment (ADR-028): the Hetzner k3s cluster built by roots/hcloud, deployed with
+# TENANT values into the namespace-scoped Role (proves the tenant contract on the own-cluster
+# path). Layer on top of values-tenant.yaml: `make deploy-tenant ENV=demo`.
+# Residency is declared honestly: DE for the cluster and both stores (ADR-028 §4, ADR-036 §6).
+residency: DE
+postgres:
+  mode: statefulset
+  storageClassName: local-path          # k3s default provisioner, backed by the Postgres volume
+  size: 8Gi
+  walArchive:
+    size: 2Gi
+  backup:
+    enabled: true
+    schedule: "*/15 * * * *"
+bronze:
+  endpoint: https://nbg1.your-objectstorage.com        # store A (V-12)
+  bucket: energy-platform-bronze                       # roots/hcloud output bucket_a
+  region: nbg1
+  retention:
+    mode: COMPLIANCE                                   # the store-A control (V-12)
+    days: 90
+  tiering:
+    mode: none                                         # never lifecycle on this gateway (V-12)
+  replica:
+    enabled: true
+    # OCI S3-compatible endpoint: <namespace>.compat.objectstorage.eu-frankfurt-1.oraclecloud.com
+    # The namespace is `oci os ns get`; set it per deploy (--set bronze.replica.endpoint=…) or
+    # in a values-demo-secret.yaml kept outside the repository. It is not a secret, only a
+    # tenancy identifier the repository does not carry.
+    endpoint: https://REPLACE_OCI_NAMESPACE.compat.objectstorage.eu-frankfurt-1.oraclecloud.com
+    bucket: energy-platform-bronze-replica             # roots/hcloud output bucket_b (retention rule, V-13)
+    region: eu-frankfurt-1
+    schedule: "17 * * * *"
+secrets:
+  existingSecret: energy-platform                      # created by the author from the Terraform outputs
+metrics:
+  enabled: true
+  operator:
+    enabled: false
+egress:
+  clusterCIDRs: [10.42.0.0/16, 10.43.0.0/16]           # k3s cluster-cidr / service-cidr (cloud-init)
+  objectStore:
+    # Object-store endpoints are public addresses: capture pods reach them through the 443 rule
+    # already (public ranges); process/gaps/hook/drill/backup/replicate pods need this explicit
+    # rule. Resolve once and set per deploy (dig +short nbg1.your-objectstorage.com; the OCI
+    # endpoint likewise); a CDN-fronted endpoint needs its published ranges.
+    cidrs: [REPLACE_STORE_A_CIDR, REPLACE_STORE_B_CIDR]
+    ports: [443]
+smoke:
+  manifest: ote_intraday_market/manifest.yaml
+  fixture: ote_intraday_market/fixtures/ordinary_day
+drills:
+  restore:
+    enabled: true
+    schedule: "30 3 * * *"

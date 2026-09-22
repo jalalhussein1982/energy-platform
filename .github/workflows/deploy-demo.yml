@@ -1,0 +1,28 @@
+# Thin wrapper over Make (ADR-015). Deploys the tenant values to the demo cluster (ADR-028) with
+# the job's OIDC identity (ADR-015 federation clause, V-14): no kubeconfig, no stored token.
+# workflow_dispatch only until the author has run it once by hand and enabled `push: main`.
+name: deploy-demo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: demo
+    env:
+      DEMO_CLUSTER_URL: ${{ vars.DEMO_CLUSTER_URL }}
+      DEMO_CLUSTER_CA: ${{ vars.DEMO_CLUSTER_CA }}
+      IMAGE_REPO: ghcr.io/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - run: make ci-bootstrap
+      - run: make deploy-demo

@@ -229,7 +229,7 @@ deploy-tenant: target-values ## helm upgrade --install with tenant values + valu
 	  $(HELM_ATOMIC) --timeout $(HELM_TIMEOUT) $(HELM_EXTRA)
 
 kubeconfig-oidc: ## Inside GitHub Actions: kubeconfig from the job's OIDC token + the public cluster CA (no stored credential)
-	scripts/kubeconfig_from_oidc.sh $(OIDC_KUBECONFIG)
+	scripts/oidc_kube_context.sh $(OIDC_KUBECONFIG)
 
 deploy-demo: kubeconfig-oidc ## OIDC kubeconfig → deploy-tenant ENV=demo (the deploy-demo workflow's only step)
 	$(MAKE) deploy-tenant ENV=demo KUBECONFIG=$(OIDC_KUBECONFIG)
