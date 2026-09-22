@@ -1,0 +1,139 @@
+# ADR-026 §4 layer-1 verification on the local cluster (Phase 5 plan Task 5.7). Three Jobs
+# carrying the chart's selector labels, so the chart's NetworkPolicies apply to them:
+#   1. capture-role pod → https://www.ote-cr.cz            must connect (exit 0; needs internet)
+#   2. capture-role pod → http://169.254.169.254 (metadata) and http://10.0.0.1 (private)
+#                                                            must be BLOCKED (curl exit 7 or 28)
+#   3. process-role pod → https://www.ote-cr.cz             must be BLOCKED (exit 7 or 28)
+# `make local-egress-test` applies them, waits, prints PASS/FAIL per assertion. curl image by
+# digest, restricted PSS, requests/limits (the same gates as the chart).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: egress-test-capture-allowed
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/role: capture
+    energy-platform.io/test: egress
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: energy-platform
+        app.kubernetes.io/instance: energy-platform
+        energy-platform.io/role: capture
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: curl
+          image: docker.io/curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777   # 8.22.0
+          command: ["curl", "-sS", "-o", "/dev/null", "--max-time", "20", "-w", "capture->ote %{http_code}\n", "https://www.ote-cr.cz/"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: egress-test-capture-blocked
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/role: capture
+    energy-platform.io/test: egress
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: energy-platform
+        app.kubernetes.io/instance: energy-platform
+        energy-platform.io/role: capture
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: curl
+          image: docker.io/curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777   # 8.22.0
+          # succeeds (exit 0) only if BOTH private destinations are unreachable
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -u
+              fail=0
+              for url in http://169.254.169.254/ http://10.0.0.1/; do
+                curl -sS -o /dev/null --max-time 8 "$url"; rc=$?
+                if [ "$rc" -eq 7 ] || [ "$rc" -eq 28 ]; then echo "capture->$url blocked (curl $rc)"; else echo "capture->$url REACHABLE (curl $rc)"; fail=1; fi
+              done
+              exit $fail
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 64Mi}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: egress-test-process-blocked
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/role: process
+    energy-platform.io/test: egress
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: energy-platform
+        app.kubernetes.io/instance: energy-platform
+        energy-platform.io/role: process
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: curl
+          image: docker.io/curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777   # 8.22.0
+          # succeeds (exit 0) only if the internet is unreachable from a process pod
+          command:
+            - /bin/sh
+            - -c
+            - |
+              curl -sS -o /dev/null --max-time 8 https://www.ote-cr.cz/; rc=$?
+              if [ "$rc" -eq 7 ] || [ "$rc" -eq 28 ] || [ "$rc" -eq 6 ]; then echo "process->ote blocked (curl $rc)"; exit 0; fi
+              echo "process->ote REACHABLE (curl $rc)"; exit 1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 64Mi}

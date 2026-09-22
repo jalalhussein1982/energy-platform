@@ -1,0 +1,22 @@
+# kind cluster for the local profile (ADR-010; Phase 5 plan P5-D10). One node: this is a laptop
+# profile. The default CNI is disabled because kindnet does not enforce NetworkPolicy
+# (ADR-026 §4); `make local-up` installs Cilium with policy enforcement. The subnets are the
+# values of egress.clusterCIDRs in values-local.yaml — change both together.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: energy-platform
+# containerd reads per-registry host configuration from /etc/containerd/certs.d; `make
+# local-registry` writes the entry that maps localhost:5001 to the kind-attached registry
+# so the platform image is pulled BY DIGEST from a real registry (kind's documented recipe).
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+networking:
+  disableDefaultCNI: true
+  kubeProxyMode: iptables
+  podSubnet: 10.244.0.0/16
+  serviceSubnet: 10.96.0.0/12
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5   # kind 0.33.0 default

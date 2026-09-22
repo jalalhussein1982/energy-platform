@@ -19,7 +19,9 @@ IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
 
 .PHONY: help check lint lock-check format type test db-test schema fixtures deps-allowlist secret-scan helm-lint terraform-validate \
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
-        harness-check pr-surface live-smoke image image-digest target-values
+        harness-check pr-surface live-smoke image image-digest target-values \
+        local-cluster local-registry local-cni local-image local-secrets deploy-local local-egress-test terraform-plan-hcloud \
+        deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -94,17 +96,31 @@ helm-lint: sync ## helm lint + template (tenant, local, all-flags) → workload 
 	  done; \
 	fi
 
-terraform-validate: ## terraform fmt/validate/test with mock providers. Skips honestly until the profile exists.
+TF ?= $(shell command -v terraform 2>/dev/null || command -v tofu 2>/dev/null)
+TF_ROOTS := $(wildcard $(TF_DIR)/roots/*)
+TF_PLAN_DIR ?= $(HOME)/.config/energy-platform/plans
+
+terraform-validate: ## fmt -check, init -backend=false, validate, test (mock providers) for every root; terraform or tofu. Skips honestly until the profile exists.
 	@if [ ! -d "$(TF_DIR)" ]; then \
 	  echo "terraform-validate: no Terraform at $(TF_DIR) yet (Phase 5) — nothing to check"; \
-	elif ! command -v terraform >/dev/null; then \
-	  echo "terraform-validate: Terraform exists but terraform is not installed"; exit 1; \
+	elif [ -z "$(TF)" ]; then \
+	  echo "terraform-validate: Terraform exists but neither terraform nor tofu is installed"; exit 1; \
 	else \
-	  terraform -chdir=$(TF_DIR) fmt -check -recursive && \
-	  terraform -chdir=$(TF_DIR) init -backend=false -input=false && \
-	  terraform -chdir=$(TF_DIR) validate && \
-	  terraform -chdir=$(TF_DIR) test; \
+	  $(TF) fmt -check -recursive $(TF_DIR) && \
+	  for root in $(TF_ROOTS); do \
+	    echo "== terraform-validate: $$root ($(notdir $(TF)))"; \
+	    $(TF) -chdir=$$root init -backend=false -input=false >/dev/null && \
+	    $(TF) -chdir=$$root validate && \
+	    $(TF) -chdir=$$root test || exit 1; \
+	  done; \
 	fi
+
+terraform-plan-hcloud: ## Plan the demo root into $(TF_PLAN_DIR) (outside the repository); never applies (Level 3)
+	@test -n "$(TF)" || { echo "terraform-plan-hcloud: neither terraform nor tofu installed"; exit 1; }
+	@mkdir -p $(TF_PLAN_DIR)
+	$(TF) -chdir=$(TF_DIR)/roots/hcloud init -backend=false -input=false >/dev/null
+	$(TF) -chdir=$(TF_DIR)/roots/hcloud plan -input=false -out=$(TF_PLAN_DIR)/hcloud-$$(date +%Y%m%d-%H%M%S).tfplan
+	@echo "terraform-plan-hcloud: plan written under $(TF_PLAN_DIR); apply is the author's (Level 3)"
 
 ci-bootstrap: ## Install uv on a bare CI runner (the only tool installation CI is allowed to do)
 	@command -v $(UV) >/dev/null && { echo "uv present: $$($(UV) --version)"; exit 0; } || true
@@ -115,28 +131,119 @@ ci-bootstrap: ## Install uv on a bare CI runner (the only tool installation CI i
 image: ## Build the platform runtime image deployment/image/Dockerfile as $(IMAGE)
 	$(DOCKER) build -f deployment/image/Dockerfile -t $(IMAGE) .
 
-image-digest: ## Print the digest reference of $(IMAGE): from the kind node (KIND=1, after kind load) or from RepoDigests (after a push)
+LOCAL_REGISTRY      ?= kind-registry
+LOCAL_REGISTRY_PORT ?= 5001
+LOCAL_IMAGE_REPO    := localhost:$(LOCAL_REGISTRY_PORT)/$(IMAGE_REPO)
+REGISTRY_IMAGE      ?= docker.io/library/registry:2@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373   # registry:2, 2026-09-22
+
+image-digest: ## Print the digest reference of $(IMAGE): from the kind-attached registry (KIND=1, after make local-image) or from RepoDigests (after a push)
 	@if [ -n "$(KIND)" ]; then \
-	  node="$$($(DOCKER) ps --filter name=$(KIND_NAME)-control-plane --format '{{.Names}}' | head -1)"; \
-	  test -n "$$node" || { echo "image-digest: kind node $(KIND_NAME)-control-plane is not running" >&2; exit 1; }; \
-	  ref="$$($(DOCKER) exec "$$node" crictl inspecti --output go-template --template '{{range .status.repoDigests}}{{.}}{{"\n"}}{{end}}' docker.io/library/$(IMAGE) 2>/dev/null | grep '@sha256:' | head -1)"; \
-	  test -n "$$ref" || { echo "image-digest: $(IMAGE) has no digest on the node; run make image && kind load docker-image $(IMAGE) --name $(KIND_NAME)" >&2; exit 1; }; \
+	  ref="$$($(DOCKER) image inspect --format '{{range .RepoDigests}}{{.}}{{"\n"}}{{end}}' $(LOCAL_IMAGE_REPO):$(IMAGE_TAG) 2>/dev/null | grep '^$(LOCAL_IMAGE_REPO)@sha256:' | head -1)"; \
+	  test -n "$$ref" || { echo "image-digest: $(LOCAL_IMAGE_REPO):$(IMAGE_TAG) has no digest; run make local-image" >&2; exit 1; }; \
 	  echo "$$ref"; \
 	else \
 	  ref="$$($(DOCKER) image inspect --format '{{index .RepoDigests 0}}' $(IMAGE) 2>/dev/null)"; \
-	  test -n "$$ref" || { echo "image-digest: $(IMAGE) has no RepoDigest; push it to a registry first (or KIND=1 after kind load)" >&2; exit 1; }; \
+	  test -n "$$ref" || { echo "image-digest: $(IMAGE) has no RepoDigest; push it to a registry first (or KIND=1 after make local-image)" >&2; exit 1; }; \
 	  echo "$$ref"; \
 	fi
 
 # ---------------------------------------------------------------- local reproduction (ADR-010) — Phase 5
-local-up: ## kind cluster → Helm deps → platform → migrations → smoke tests
-	@echo "local-up: not implemented until Phase 5 (deployment/local/)"; exit 1
+KUBECTL       ?= kubectl
+KIND          ?= kind
+NAMESPACE     ?= energy-platform
+RELEASE       ?= energy-platform
+CILIUM_VERSION ?= 1.20.2
+KIND_CONTEXT  := kind-$(KIND_NAME)
+KUBE          := $(KUBECTL) --context $(KIND_CONTEXT)
+HELM_KIND     := $(HELM) --kube-context $(KIND_CONTEXT)
+
+local-up: image local-cluster local-registry local-cni local-image local-secrets deploy-local local-egress-test ## kind + registry + Cilium → image by digest → secrets → atomic deploy (hooks: migrate, smoke) → layer-1 egress test
+	@echo "local-up: done — kubectl --context $(KIND_CONTEXT) -n $(NAMESPACE) get cronjobs,jobs,pods"
+
+local-cluster: ## Create the kind cluster from deployment/local/kind-config.yaml (idempotent)
+	@if $(KIND) get clusters 2>/dev/null | grep -qx $(KIND_NAME); then echo "local-cluster: $(KIND_NAME) exists"; \
+	else $(KIND) create cluster --config deployment/local/kind-config.yaml; fi   # no --wait: the node is Ready only after Cilium
+
+local-cni: ## Cilium with policy enforcement (kindnet does not enforce NetworkPolicy, ADR-026 §4)
+	$(HELM) repo add cilium https://helm.cilium.io/ >/dev/null 2>&1 || true
+	$(HELM) repo update cilium >/dev/null
+	$(HELM_KIND) upgrade --install cilium cilium/cilium --version $(CILIUM_VERSION) -n kube-system \
+	  -f deployment/local/cilium-values.yaml --wait --timeout 10m
+	$(KUBE) -n kube-system rollout status ds/cilium --timeout=300s
+	$(KUBE) wait --for=condition=Ready node --all --timeout=180s
+
+local-registry: ## A registry container attached to the kind network; nodes resolve localhost:$(LOCAL_REGISTRY_PORT) to it (kind's local-registry recipe)
+	@if [ "$$($(DOCKER) inspect -f '{{.State.Running}}' $(LOCAL_REGISTRY) 2>/dev/null)" != "true" ]; then \
+	  $(DOCKER) run -d --restart=always -p "127.0.0.1:$(LOCAL_REGISTRY_PORT):5000" --network bridge --name $(LOCAL_REGISTRY) $(REGISTRY_IMAGE) >/dev/null; fi
+	@$(DOCKER) network inspect kind -f '{{range .Containers}}{{.Name}} {{end}}' | grep -qw $(LOCAL_REGISTRY) || $(DOCKER) network connect kind $(LOCAL_REGISTRY)
+	@for node in $$($(KIND) get nodes --name $(KIND_NAME)); do \
+	  $(DOCKER) exec "$$node" mkdir -p /etc/containerd/certs.d/localhost:$(LOCAL_REGISTRY_PORT); \
+	  printf '[host."http://%s:5000"]\n' $(LOCAL_REGISTRY) | $(DOCKER) exec -i "$$node" cp /dev/stdin /etc/containerd/certs.d/localhost:$(LOCAL_REGISTRY_PORT)/hosts.toml; \
+	done
+
+local-image: ## Push $(IMAGE) to the kind-attached registry; the deploy references it by the digest the push returns
+	$(DOCKER) tag $(IMAGE) $(LOCAL_IMAGE_REPO):$(IMAGE_TAG)
+	$(DOCKER) push $(LOCAL_IMAGE_REPO):$(IMAGE_TAG)
+	@echo "local-image: $$(make -s image-digest KIND=1)"
+
+local-secrets: ## Generate the local Secret (random Postgres password and MinIO keys); never asks for credentials (P5-D10)
+	@$(KUBE) get namespace $(NAMESPACE) >/dev/null 2>&1 || $(KUBE) create namespace $(NAMESPACE) >/dev/null
+	@$(KUBE) -n $(NAMESPACE) get secret $(RELEASE) >/dev/null 2>&1 && echo "local-secrets: $(RELEASE) exists" || \
+	$(KUBE) -n $(NAMESPACE) create secret generic $(RELEASE) \
+	  --from-literal=POSTGRES_PASSWORD=$$(openssl rand -hex 16) \
+	  --from-literal=BRONZE_ACCESS_KEY_ID=minioa$$(openssl rand -hex 6) \
+	  --from-literal=BRONZE_SECRET_ACCESS_KEY=$$(openssl rand -hex 20) \
+	  --from-literal=BRONZE_REPLICA_ACCESS_KEY_ID=miniob$$(openssl rand -hex 6) \
+	  --from-literal=BRONZE_REPLICA_SECRET_ACCESS_KEY=$$(openssl rand -hex 20)
+
+deploy-local: target-values ## helm upgrade --install with rollback-on-failure + wait (hooks gate the release, ADR-025)
+	$(HELM_KIND) upgrade --install $(RELEASE) $(CHART_DIR) -n $(NAMESPACE) --create-namespace \
+	  -f deployment/local/values-local.yaml -f $(TARGET_VALUES) \
+	  --set image.repository=$(LOCAL_IMAGE_REPO) \
+	  --set image.digest=$$(make -s image-digest KIND=1 | sed 's/.*@//') \
+	  $(HELM_ATOMIC) --timeout $(HELM_TIMEOUT) $(HELM_EXTRA)
+
+local-egress-test: ## ADR-026 §4: capture pod reaches 443; metadata/private blocked; process pod has no internet
+	$(KUBE) -n $(NAMESPACE) delete job -l energy-platform.io/test=egress --ignore-not-found >/dev/null
+	$(KUBE) -n $(NAMESPACE) apply -f deployment/local/egress-test-job.yaml >/dev/null
+	@fail=0; for j in egress-test-capture-allowed egress-test-capture-blocked egress-test-process-blocked; do \
+	  if $(KUBE) -n $(NAMESPACE) wait --for=condition=complete job/$$j --timeout=120s >/dev/null 2>&1; then \
+	    echo "PASS $$j: $$($(KUBE) -n $(NAMESPACE) logs job/$$j | tr '\n' ' ')"; \
+	  else \
+	    if [ "$$j" = egress-test-capture-allowed ] && [ -n "$(LOCAL_EGRESS_OFFLINE)" ]; then echo "SKIP $$j (LOCAL_EGRESS_OFFLINE=1)"; \
+	    else echo "FAIL $$j: $$($(KUBE) -n $(NAMESPACE) logs job/$$j 2>/dev/null | tr '\n' ' ')"; fail=1; fi; \
+	  fi; \
+	done; exit $$fail
+
+# ---------------------------------------------------------------- tenant / demo deploys (ADR-001 amend, ADR-028, ADR-015)
+ENV ?= demo
+OIDC_KUBECONFIG := /tmp/ep-oidc-kubeconfig
+DEMO_SECRET_KEYS := POSTGRES_PASSWORD BRONZE_ACCESS_KEY_ID BRONZE_SECRET_ACCESS_KEY BRONZE_REPLICA_ACCESS_KEY_ID BRONZE_REPLICA_SECRET_ACCESS_KEY
+
+deploy-tenant: target-values ## helm upgrade --install with tenant values + values-$(ENV).yaml (KUBECONFIG = a namespace-scoped kubeconfig); IMAGE must have a RepoDigest
+	@test -f deployment/tenant/values-$(ENV).yaml || { echo "deploy-tenant: deployment/tenant/values-$(ENV).yaml does not exist"; exit 1; }
+	$(HELM) upgrade --install $(RELEASE) $(CHART_DIR) -n $(NAMESPACE) \
+	  -f deployment/tenant/values-tenant.yaml -f deployment/tenant/values-$(ENV).yaml -f $(TARGET_VALUES) \
+	  --set image.repository=$(IMAGE_REPO) \
+	  --set image.digest=$$(make -s image-digest | sed 's/.*@//') \
+	  $(HELM_ATOMIC) --timeout $(HELM_TIMEOUT) $(HELM_EXTRA)
+
+kubeconfig-oidc: ## Inside GitHub Actions: kubeconfig from the job's OIDC token + the public cluster CA (no stored credential)
+	scripts/kubeconfig_from_oidc.sh $(OIDC_KUBECONFIG)
+
+deploy-demo: kubeconfig-oidc ## OIDC kubeconfig → deploy-tenant ENV=demo (the deploy-demo workflow's only step)
+	$(MAKE) deploy-tenant ENV=demo KUBECONFIG=$(OIDC_KUBECONFIG)
+
+print-demo-secret-template: ## The kubectl command shape for the demo Secret (values come from the Terraform outputs and verify.env, never from the repo)
+	@echo "kubectl -n $(NAMESPACE) create secret generic $(RELEASE) \\"
+	@for k in $(DEMO_SECRET_KEYS); do echo "  --from-literal=$$k=... \\"; done
+	@echo "  --dry-run=client -o yaml | kubectl apply -f -"
 
 local-down: ## Tear the kind cluster down
-	@echo "local-down: not implemented until Phase 5"; exit 1
+	$(KIND) delete cluster --name $(KIND_NAME)
 
 smoke-test: ## One capture+process on a fixture target, freshness metric present, restore-drill dry-run
-	@echo "smoke-test: not implemented until Phase 5"; exit 1
+	@echo "smoke-test: not implemented until Task 5.13"; exit 1
 
 demo: sync ## fixture → capture → Bronze → parse → map → Postgres → query, offline (ephemeral PostgreSQL unless ENERGY_PLATFORM_DSN is set)
 	scripts/with_postgres.sh $(RUN) python -m energy_platform.cli demo
