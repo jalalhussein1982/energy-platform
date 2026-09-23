@@ -35,8 +35,11 @@ runcmd:
   - mkdir -p /var/lib/rancher/k3s/storage /etc/rancher/k3s/config.yaml.d
 %{ if storage_device_glob != "" ~}
   # the Postgres block volume is attached seconds after first boot (its id is only known once it
-  # exists): wait for it, format once, mount it under the k3s local-path provisioner root
-  - "for i in $(seq 1 60); do DEV=$(ls ${storage_device_glob} 2>/dev/null | head -1); [ -n \"$DEV\" ] && break; sleep 5; done; if [ -n \"$DEV\" ]; then blkid \"$DEV\" >/dev/null || mkfs.ext4 -L k3s-storage \"$DEV\"; grep -q k3s-storage /etc/fstab || echo \"LABEL=k3s-storage /var/lib/rancher/k3s/storage ext4 defaults,nofail 0 2\" >> /etc/fstab; mount -a; fi"
+  # exists): wait for it, format only if it has no filesystem, mount it under the k3s local-path
+  # provisioner root by its stable by-id path (a volume the provider pre-formats carries no label:
+  # 2026-09-23 a LABEL= entry matched nothing and nofail hid it), and stop before k3s is
+  # installed if it is not mounted — Postgres must never land on the root disk silently
+  - "for i in $(seq 1 60); do DEV=$(ls ${storage_device_glob} 2>/dev/null | head -1); [ -n \"$DEV\" ] && break; sleep 5; done; if [ -z \"$DEV\" ]; then echo 'k3s-storage: no volume matched ${storage_device_glob}' >&2; exit 1; fi; blkid \"$DEV\" >/dev/null || mkfs.ext4 -L k3s-storage \"$DEV\"; grep -q ' /var/lib/rancher/k3s/storage ' /etc/fstab || echo \"$DEV /var/lib/rancher/k3s/storage ext4 defaults,nofail 0 2\" >> /etc/fstab; mount -a; mountpoint -q /var/lib/rancher/k3s/storage || { echo \"k3s-storage: $DEV did not mount\" >&2; exit 1; }"
 %{ endif ~}
   # the public address is only known after boot: append it to tls-san through a k3s drop-in
   - "PUB=$(curl -sf --max-time 5 ${public_ip_metadata_url} || true); if [ -n \"$PUB\" ]; then printf 'tls-san+:\\n  - %s\\n' \"$PUB\" > /etc/rancher/k3s/config.yaml.d/10-public-tls-san.yaml; fi"

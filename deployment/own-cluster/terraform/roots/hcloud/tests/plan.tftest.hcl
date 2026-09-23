@@ -126,4 +126,12 @@ run "cloud_init_is_valid_yaml" {
     condition     = strcontains(yamldecode(nonsensitive(output.server_cloud_init)).write_files[2].content, "kind: RoleBinding")
     error_message = "the namespace RBAC manifest must be embedded in cloud-init"
   }
+
+  assert {
+    condition = anytrue([
+      for c in yamldecode(nonsensitive(output.server_cloud_init)).runcmd :
+      strcontains(c, "mountpoint -q /var/lib/rancher/k3s/storage") && !strcontains(c, "LABEL=")
+    ])
+    error_message = "the Postgres volume is mounted by its by-id path and checked before k3s is installed (a pre-formatted volume has no label)"
+  }
 }
