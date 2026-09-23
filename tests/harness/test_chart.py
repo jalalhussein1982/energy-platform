@@ -304,6 +304,15 @@ def test_demo_values_render_without_placeholders(tmp_path: Path) -> None:
         if "ipBlock" in to
     ]
     assert {"88.198.120.0/25", "134.70.40.0/21", "134.70.48.0/22"} <= set(blocks)
+    pg = named(docs, "StatefulSet")["ep-energy-platform-postgres"]["spec"]["template"]["spec"]
+    # the Hetzner volume is mounted on the server only; local-path is node-local
+    assert pg["nodeSelector"] == {"kubernetes.io/hostname": "energy-platform-demo-server"}
+    assert (
+        "nodeSelector"
+        not in named(render(tmp_path, TENANT), "StatefulSet")["ep-energy-platform-postgres"][
+            "spec"
+        ]["template"]["spec"]
+    )
     for cidr in blocks:
         ipaddress.ip_network(cidr)  # strict: raises on a placeholder or host bits
     platform = [s for s in map(_pod_spec, docs) if s is not None]

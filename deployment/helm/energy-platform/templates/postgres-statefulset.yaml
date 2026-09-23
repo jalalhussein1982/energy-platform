@@ -54,6 +54,10 @@ spec:
     spec:
       serviceAccountName: {{ include "energy-platform.fullname" . }}
       automountServiceAccountToken: false
+{{- with .Values.postgres.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+{{- end }}
       securityContext:
 {{ include "energy-platform.podSecurity" (dict "uid" 999) | indent 8 }}
       containers:

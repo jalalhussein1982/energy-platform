@@ -11,6 +11,11 @@ image:
 postgres:
   mode: statefulset
   storageClassName: local-path          # k3s default provisioner, backed by the Postgres volume
+  # local-path creates the volume on whichever node the pod lands on, and only the server has the
+  # 10 GB Hetzner volume mounted under the provisioner root (roots/hcloud): pin Postgres there.
+  # 2026-09-23: without it the first deploy put Postgres on the agent's root disk.
+  nodeSelector:
+    kubernetes.io/hostname: energy-platform-demo-server
   size: 8Gi
   walArchive:
     size: 2Gi

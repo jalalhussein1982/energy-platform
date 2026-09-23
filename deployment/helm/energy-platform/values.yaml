@@ -43,6 +43,7 @@ postgres:
   user: energy
   storageClassName: ""                   # "" = the cluster default (tenant: consume by name)
   size: 5Gi
+  nodeSelector: {}                       # pin Postgres where its storage is (node-local provisioners, e.g. k3s local-path)
   walArchive:
     size: 2Gi                            # ADR-036 §4: archive_command target, drained by pg-wal-ship
   cnpg:                                  # only rendered with mode=cnpg (operator pre-existing)
