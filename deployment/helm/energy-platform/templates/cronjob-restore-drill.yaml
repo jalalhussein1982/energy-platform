@@ -19,22 +19,24 @@ restored is a hypothesis. Every run:
 {{- if .Values.drills.restore.enabled }}
 {{- $fullname := include "energy-platform.fullname" . -}}
 {{- $b := printf "B:%s/%s" .Values.bronze.replica.bucket .Values.bronze.backupPrefix -}}
-{{- /* ADR-036 amendment 1: only the archived WAL at or after the base's START_WAL is fetched
-(string comparison: segment names sort in LSN order within a timeline; a base from before the
-amendment has no marker and gets the whole archive). An absent wal/ prefix is an empty archive. */ -}}
-{{- $fetch := `LATEST=$(rclone lsf @B@/base/ --dirs-only 2>/dev/null | sort | tail -1)
-if [ -z "$LATEST" ]; then
-  case " $RESTORE_DRILL_ARGS " in *" --dry-run "*) echo "restore-drill: dry run — no base backup under @B@/base/ yet; the scratch cluster will start empty"; exit 0;; esac
-  echo "restore-drill: no base backup under @B@/base/ yet"; exit 1
+{{- /* ADR-036 amendment 1: the newest base across clusters (<backupPrefix>/<system identifier>/
+base/<stamp>, §6) and only that cluster's archived WAL at or after the base's START_WAL
+(string comparison: segment names sort in LSN order within a timeline). An absent wal/ prefix
+is an empty archive. */ -}}
+{{- $fetch := `NEWEST=$(rclone lsf -R @B@/ --dirs-only --max-depth 3 2>/dev/null | grep -E '^[0-9]+/base/[0-9]{8}T[0-9]{6}Z/$' | awk -F/ '{ print $3 " " $1 }' | sort | tail -1)
+if [ -z "$NEWEST" ]; then
+  case " $RESTORE_DRILL_ARGS " in *" --dry-run "*) echo "restore-drill: dry run — no base backup under @B@/ yet; the scratch cluster will start empty"; exit 0;; esac
+  echo "restore-drill: no base backup under @B@/ yet"; exit 1
 fi
-rclone copy "@B@/base/$LATEST" /restore/base --stats-one-line -v
+LATEST=${NEWEST% *}; SYSID=${NEWEST#* }
+rclone copy "@B@/$SYSID/base/$LATEST" /restore/base --stats-one-line -v
 START=$(cat /restore/base/START_WAL 2>/dev/null || true)
-if ! rclone lsf @B@/wal/ --files-only > /restore/wal-all.list 2> /restore/lsf.err; then
+if ! rclone lsf "@B@/$SYSID/wal/" --files-only > /restore/wal-all.list 2> /restore/lsf.err; then
   grep -q "directory not found" /restore/lsf.err || { cat /restore/lsf.err; exit 1; }
 fi
 awk -v s="$START" '{ n = $0; sub(/\.gz$/, "", n); if (s == "" || (n "") >= (s "")) print }' /restore/wal-all.list > /restore/wal.list
-rclone copy @B@/wal /restore/wal --files-from /restore/wal.list --no-traverse --stats-one-line -v
-echo "restore-drill: fetched base $LATEST and $(wc -l < /restore/wal.list) of $(wc -l < /restore/wal-all.list) archived WAL files (from ${START:-the beginning}) from store B"` | replace "@B@" $b -}}
+rclone copy "@B@/$SYSID/wal" /restore/wal --files-from /restore/wal.list --no-traverse --stats-one-line -v
+echo "restore-drill: fetched cluster $SYSID base $LATEST and $(wc -l < /restore/wal.list) of $(wc -l < /restore/wal-all.list) archived WAL files (from ${START:-the beginning}) from store B"` | replace "@B@" $b -}}
 {{- $fetchEnv := printf "%s\n- name: RESTORE_DRILL_ARGS\n  value: \"\"" (include "energy-platform.rcloneEnv" (dict "root" . "alias" "B" "store" .Values.bronze.replica "secret" "BRONZE_REPLICA")) -}}
 {{- $fetchMounts := list (dict "name" "restore" "mountPath" "/restore") -}}
 {{- $fetchContainer := include "energy-platform.rcloneContainer" (dict "root" . "name" "fetch" "script" $fetch "env" $fetchEnv "mounts" $fetchMounts) -}}

@@ -179,6 +179,14 @@ smoke-test`: exit 0 in 257 s; local schedules: base every 10 min, WAL every 5, r
 | `restore-drill` 23:10 | failed loudly, "no base backup under B:…/base/ yet" — base, WAL ship and replication fired in the same minute (first-run behaviour, as on 2026-09-22) |
 | `restore-drill` 23:20 | fetched base `20260922T231007Z` and **3 of 6** archived WAL files (from `…04`); `restored log file "000000010000000000000004" from archive` (the `.gz` path of `restore_command`), archive recovery complete; restored database and Bronze-only rebuild both **identical** to live (4 targets, 690 Silver versions); 31 s wall clock |
 
+Per-cluster archive paths (amendment 1 §6, 2026-09-23): the first demo release had shipped
+`backups/postgres/wal/000000010000000000000001.gz` before it had to be reinstalled; a fresh
+cluster's `…01` would have collided with that locked object on every run. On kind after the
+change: `pg-wal-ship` → `A:bronze/backups/postgres/7688498667088228381/wal/`, `pg-backup` → the
+same cluster's `base/20260923T063545Z/`, replication copied it, and the restore drill fetched
+"cluster 7688498667088228381 base 20260923T063545Z" and matched live (identical or live ⊆ rebuild
+on every target).
+
 Demo projection (not a measurement): one base a day plus about 12 closed segments an hour at
 16–150 KB each — tens of MB a day into A and B instead of ≈ 4.5 GiB of WAL plus 96 bases.
 

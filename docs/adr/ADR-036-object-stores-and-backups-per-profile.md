@@ -152,6 +152,14 @@ kind never showed the problem because nothing ran long enough and MinIO's lock t
    before this amendment, the plain segment.
 5. RPO for Silver: `archive_timeout` (5 min) + `walSchedule` (10 min) = 15 min, the ADR-002
    target. Base-backup frequency moves only the replay length, i.e. RTO, which the drill measures.
+6. *(added 2026-09-23, first demo deploy)* Every archive path carries the cluster's **system
+   identifier** (`pg_control_system()`): `<backupPrefix>/<system id>/base/<stamp>/` and
+   `<backupPrefix>/<system id>/wal/`. A re-initialised cluster — a fresh deploy, a Bronze-only
+   rebuild — restarts WAL names at `…01`; in a shared prefix its first segment would meet the
+   earlier cluster's locked object at the same key and every `pg-wal-ship` run would fail
+   (`--immutable`), with no way to delete the old object for 90 days. The restore drill takes
+   the newest base across system identifiers and that cluster's WAL. This is what pgBackRest's
+   stanza and WAL-G's system-identifier check do.
 
 **Consequences.** Base backups and WAL still live 90 days under the store-A lock and in B
 (deleting expired ones stays a documented Level 3 step), but the daily volume is one compressed

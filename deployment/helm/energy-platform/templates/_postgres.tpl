@@ -25,3 +25,12 @@ pg_hba.conf: |
   host    replication  all  0.0.0.0/0  scram-sha-256
   host    replication  all  ::/0       scram-sha-256
 {{- end -}}
+
+{{/* ADR-036 amendment 1 §6: every archive path carries the cluster's system identifier, so a
+re-initialised cluster (new deploy, Bronze-only rebuild) never collides with the locked WAL of
+an earlier one. Writes the identifier to the given file and refuses anything but digits.
+dict "root" $ "out" "/work/SYSTEM_ID" */}}
+{{- define "energy-platform.systemIdScript" -}}
+psql -h {{ include "energy-platform.fullname" .root }}-postgres -U {{ .root.Values.postgres.user }} -d {{ .root.Values.postgres.database }} -Atc "select system_identifier from pg_control_system()" > {{ .out }}
+grep -Eq '^[0-9]+$' {{ .out }} || { echo "system identifier unreadable: $(cat {{ .out }})" >&2; exit 1; }
+{{- end -}}

@@ -227,6 +227,8 @@ def test_dr_workloads_render_behind_their_flags(tmp_path: Path) -> None:
     base = backup["initContainers"][0]["args"][0]
     assert "pg_basebackup" in base and "-X stream" in base
     assert "backup_label" in base and "> /backup/base/START_WAL" in base
+    assert "> /backup/base/SYSTEM_ID" in base
+    assert "A:bronze/backups/postgres/$SYSID/base/$STAMP/" in backup["containers"][0]["args"][0]
     assert "wal-archive" not in {v["name"] for v in backup["volumes"]}  # base only (amendment 1)
     drill = local["ep-energy-platform-restore-drill"]["spec"]["jobTemplate"]["spec"]["template"][
         "spec"
@@ -235,7 +237,10 @@ def test_dr_workloads_render_behind_their_flags(tmp_path: Path) -> None:
     assert names == ["fetch", "prep", "scratch-postgres"]
     assert drill["initContainers"][2]["restartPolicy"] == "Always"  # native sidecar
     fetch = drill["initContainers"][0]["args"][0]
-    assert "B:bronze-replica/backups/postgres/base/" in fetch
+    # newest base across clusters, then that cluster's WAL (ADR-036 amendment 1 §6)
+    assert "rclone lsf -R B:bronze-replica/backups/postgres/" in fetch
+    assert '"B:bronze-replica/backups/postgres/$SYSID/base/$LATEST"' in fetch
+    assert '"B:bronze-replica/backups/postgres/$SYSID/wal"' in fetch
     assert "/restore/base/START_WAL" in fetch and "--files-from /restore/wal.list" in fetch
     assert "gzip -dc /restore/wal/%f.gz" in drill["initContainers"][1]["args"][0]
     env = {e["name"] for e in drill["containers"][0]["env"]}
@@ -263,10 +268,14 @@ def test_wal_archive_is_compressed_shipped_and_pruned(tmp_path: Path) -> None:
     assert ship["spec"]["schedule"] == "*/5 * * * *"
     pod = ship["spec"]["jobTemplate"]["spec"]["template"]["spec"]
     script = pod["containers"][0]["args"][0]
-    move = "rclone move /wal-archive A:bronze/backups/postgres/wal/ --immutable --checksum"
+    move = "rclone move /wal-archive A:bronze/backups/postgres/$SYSID/wal/ --immutable --checksum"
     assert move in script
     assert "--exclude '*.part'" in script and "rclone copy" not in script
     assert pod["affinity"]["podAffinity"]  # pinned next to Postgres: the WAL claim is RWO
+    # the archive is named by the cluster (§6): a re-initialised cluster restarts WAL names
+    sysid = pod["initContainers"][0]
+    assert sysid["name"] == "system-id" and "pg_control_system()" in sysid["args"][0]
+    assert "SYSID=$(cat /work/SYSTEM_ID)" in script
     claim = next(v for v in pod["volumes"] if v["name"] == "wal-archive")
     assert not claim["persistentVolumeClaim"].get("readOnly")  # move deletes after upload
     old_key = tmp_path / "old-key.yaml"

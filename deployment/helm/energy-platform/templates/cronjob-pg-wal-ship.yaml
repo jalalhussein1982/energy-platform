@@ -1,6 +1,7 @@
 {{- /*
 ADR-036 amendment 1: the WAL archive leaves the wal-archive volume only once it is in store A.
-`rclone move --immutable --checksum` uploads each compressed segment to <backupPrefix>/wal/ and
+`rclone move --immutable --checksum` uploads each compressed segment to
+<backupPrefix>/<system identifier>/wal/ (§6: the init container asks Postgres which cluster it is) and
 deletes the local file after the upload (or when an identical object is already there); an
 object that differs at the same key fails the Job instead of being overwritten. `*.part` files
 are segments archive_command is still writing; lost+found exists on block-device volumes and is
@@ -9,9 +10,9 @@ because the wal-archive claim is ReadWriteOnce.
 */ -}}
 {{- if and (eq .Values.postgres.mode "statefulset") .Values.postgres.backup.enabled }}
 {{- $fullname := include "energy-platform.fullname" . -}}
-{{- $script := printf "rclone move /wal-archive A:%s/%s/wal/ --immutable --checksum --exclude '*.part' --exclude 'lost+found/**' --s3-no-check-bucket --stats-one-line -v\necho \"pg-wal-ship: shipped to A:%s/%s/wal/; $(find /wal-archive -maxdepth 1 -name '*.gz' | wc -l) segments left on the volume\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
+{{- $script := printf "SYSID=$(cat /work/SYSTEM_ID)\nrclone move /wal-archive A:%s/%s/$SYSID/wal/ --immutable --checksum --exclude '*.part' --exclude 'lost+found/**' --s3-no-check-bucket --stats-one-line -v\necho \"pg-wal-ship: shipped to A:%s/%s/$SYSID/wal/; $(find /wal-archive -maxdepth 1 -name '*.gz' | wc -l) segments left on the volume\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
 {{- $env := include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE") -}}
-{{- $mounts := list (dict "name" "wal-archive" "mountPath" "/wal-archive") -}}
+{{- $mounts := list (dict "name" "wal-archive" "mountPath" "/wal-archive") (dict "name" "work" "mountPath" "/work" "readOnly" true) -}}
 {{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "ship" "script" $script "env" $env "mounts" $mounts) -}}
 apiVersion: batch/v1
 kind: CronJob
@@ -50,10 +51,36 @@ spec:
                     matchLabels:
 {{ include "energy-platform.selectorLabels" . | indent 22 }}
                       energy-platform.io/role: postgres
+          initContainers:
+            - name: system-id
+              image: {{ include "energy-platform.thirdPartyImage" .Values.postgres.image }}
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+{{ include "energy-platform.systemIdScript" (dict "root" . "out" "/work/SYSTEM_ID") | indent 18 }}
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secrets.existingSecret }}
+                      key: POSTGRES_PASSWORD
+                - name: HOME
+                  value: /tmp
+              securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 16 }}
+              resources:
+{{ toYaml .Values.resources.job | indent 16 }}
+              volumeMounts:
+                - name: work
+                  mountPath: /work
+                - name: tmp
+                  mountPath: /tmp
           containers:
 {{ $container | indent 12 }}
           volumes:
             - name: tmp
+              emptyDir: {}
+            - name: work
               emptyDir: {}
             - name: wal-archive
               persistentVolumeClaim:
