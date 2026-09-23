@@ -1,0 +1,15 @@
+fixture: edge_values
+checked_by: "Codex, 2026-09-23: values read directly from fixtures/edge_values/blob with ElementTree; counts and UTC offsets calculated by hand, never copied from platform output; human review pending"
+expect:
+  row_count: 288
+  quality_events: [partition_status]
+  rows:
+    - {delivery_start_utc: 2026-09-20T22:00:00Z, resolution: PT15M, period_index: 1, source_version: "0", metric: system_imbalance, value: "-12.50000"}
+    - {delivery_start_utc: 2026-09-20T22:00:00Z, resolution: PT15M, period_index: 1, source_version: "0", metric: imbalance_price, value: "0.000"}
+    - {delivery_start_utc: 2026-09-20T22:00:00Z, resolution: PT15M, period_index: 1, source_version: "0", metric: counter_imbalance_price, value: "-345.750"}
+    - {delivery_start_utc: 2026-09-20T22:15:00Z, resolution: PT15M, period_index: 2, source_version: "0", metric: system_imbalance, value: "0.00000"}
+    - {delivery_start_utc: 2026-09-20T22:15:00Z, resolution: PT15M, period_index: 2, source_version: "0", metric: imbalance_price, value: null}
+    - {delivery_start_utc: 2026-09-20T22:15:00Z, resolution: PT15M, period_index: 2, source_version: "0", metric: counter_imbalance_price, value: "0.000"}
+    - {delivery_start_utc: 2026-09-20T22:30:00Z, resolution: PT15M, period_index: 3, source_version: "0", metric: system_imbalance, value: null}
+    - {delivery_start_utc: 2026-09-20T22:30:00Z, resolution: PT15M, period_index: 3, source_version: "0", metric: imbalance_price, value: "-123.250"}
+    - {delivery_start_utc: 2026-09-20T22:30:00Z, resolution: PT15M, period_index: 3, source_version: "0", metric: counter_imbalance_price, value: null}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic fixture; no live settlement values. -->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <GetImbalanceSettlementPeriodEResponse xmlns="http://www.ote-cr.cz/schema/service/public">
+      <Result>
+        <Item><Version>0</Version><Date>2026-09-21</Date><PeriodResolution>PT15M</PeriodResolution><PeriodIndex>1</PeriodIndex><SystemImbalance>1,12500</SystemImbalance><SettlImbalancePrice>1001.250</SettlImbalancePrice><SettlCounterImbalancePrice>2001.750</SettlCounterImbalancePrice><Sum>101.00000</Sum><PositiveImbalance>111.00000</PositiveImbalance><NegativeImbalance>-10.00000</NegativeImbalance><RoundedImbalance>1.00000</RoundedImbalance><ReCost>222.000</ReCost><ImbalanceCost>333.000</ImbalanceCost><PriceWARE>444.00</PriceWARE><PriceRE>555.00</PriceRE><PriceWAIM>666.00</PriceWAIM><PriceCurve>777.00</PriceCurve><Emerg>0</Emerg></Item>
+      </Result>
+    </GetImbalanceSettlementPeriodEResponse>
+  </soapenv:Body>
+</soapenv:Envelope>
