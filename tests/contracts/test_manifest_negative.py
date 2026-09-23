@@ -206,6 +206,38 @@ def test_secret_ref_is_not_a_secret() -> None:
     Manifest.model_validate(data)
 
 
+@pytest.mark.parametrize(
+    "expr",
+    [
+        "{delivery_day.__class__}",
+        "{month_start.__getitem__.__globals__[calendar]}",
+        "{delivery_day!r}",
+        "{delivery_day:{scheduled_for}}",
+        "{month_start[13]:%Y-%m-%d}",
+        "{month_start:%Y-%m-%d}",
+        "{previous_day:%Y-%m-%d}",
+    ],
+)
+def test_template_traversal_or_unknown_name_rejected(expr: str) -> None:
+    # 05 C-62: str.format walks attributes and items; a template could otherwise render
+    # os.environ (a platform credential) into a request to a registered host
+    data = with_(t1_manifest(), "fetch.soap_xml.params.start_date", expr)
+    _rejects(data, "placeholder")
+
+
+def test_soap_body_may_only_name_params() -> None:
+    body = t1_manifest()["fetch"]["soap_xml"]["body_template"].replace(
+        "{start_date}", "{start_date.__class__}"
+    )
+    _rejects(with_(t1_manifest(), "fetch.soap_xml.body_template", body), "placeholder")
+
+
+def test_month_offsets_are_valid_placeholders() -> None:
+    data = with_(t1_manifest(), "fetch.soap_xml.params.start_date", "{month_start[1]:%Y-%m-%d}")
+    data = with_(data, "fetch.soap_xml.params.end_date", "{month_end[1]:%Y-%m-%d}")
+    Manifest.model_validate(data)
+
+
 # ----------------------------------------------------------------- YAML subset (ADR-017)
 
 

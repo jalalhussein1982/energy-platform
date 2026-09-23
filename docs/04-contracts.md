@@ -199,9 +199,15 @@ body. A URL must not carry a port (ports come from the host registry).
 | `rest-json` | `rest_json` | `url_template`, `query`, `headers`, optional `auth` (§3.4), optional `rate_limit {requests, per}` |
 | `rest-xml` | `rest_xml` | same fields as `rest_json` |
 
-Placeholder expressions are rendered by the Phase 2 fetch layer from the run context
-(`delivery_day`, `next_delivery_day` — the following civil day, for a source that publishes day D
-on D-1, ADR-033 §4 — and `scheduled_for`); Phase 1 only checks that they contain no credential.
+Placeholder expressions are rendered by the Phase 2 fetch layer from the run context:
+`delivery_day`, `next_delivery_day` (the following civil day, for a source that publishes day D
+on D-1, ADR-033 §4), `scheduled_for`, and `month_start[k]` / `month_end[k]` (the first and last
+civil day of the month *k* months before the delivery day's month, 0 ≤ *k* ≤ 12, for a source
+that settles a whole month long after it ends, ADR-033 amendment 1). A field is a bare name, or
+one of the two month names with a literal index. Attribute access (`{delivery_day.year}`), other
+indexes, conversions (`!r`) and nested placeholders are refused at validation and at render
+(`05` C-62). A SOAP `body_template` may name only its own `params`, and no expression may contain
+a credential.
 
 ### 3.4 `secretRef`
 
@@ -342,6 +348,7 @@ a target.
 | golden file model: rows, a quarantine or `row_count: 0` (an empty document), `checked_by`, no YAML floats (ADR-020; 05 C-16; P4-D6) | `tests/contracts/test_golden.py`, `tests/harness/test_goldens.py::test_empty_document_golden_passes` |
 | `cadence.correction` shape; `mapping.ignore_fields` never names a mapped source, silences only the listed fields (ADR-033, ADR-034) | `tests/contracts/test_manifest.py`, `test_manifest_negative.py`, `tests/mapping/test_engine.py::test_ignore_fields_silences_only_the_listed_columns` |
 | `next_delivery_day` renders the following civil day (ADR-033 §4) | `tests/fetch/test_render.py::test_next_delivery_day_is_the_following_civil_day` |
+| `month_start[k]` / `month_end[k]` render whole earlier months (year boundary, February, the Prague delivery day); attribute access, conversions and nesting refused (ADR-033 amendment 1, 05 C-62) | `tests/fetch/test_render.py`, `tests/contracts/test_manifest_negative.py::test_template_traversal_or_unknown_name_rejected` |
 | every committed target's goldens (T1, T2, T3, E1 — 38 goldens on the four `target/*` branches) run through the production pipeline on `make test` | `tests/harness/test_goldens.py::test_committed_target_golden` (auto-discovered) |
 | nightly live smoke, shape only, never in PR CI (ADR-020) | `tests/live/test_smoke.py` (marked `live`, `make live-smoke`) |
 | freshness SLI (ADR-037): 01 §5 states in order complete → pending → late → partial, DST-aware expected periods, hour partition for `ceps.load`, `source_unavailable` vs `pipeline_failed`, `target_freshness` upsert on both stores (migration `0003_freshness`, downgrade exercised by `make db-test`) | `tests/runtime/test_freshness.py`, `tests/store/test_store.py::test_freshness_row_is_upserted_and_period_helpers_agree`, `tests/cli/test_cli.py::test_gaps_with_freshness_writes_the_sli_row` (`db`) |

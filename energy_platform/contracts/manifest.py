@@ -31,6 +31,7 @@ from energy_platform.contracts.intervals import IntervalLabel, parse_duration
 from energy_platform.contracts.parser import DecodeKind
 from energy_platform.contracts.registry import Transport
 from energy_platform.contracts.registry import dataset as registered_dataset
+from energy_platform.contracts.templates import RUN_NAMES, TemplateError, check_template
 
 SCHEMA_VERSION = 1
 Modality = Literal["soap-xml", "dated-file", "html-table", "rest-json", "rest-xml"]
@@ -157,6 +158,21 @@ class FetchBlock(_Model):
     @property
     def key(self) -> str:
         return next(k for k in _FETCH_KEYS if getattr(self, k) is not None)
+
+    def templates(self) -> tuple[tuple[str, str, frozenset[str], bool], ...]:
+        """Every string the fetch layer renders: ``(where, template, names, month_index)``."""
+        block: Any = getattr(self, self.key)
+        found: list[tuple[str, str, frozenset[str], bool]] = []
+        if isinstance(block, SoapXmlFetch):
+            found += [(f"params.{k}", v, RUN_NAMES, True) for k, v in block.params.items()]
+            found.append(("body_template", block.body_template, frozenset(block.params), False))
+        elif isinstance(block, DatedFileFetch):
+            found.append(("url_template", block.url_template, RUN_NAMES, True))
+        elif isinstance(block, RestJsonFetch | RestXmlFetch):
+            found.append(("url_template", block.url_template, RUN_NAMES, True))
+            found += [(f"query.{k}", v, RUN_NAMES, True) for k, v in block.query.items()]
+            found += [(f"headers.{k}", v, RUN_NAMES, True) for k, v in block.headers.items()]
+        return tuple(found)
 
     def urls(self) -> tuple[str, ...]:
         """Every literal URL or URL template in the block, for host and scheme checks."""
@@ -477,6 +493,11 @@ class Manifest(_Model):
                 f"fetch block contains a credential-looking string ({secret}); "
                 "use secretRef (ADR-017)"
             )
+        for where, template, names, month_index in self.fetch.templates():
+            try:
+                check_template(template, names=names, month_index=month_index)
+            except TemplateError as exc:
+                raise ValueError(f"fetch.{self.fetch.key}.{where}: {exc}") from exc
         declared = set(self.contract.metrics)
         mapped = set(self.mapping.metrics)
         if declared != mapped:

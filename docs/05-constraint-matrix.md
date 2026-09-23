@@ -114,14 +114,15 @@
 | C-59 | **Triage proposal reaching beyond the target's mapping** (another file; any model path other than `mapping.metrics.*.source`, `*.decimal_separator`, `mapping.time.*.source`, `mapping.ignore_fields`; a push) | text edits limited to those keys, re-parse, model-level diff guard; output is one proposal file in the outbox | `test` | `tests/triage/test_injection.py::test_proposal_touches_only_the_target_manifest`, `tests/triage/test_pipeline.py::test_renamed_field_yields_manifest_only_proposal` |
 | C-60 | **Triage fed unbounded or instruction-bearing content** (the untrusted document in the system prompt; a source name the document does not contain; paragraphs, control or bidi characters) | bounded extractor (≤ 3 records, 64-char values, 4 000-char sample, name pattern); constant system prompt; proposals may only name inventory fields | `test` | `tests/triage/test_extractor.py::test_sample_is_bounded_and_data_only`, `tests/triage/test_extractor.py::test_hostile_text_is_truncated_and_stripped`, `tests/triage/test_injection.py::test_system_prompt_is_constant`, `tests/triage/test_injection.py::test_invented_source_field_rejected` |
 | C-61 | **Platform depending on the LLM** (ADR-009: model unavailable must leave the data platform unaffected) | triage returns `no_proposal`; no module on the capture/process path imports `energy_platform.triage` | `test` | `tests/triage/test_pipeline.py::test_llm_unavailable_returns_no_proposal` |
+| C-62 | **Template traversal in a fetch block** (`{delivery_day.__class__…}`, `{month_start.__getitem__.__globals__[…]}`, `!r`, a nested placeholder, an unknown name, a month index outside 0…12): `str.format` walks attributes and items, so a manifest could render `os.environ` (a platform credential) into a request to a registered host (ADR-033 amendment 1, ADR-017) | manifest: `contracts.templates.check_template` on every rendered string; fetch: the same check before `format_map` | `harness-check`; runtime | `tests/contracts/test_manifest_negative.py::test_template_traversal_or_unknown_name_rejected`, `tests/contracts/test_manifest_negative.py::test_soap_body_may_only_name_params`, `tests/fetch/test_render.py::test_attribute_access_conversions_and_nesting_are_refused` |
 
 ## 2. Gate inventory (what CI actually runs)
 
 | Make target | Runs | Rows |
 |---|---|---|
 | `lint` | ruff (`DTZ`, `S`, `BLE`, `TID251`, …), ruff format, import-linter, `scripts/check_target_surface.py` | C-01…C-16, C-18, C-19, C-30 |
-| `test` | pytest with sockets disabled; `tests/harness/test_goldens.py` auto-discovers every `targets/*/tests/golden/*.yaml`; `conftest.py` refuses an incomplete target at session start | C-07, C-09, C-14…C-17, C-31…C-37, C-46…C-53 |
-| `harness-check` | `validate-targets` (`energyctl validate --all`), `migration-check`, `workload-check` | C-04, C-19…C-29, C-42…C-45, C-54 |
+| `test` | pytest with sockets disabled; `tests/harness/test_goldens.py` auto-discovers every `targets/*/tests/golden/*.yaml`; `conftest.py` refuses an incomplete target at session start | C-07, C-09, C-14…C-17, C-31…C-37, C-46…C-53, C-58…C-62 |
+| `harness-check` | `validate-targets` (`energyctl validate --all`), `migration-check`, `workload-check` | C-04, C-19…C-29, C-42…C-45, C-54, C-62 |
 | `pr-surface` | `scripts/check_pr_surface.py` on `BASE…HEAD` (only on pull requests; says so and exits 0 otherwise) | C-39…C-41 |
 | `deps-allowlist`, `lock-check` | allowlist and lockfile consistency | C-38 |
 | `secret-scan` | credential-looking strings in tracked files | C-26 |

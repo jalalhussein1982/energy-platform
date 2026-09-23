@@ -6,6 +6,7 @@
 | Date | 2026-09-20 |
 | Resolves | D-5 (`02-architecture-decisions.md` §4.2), implementing its recorded default; closes the `04-contracts.md` §5 "delivery-day offset" question |
 | Supersedes | — |
+| Amended | 2026-09-23, amendment 1 (below): §4 gains `month_start[k]` / `month_end[k]`; every template field is checked (bare names only) |
 
 ## Context
 
@@ -95,6 +96,42 @@ golden runner for a feature whose only purpose is to notice late corrections.
 - Known weakness: until Phase 5 the committed targets capture only their own day, so a
   correction published on D+1 is picked up only by a manual `energyctl capture --force`. Recorded
   in `docs/06` per target.
+
+## Amendment 1 (2026-09-23) — month-offset placeholders, strict template fields
+
+**Context.** OTE's imbalance settlement exists in three versions per delivery day: 0 (daily),
+1 (monthly), 2 (final). Bounded reads on 2026-09-23 (`docs/06` §9.1) found version 1 already
+published for 2026-08-31 (at most 23 days after the month ended) and version 2 published for
+May 2026 but not for June (roughly 3–4 months after the month ended). Neither version can be
+expressed today: §3's correction window is at most 31 days, and §4 allows only `delivery_day`,
+`next_delivery_day` and `scheduled_for`, so no request can name an earlier month (`docs/09` F-4).
+
+**Decision.**
+
+1. §4 gains two indexed render names: **`month_start[k]`** and **`month_end[k]`**, the first
+   and last civil day of the calendar month *k* months before the delivery day's month
+   (0 ≤ *k* ≤ 12; the delivery day is still the source-timezone date of `scheduled_for`). A
+   settlement target asks for "the previous month" with
+   `start_date: "{month_start[1]:%Y-%m-%d}"`, `end_date: "{month_end[1]:%Y-%m-%d}"` on a
+   monthly cron (the 1st), and keeps re-polling that one run for up to 31 days with §3's
+   correction window. A day without a run is skipped by the correction, so this costs one
+   request per day. The run identity, the ledger and Bronze are untouched. The observations
+   carry each item's own `Date`, exactly as for `next_delivery_day`.
+2. **Every template field is checked, statically and at render time**
+   (`energy_platform/contracts/templates.py`, used by manifest validation and by
+   `energy_platform/fetch/render.py`). A field must be a bare allowed name, or `month_start[k]` /
+   `month_end[k]` with a literal *k* in 0…12. Attribute access, any other index, conversions
+   (`!r`) and nested placeholders inside a format spec are refused, and a SOAP body may name only
+   its own `params`. The reason is that `str.format` walks attributes and items. From a
+   Python-level context object, `{month_start.__getitem__.__globals__[calendar].sys.modules[os].environ[…]}`
+   renders a process environment variable (demonstrated while this amendment was written),
+   which would send a platform credential to a registered host. The check closes that path for
+   the older names as well. `05` C-62.
+
+**Rejected.** A general date-arithmetic language in templates (a small interpreter to review
+and gate for one use); a per-target delivery-day offset (rejected above, for the same reasons);
+raising the correction window to about 130 days (130 requests per firing, and version 1 would
+still not be a month document).
 
 ## Verification refs
 

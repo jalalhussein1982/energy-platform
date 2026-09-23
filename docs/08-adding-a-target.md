@@ -99,7 +99,7 @@ Field by field:
 | `allowed_hosts` | the host(s) from the admission; nothing else |
 | `cadence.cron` | how often to fetch (Europe/Prague); `correction` re-polls past days when the source revises |
 | `history.max_age` | how far back the source serves data (ISO duration) |
-| `fetch.<modality>` | URL, SOAP action and body template with `{start_date}`-style parameters; `params` render them from `{delivery_day:%Y-%m-%d}` or `{next_delivery_day:…}` |
+| `fetch.<modality>` | URL, SOAP action and body template with `{start_date}`-style parameters; `params` render them from `{delivery_day:%Y-%m-%d}`, `{next_delivery_day:…}`, or, for a whole earlier month, `{month_start[k]:…}` / `{month_end[k]:…}` (*k* months back, 0…12); nothing else, and no attribute access |
 | `contract` | `dataset_id`, `source_transport`, `decode`, and the metric list |
 | `mapping.dimensions` | the constant identity dimensions (e.g. `bidding_zone: CZ`) |
 | `mapping.time` | `kind: period_index` with `date`, `index`, `resolution` (each `{source: <field>}`, `{constant: …}` or `{context: delivery_day}`), or `kind: timestamp` |

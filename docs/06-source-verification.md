@@ -214,5 +214,22 @@ Admission check (not committed, nothing under `targets/`): a scratch manifest fo
 generic SOAP parser to 288 observations (96 periods × 3 metrics), no quality event, the first
 period at 2026-09-20T22:00Z (local midnight), `source_version` = `0`.
 
-Not verified: the meaning of the imbalance sign (`SystemImbalance` published as is), when
-versions 1 and 2 appear for a day, history depth, and the fields not admitted.
+Not verified: the meaning of the imbalance sign (`SystemImbalance` published as is), history depth, and the fields not admitted.
+
+### 9.1 When versions 1 and 2 appear (2026-09-23, Phase 9)
+
+Seven bounded reads (curl, 25 s timeout, no retry, one day each), payloads in local evidence
+(`~/.config/energy-platform/evidence/2026-09-23/phase9/`, `SHA256SUMS`), nothing committed:
+
+| Request | Result |
+|---|---|
+| `Version 1`, 2026-08-31 | HTTP 200, 60 597 B, 96 items |
+| `Version 2`, 2026-08-01, 2026-07-01, 2026-06-01 | HTTP 200, 248 B, empty `<Result/>` each |
+| `Version 2`, 2026-05-01, 2026-03-01, 2025-09-01 | HTTP 200, 60 492 / 60 169 / 60 383 B, 96 items each |
+
+So on 2026-09-23 the monthly settlement (version 1) of August was out, at most 23 days after the
+month ended. The final settlement (version 2) of May was out and that of June was not: roughly
+3–4 months after the month ended. A day's version-0 request asks for one day; versions 1 and 2
+are published for a whole month, which is why ADR-033 amendment 1 lets a request name an earlier
+month (`month_start[k]` / `month_end[k]`) instead of widening the correction window. Not verified:
+the exact publication days (the bounds above come from one afternoon's reads).

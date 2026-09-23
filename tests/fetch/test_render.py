@@ -1,4 +1,5 @@
-"""Placeholder rendering: only delivery_day, next_delivery_day and scheduled_for exist."""
+"""Placeholder rendering: delivery_day, next_delivery_day, scheduled_for and month_start[k] /
+month_end[k] exist (ADR-033 §4, amendment 1); nothing else, and no attribute access."""
 
 from __future__ import annotations
 
@@ -64,3 +65,73 @@ def test_second_stage_fills_soap_params_only() -> None:
     assert render_with("<a>{start_date}</a>", {"start_date": "2026-09-18"}) == "<a>2026-09-18</a>"
     with pytest.raises(RenderError):
         render_with("<a>{end_date}</a>", {"start_date": "2026-09-18"})
+
+
+def test_month_offsets_name_whole_earlier_months() -> None:
+    c = ctx()  # delivery day 2026-09-18
+    assert render("{month_start[0]:%Y-%m-%d}/{month_end[0]:%Y-%m-%d}", c) == "2026-09-01/2026-09-30"
+    assert render("{month_start[1]:%Y-%m-%d}/{month_end[1]:%Y-%m-%d}", c) == "2026-08-01/2026-08-31"
+    assert render("{month_start[4]:%Y-%m-%d}/{month_end[4]:%Y-%m-%d}", c) == "2026-05-01/2026-05-31"
+    assert render("{month_start[12]:%Y-%m-%d}", c) == "2025-09-01"
+
+
+def test_month_offsets_cross_the_year_and_know_february() -> None:
+    january = FetchContext.for_run(datetime(2026, 1, 15, 12, 0, tzinfo=UTC))
+    assert render("{month_start[1]:%Y-%m-%d}/{month_end[1]:%Y-%m-%d}", january) == (
+        "2025-12-01/2025-12-31"
+    )
+    leap = FetchContext.for_run(datetime(2028, 3, 1, 12, 0, tzinfo=UTC))
+    assert render("{month_end[1]:%Y-%m-%d}", leap) == "2028-02-29"
+    common = FetchContext.for_run(datetime(2027, 3, 1, 12, 0, tzinfo=UTC))
+    assert render("{month_end[1]:%Y-%m-%d}", common) == "2027-02-28"
+
+
+def test_month_offsets_follow_the_prague_delivery_day() -> None:
+    # 22:30 UTC on 30 September is 00:30 on 1 October in Prague: the previous month is September
+    first = FetchContext.for_run(datetime(2026, 9, 30, 22, 30, tzinfo=UTC))
+    assert first.delivery_day == date(2026, 10, 1)
+    assert render("{month_start[1]:%Y-%m-%d}/{month_end[1]:%Y-%m-%d}", first) == (
+        "2026-09-01/2026-09-30"
+    )
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "{month_start[13]:%Y-%m-%d}",
+        "{month_end[99]:%Y-%m-%d}",
+        "{month_start[-1]:%Y-%m-%d}",
+        "{month_start[k]:%Y-%m-%d}",
+        "{month_start:%Y-%m-%d}",
+        "{month_end}",
+    ],
+)
+def test_month_offsets_need_an_index_within_bounds(template: str) -> None:
+    with pytest.raises(RenderError):
+        render(template, ctx())
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "{delivery_day.__class__}",
+        "{scheduled_for.tzinfo}",
+        "{month_start.__getitem__.__globals__[calendar]}",
+        "{month_start[1].__class__}",
+        "{delivery_day!r}",
+        "{delivery_day:{scheduled_for}}",
+        "{0}",
+        "{}",
+    ],
+)
+def test_attribute_access_conversions_and_nesting_are_refused(template: str) -> None:
+    # str.format would walk attributes and items of the context objects: from a Python-level
+    # object that reaches module globals and os.environ, i.e. a platform secret in a request
+    with pytest.raises(RenderError):
+        render(template, ctx())
+
+
+@pytest.mark.parametrize("template", ["<a>{start_date.__class__}</a>", "<a>{start_date[0]}</a>"])
+def test_second_stage_refuses_attribute_and_index_access(template: str) -> None:
+    with pytest.raises(RenderError):
+        render_with(template, {"start_date": "2026-09-18"})
