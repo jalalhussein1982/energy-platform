@@ -37,7 +37,7 @@ A contributor session — adding a target or requesting an admission — follows
 | 4 | Committed-target verification through the harness (01 §3) | 4 | 1–2 | T1, T2, T3, E1 green on fixtures; nightly live smoke defined — **done 2026-09-20** (polling campaign closed without running, 2026-09-23) |
 | 5 | Deployment, IaC, HA, DR, observability | 5 | 3–4 | clean-clone `make local-up && make smoke-test`; restore drill passes — **done 2026-09-22 (local), live demo 2026-09-23** (V-11 closed without running) |
 | 6 | Threat model, triage pipeline, documentation | 5 | 1–2 | `docs/threat-model.md` complete; triage pipeline runs with stubbed LLM — **done 2026-09-23** |
-| 7 | Blind acceptance tests | 6 | 1 | agent PR + junior dry-run pass without core changes |
+| 7 | Blind acceptance tests | 6 | 1 | agent PR + junior dry-run pass without core changes — **done 2026-09-23** (3/3 pass, `docs/09-acceptance-report.md`) |
 | 8 | Submission packaging | — | 1 | README reproducible by a stranger |
 
 ---
@@ -213,10 +213,10 @@ Run 3 — **junior path.** Repeat run 1 via the CLI golden path following `docs/
 
 Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-23, plan P6-D2)*. If run 1 or run 3 required a core change or human architectural guidance, that is a Phase 3 defect: fix the harness, not the report. If run 2 stopped with a correct admission request, that is a pass.
 
-- [ ] Run 1 (adapter addition) recorded
-- [ ] Run 2 (escalation) recorded
-- [ ] Run 3 (junior path) recorded
-- [ ] Defects fed back and closed
+- [x] Run 1 (adapter addition) recorded *(2026-09-23: PASS — PR #1, target-only, CI 12/12, 45/45 golden rows re-derived)*
+- [x] Run 2 (escalation) recorded *(PASS — PR #2, the admission request only; flags Open-Meteo's non-commercial API terms)*
+- [x] Run 3 (junior path) recorded *(PASS — PR #3, CLI only, target-only, CI 12/12, 32/32 golden rows re-derived)*
+- [x] Defects fed back and closed *(F-1 contributor sessions vs the maintainer protocol, F-2 `AGENTS.md` drift — closed with a test in f7c77d1; F-3 memory not perfectly blind, F-4 one version per target: recorded)*
 
 ---
 
