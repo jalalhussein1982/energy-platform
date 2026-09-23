@@ -134,12 +134,18 @@ def test_banned_api_list_covers_every_egress_path() -> None:
 
 def test_deploy_demo_workflow_uses_oidc_and_nothing_stored() -> None:
     """ADR-015 federation clause / V-14: the deploy job holds id-token only, the image job
-    packages only (plan P5-D20); nothing stored; dispatch-only until push is enabled."""
+    packages only (plan P5-D20); nothing stored; on push to main (paths that change what the
+    demo runs) and by hand, never on a pull request (Phase 9, G6)."""
     wf = yaml.safe_load(
         (REPO / ".github" / "workflows" / "deploy-demo.yml").read_text(encoding="utf-8")
     )
     triggers = wf[True] if True in wf else wf["on"]
-    assert set(triggers) == {"workflow_dispatch"}
+    assert set(triggers) == {"push", "workflow_dispatch"}
+    assert triggers["push"]["branches"] == ["main"]
+    paths = set(triggers["push"]["paths"])
+    assert {"energy_platform/**", "targets/**", "deployment/helm/**", "uv.lock"} <= paths
+    assert ".github/workflows/deploy-demo.yml" in paths
+    assert "docs/**" not in paths  # a docs-only push does not rebuild
     assert wf["permissions"] == {"contents": "read"}
     image, deploy = wf["jobs"]["image"], wf["jobs"]["deploy"]
     assert image["permissions"] == {"contents": "read", "packages": "write"}

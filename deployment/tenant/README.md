@@ -61,7 +61,9 @@ live. What it took is in `docs/07-operations.md` §4.1.)*
    `BRONZE_REPLICA_SECRET_ACCESS_KEY` (OCI customer secret key, `verify.env`); and `ghcr-pull`
    from a classic GitHub PAT with `read:packages` only (set an expiry).
 4. Run the `deploy-demo` workflow once by hand (`gh workflow run deploy-demo`); then switch it
-   to `push: main`.
+   to `push: main`. *(Done 2026-09-23, Phase 9: it runs on every push to `main` that touches
+   the platform, a target, the chart, the tenant values, the image, the lock file or the
+   Makefile, and still by hand.)*
 
 The image build needs nothing from you: the workflow pushes it. A deploy from the laptop with
 the admin kubeconfig is `make deploy-tenant ENV=demo KUBECONFIG=… DEMO_OCI_NAMESPACE=…

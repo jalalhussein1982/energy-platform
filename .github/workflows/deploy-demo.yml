@@ -2,10 +2,25 @@
 # cx23 architecture), pushes it to ghcr.io with the job's own token, then deploys that digest to
 # the demo cluster (ADR-028) with the job's OIDC identity (ADR-015 federation clause, V-14): no
 # kubeconfig, no stored token. Each job holds only the permission it needs (plan P5-D20).
-# workflow_dispatch only until the author has run it once by hand and enabled `push: main`.
+# Runs on every push to main that changes what the demo runs (a merged target included), and by
+# hand. Never on pull requests: the cluster accepts only this workflow's token from main
+# (job_workflow_ref, ADR-035 amendment 1).
 name: deploy-demo
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "energy_platform/**"
+      - "targets/**"
+      - "deployment/helm/**"
+      - "deployment/tenant/**"
+      - "deployment/image/**"
+      - "scripts/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+      - ".github/workflows/deploy-demo.yml"
   workflow_dispatch:
 
 permissions:

@@ -150,6 +150,15 @@ added), applied; revisions 1–3 copied to ConfigMaps; `demo-reconfigure` 16 s; 
 captures and gaps ran normally after the restart. The identity `gha:jalalhussein1982/energy-platform`:
 `get`/`list secrets` yes → **no**; `create pods --subresource=exec|portforward|attach` → **no**;
 `create cronjobs`, `create configmaps`, `get replicasets` yes; `list nodes` no.
+The first `deploy-demo` run after the change
+([35894749370](https://github.com/jalalhussein1982/energy-platform/actions/runs/35894749370),
+17:19 UTC) logged the claims `{"repository": "jalalhussein1982/energy-platform", "ref":
+"refs/heads/main", "job_workflow_ref": "jalalhussein1982/energy-platform/.github/workflows/deploy-demo.yml@refs/heads/main",
+"event_name": "workflow_dispatch"}`, authenticated, and **upgraded** the release to revision 4
+under the ConfigMap driver (history 1–4; no re-install). The three Secret-stored records were
+then deleted (`DELETE_SECRETS=1`); the namespace holds only `energy-platform` and `ghcr-pull`.
+From here on `deploy-demo` also runs on a push to `main` that touches what the demo runs
+(Phase 9, G6).
 
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
