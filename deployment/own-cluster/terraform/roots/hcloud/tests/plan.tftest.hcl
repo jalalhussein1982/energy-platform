@@ -105,3 +105,25 @@ run "admin_only_api" {
     error_message = "ADR-028 §2 original shape: 6443 from the author's address only"
   }
 }
+
+# The k3s token is a random_password, unknown at plan time: this run applies against the mock
+# providers (no cloud call; random generates locally) so the rendered cloud-init is known and can
+# be parsed the way cloud-init will parse it on the node.
+run "cloud_init_is_valid_yaml" {
+  command = apply
+
+  assert {
+    condition     = can(yamldecode(nonsensitive(output.server_cloud_init)))
+    error_message = "the rendered server cloud-init must be valid YAML (2026-09-23: an unindented embed made cloud-init drop the whole document and the demo nodes booted without k3s)"
+  }
+
+  assert {
+    condition     = yamldecode(yamldecode(nonsensitive(output.server_cloud_init)).write_files[1].content).anonymous.enabled == false
+    error_message = "the authn.yaml embedded in cloud-init must decode intact, anonymous auth off"
+  }
+
+  assert {
+    condition     = strcontains(yamldecode(nonsensitive(output.server_cloud_init)).write_files[2].content, "kind: RoleBinding")
+    error_message = "the namespace RBAC manifest must be embedded in cloud-init"
+  }
+}

@@ -31,3 +31,9 @@ output "server_type" {
 output "node_count" {
   value = 1 + var.agent_count
 }
+
+output "server_user_data" {
+  description = "The rendered server cloud-init (the mock tests parse it; holds the k3s token)."
+  value       = local.server_user_data
+  sensitive   = true
+}

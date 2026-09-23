@@ -2,6 +2,9 @@
 # k3s server node (ADR-035 §1-§2). Rendered by the nodes module for both roots.
 # Structured authentication (V-14) with anonymous auth explicitly OFF; Traefik and servicelb
 # disabled; secrets encryption on; the embedded NetworkPolicy controller stays on (ADR-026).
+# indent() leaves the FIRST line of its argument alone: each embed below starts at the block's
+# indentation on the template line itself (2026-09-23: without it cloud-init rejected the whole
+# document and the first demo nodes booted without k3s). The roots' mock tests parse the result.
 package_update: true
 packages: [curl, ca-certificates]
 write_files:
@@ -23,11 +26,11 @@ write_files:
   - path: /etc/rancher/k3s/authn.yaml
     permissions: "0600"
     content: |
-${indent(6, authn_yaml)}
+      ${indent(6, authn_yaml)}
   - path: /var/lib/rancher/k3s/server/manifests/energy-platform-rbac.yaml
     permissions: "0644"
     content: |
-${indent(6, rbac_yaml)}
+      ${indent(6, rbac_yaml)}
 runcmd:
   - mkdir -p /var/lib/rancher/k3s/storage /etc/rancher/k3s/config.yaml.d
 %{ if storage_device_glob != "" ~}

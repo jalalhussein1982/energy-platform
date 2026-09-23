@@ -26,6 +26,12 @@ output "authn_yaml" {
   value = module.nodes.authn_yaml
 }
 
+output "server_cloud_init" {
+  description = "The rendered server cloud-init, for the mock tests (holds the k3s token)."
+  value       = module.nodes.server_user_data
+  sensitive   = true
+}
+
 output "bucket_a" {
   value = module.storage.bucket_a
 }

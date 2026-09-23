@@ -33,6 +33,19 @@ locals {
     namespace         = var.namespace
     github_repository = var.github_repository
   })
+  # rendered once: the server's user_data and the server_user_data output the mock tests parse
+  server_user_data = templatefile("${path.module}/../../../cloud-init/k3s-server.yaml.tftpl", {
+    public_ip_metadata_url = "http://169.254.169.254/latest/meta-data/public-ipv4"
+    private_address        = local.server_private_ip
+    private_iface          = var.private_iface
+    cluster_cidr           = var.cluster_cidr
+    service_cidr           = var.service_cidr
+    k3s_token              = random_password.k3s_token.result
+    k3s_version            = var.k3s_version
+    authn_yaml             = local.authn_yaml
+    rbac_yaml              = local.rbac_yaml
+    storage_device_glob    = var.storage_device_glob
+  })
 }
 
 resource "openstack_compute_instance_v2" "server" {
@@ -47,18 +60,7 @@ resource "openstack_compute_instance_v2" "server" {
     fixed_ip_v4 = local.server_private_ip
   }
 
-  user_data = templatefile("${path.module}/../../../cloud-init/k3s-server.yaml.tftpl", {
-    public_ip_metadata_url = "http://169.254.169.254/latest/meta-data/public-ipv4"
-    private_address        = local.server_private_ip
-    private_iface          = var.private_iface
-    cluster_cidr           = var.cluster_cidr
-    service_cidr           = var.service_cidr
-    k3s_token              = random_password.k3s_token.result
-    k3s_version            = var.k3s_version
-    authn_yaml             = local.authn_yaml
-    rbac_yaml              = local.rbac_yaml
-    storage_device_glob    = var.storage_device_glob
-  })
+  user_data = local.server_user_data
 
   metadata = {
     role      = "server"
