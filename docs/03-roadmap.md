@@ -38,7 +38,7 @@ A contributor session — adding a target or requesting an admission — follows
 | 5 | Deployment, IaC, HA, DR, observability | 5 | 3–4 | clean-clone `make local-up && make smoke-test`; restore drill passes — **done 2026-09-22 (local), live demo 2026-09-23** (V-11 closed without running) |
 | 6 | Threat model, triage pipeline, documentation | 5 | 1–2 | `docs/threat-model.md` complete; triage pipeline runs with stubbed LLM — **done 2026-09-23** |
 | 7 | Blind acceptance tests | 6 | 1 | agent PR + junior dry-run pass without core changes — **done 2026-09-23** (3/3 pass, `docs/09-acceptance-report.md`) |
-| 8 | Submission packaging | — | 1 | README reproducible by a stranger |
+| 8 | Submission packaging | — | 1 | README reproducible by a stranger — **done 2026-09-23** (clean clone on a fresh VM: exit 0 in 199 s) |
 
 ---
 
@@ -222,10 +222,10 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 
 ## Phase 8 — Submission packaging
 
-- [ ] `README.md`: what it is, 5-line reproduce block (ADR-010), architecture diagram, how targets are added, how agents are constrained, what was deliberately not built and why (link to §4 defaults not implemented), and a section **"Assumptions and what they cost"** summarising `00-assumptions.md` §2 (reference environment, scenarios A/B/C, each assumption's cost if false, verification verdicts). The reproduce block gains **"or open the live demo"** (ADR-028): URL, how read-only evaluator credentials are handed over out of band, what the demo shows (captures landing, freshness SLI, a restore drill run), and the demo's declared deviations (`residency: DE`, two-node k3s without control-plane HA).
-- [ ] `docs/ci-porting.md` stub: how to port the GitHub Actions wrappers to GitLab CI (ADR-015, A-13).
-- [ ] `docs/` index; ADR log complete; progress log trimmed.
-- [ ] Final clean-clone run on a machine that has never seen the repository.
+- [x] `README.md`: what it is, 5-line reproduce block (ADR-010), architecture diagram, how targets are added, how agents are constrained, what was deliberately not built and why (link to §4 defaults not implemented), and a section **"Assumptions and what they cost"** summarising `00-assumptions.md` §2 (reference environment, scenarios A/B/C, each assumption's cost if false, verification verdicts). The reproduce block gains **"or open the live demo"** (ADR-028): URL, how read-only evaluator credentials are handed over out of band, what the demo shows (captures landing, freshness SLI, a restore drill run), and the demo's declared deviations (`residency: DE`, two-node k3s without control-plane HA).
+- [x] `docs/ci-porting.md` stub: how to port the GitHub Actions wrappers to GitLab CI (ADR-015, A-13).
+- [x] `docs/` index; ADR log complete; progress log trimmed. *(2026-09-23: `docs/README.md`, `docs/adr/README.md`, entries before Phase 5 moved verbatim to `docs/archive/`.)*
+- [x] Final clean-clone run on a machine that has never seen the repository. *(2026-09-23: fresh Ubuntu 24.04 VM; two findings fixed — libpq prerequisite, `smoke-test` under Make 4.x `-e`; then `make check` 815 passed and `local-up && smoke-test` exit 0 in 199 s — `docs/07` §8.1.)*
 
 ---
 

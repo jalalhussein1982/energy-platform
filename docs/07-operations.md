@@ -258,3 +258,17 @@ metric present, dry run `OK in 0.2s`.
 
 Phase gate (03 Phase 5): from a **clean clone**, `make local-down && make local-up && make
 smoke-test` — 2026-09-22 06:37–06:42, commit 93dafd9: **exit 0 in 305 s** (kind node and third-party images already cached on the laptop). Two earlier runs failed honestly and shaped the gate: a fresh cluster has no freshness row until the gaps CronJob fires, so `smoke-test` runs one gaps+freshness Job first; and store B holds no backup yet, so the drill's dry run starts an empty scratch cluster and checks reachability only (the drill pod runs as uid 999 because `initdb` needs its user in `/etc/passwd`).
+
+### 8.1 Clean-clone run on a machine that has never seen the repository (Phase 8, 2026-09-23)
+
+A throwaway Hetzner `cx33` (4 vCPU, 8 GB, Ubuntu 24.04, GNU Make 4.3), created and deleted with
+`hcloud` (plan P8-D1). Tools at the Makefile's pins: Docker 29.8.1, kind v0.33.0, helm v4.3.0,
+kubectl v1.37.0, uv 0.11.7. `git clone` of the public repository, then the README's reproduce block.
+
+| Attempt | Commit | Result |
+|---|---|---|
+| 1 | `59a4e0c` | `make check` **failed at collection**: `ImportError: no pq wrapper available` — psycopg needs the system **libpq**, present on the author's Mac (Homebrew PostgreSQL) and on GitHub's runners, absent on a fresh Ubuntu. With `libpq5` installed: 815 passed. `make local-up` **passed** (kind + Cilium, image by digest, atomic deploy with the migrate and smoke hooks, egress 3/3). `make smoke-test` **failed with Error 143** after "gaps + freshness row written": the recipe `wait`s for the port-forward it has just killed, and GNU Make 4.x runs recipes with `.SHELLFLAGS -e` (Make 3.81 on the Mac ignores it; CI never runs `smoke-test`). |
+| 2 | `cc7842a` (the `|| true` fix), a fresh clone | `make check` exit 0, **815 passed** (73 s); `make local-up && make smoke-test` **exit 0 in 199 s** — egress 3/3 PASS, smoke hook, gaps + freshness row, freshness metric present, restore-drill dry run OK. |
+
+The README lists libpq among the prerequisites. The VM was deleted after the run.
+
