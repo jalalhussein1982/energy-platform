@@ -39,6 +39,7 @@ A contributor session — adding a target or requesting an admission — follows
 | 6 | Threat model, triage pipeline, documentation | 5 | 1–2 | `docs/threat-model.md` complete; triage pipeline runs with stubbed LLM — **done 2026-09-23** |
 | 7 | Blind acceptance tests | 6 | 1 | agent PR + junior dry-run pass without core changes — **done 2026-09-23** (3/3 pass, `docs/09-acceptance-report.md`) |
 | 8 | Submission packaging | — | 1 | README reproducible by a stranger — **done 2026-09-23** (clean clone on a fresh VM: exit 0 in 199 s) |
+| 9 | Gap closure | — | 1 | every gap closed or listed in the README with a reason; final clean clone |
 
 ---
 
@@ -226,6 +227,17 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 - [x] `docs/ci-porting.md` stub: how to port the GitHub Actions wrappers to GitLab CI (ADR-015, A-13).
 - [x] `docs/` index; ADR log complete; progress log trimmed. *(2026-09-23: `docs/README.md`, `docs/adr/README.md`, entries before Phase 5 moved verbatim to `docs/archive/`.)*
 - [x] Final clean-clone run on a machine that has never seen the repository. *(2026-09-23: fresh Ubuntu 24.04 VM; two findings fixed — libpq prerequisite, `smoke-test` under Make 4.x `-e`; then `make check` 815 passed and `local-up && smoke-test` exit 0 in 199 s — `docs/07` §8.1.)*
+
+---
+
+## Phase 9 — Gap closure
+
+**Goal.** Close every gap still open after Phase 8 before delivery (2026-09-24): security and CI residuals first (P1), then evidence and recorded findings (P2), then optional items (P3). A P3 item that is not built goes into the README table "Deliberately not built" with its reason. Plan: `docs/plans/phase-9.md`.
+
+- [ ] P1 — deploy identity pinned to the workflow, deployer `Role` without `secrets`/`exec`, no server replacement (G1); `secretRef` scoped per target (G2); fetch response-size cap (G3); `uv` bootstrap by checksum (G4); `weekly-drills` green on GitHub (G5); `deploy-demo` on push to `main` (G6).
+- [ ] P2 — V-11 probe on the reference cluster (G7); an N-hour publication observation from the demo (G8); settlement versions 1 and 2 as Route A targets on a month-offset render capability (G9, `09` F-4); a strictly blind re-run (G10, `09` F-3); review-1 F09/F12 closed in the response document (G11).
+- [ ] P3 — as far as time allows (G12 … G18); the rest in the README with reasons.
+- [ ] Final clean-clone run on a throwaway VM; threat-model residuals reduced to what remains.
 
 ---
 
