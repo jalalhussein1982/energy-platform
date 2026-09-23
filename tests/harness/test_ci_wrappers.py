@@ -172,6 +172,18 @@ def test_tenant_deploy_keeps_helm_records_in_configmaps() -> None:
     assert not [r for r in resources if re.search(r"\bsecrets\b|pods/exec|pods/portforward", r)]
 
 
+def test_no_ci_reachable_recipe_pipes_a_download_into_a_shell() -> None:
+    """Threat model §3: every tool CI installs is a pinned artefact checked against a pinned
+    SHA-256 (`ci-bootstrap` for uv, `ci-terraform`); `curl … | sh` runs whatever the URL
+    serves that day."""
+    text = (REPO / "Makefile").read_text(encoding="utf-8")
+    assert not re.search(r"\|\s*(ba|z|da)?sh\b", text), "a download piped into a shell"
+    assert re.search(r"^UV_SHA256\s+\?= [0-9a-f]{64}$", text, re.MULTILINE)
+    recipe = text.split("\nci-bootstrap:", 1)[1].split("\n\n", 1)[0]
+    assert "releases/download/$(UV_VERSION)/" in recipe
+    assert 'echo "$(UV_SHA256)  /tmp/uv.tar.gz" | sha256sum -c -' in recipe
+
+
 def test_makefile_values_carry_no_trailing_comment() -> None:
     """Make keeps the spaces before a trailing `#` in a value (`UV_VERSION ?= 0.11.7   # …`
     broke the ci-bootstrap installer URL): a non-empty assignment ends at its value."""

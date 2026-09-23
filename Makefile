@@ -7,9 +7,11 @@ SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
 UV        ?= uv
-# pinned installer version for ci-bootstrap (F11); bump deliberately. No comment after the value:
-# Make keeps the spaces before a trailing `#` and the installer URL would break.
+# uv for ci-bootstrap (F11): a pinned release asset, checked against its SHA-256 (the release's
+# uv-x86_64-unknown-linux-gnu.tar.gz.sha256, re-checked on the download). Bump both together.
+# No comment after a value: Make keeps the spaces before a trailing `#` and the URL would break.
 UV_VERSION ?= 0.11.7
+UV_SHA256  ?= 6681d691eb7f9c00ac6a3af54252f7ab29ae72f0c8f95bdc7f9d1401c23ea868
 RUN       := $(UV) run
 CHART_DIR := deployment/helm/energy-platform
 TF_DIR    := deployment/own-cluster/terraform
@@ -127,10 +129,15 @@ terraform-plan-hcloud: ## Plan the demo root into $(TF_PLAN_DIR) (outside the re
 	$(TF) -chdir=$(TF_DIR)/roots/hcloud plan -input=false -out=$(TF_PLAN_DIR)/hcloud-$$(date +%Y%m%d-%H%M%S).tfplan
 	@echo "terraform-plan-hcloud: plan written under $(TF_PLAN_DIR); apply is the author's (Level 3)"
 
-ci-bootstrap: ## Install uv on a bare CI runner (the only tool installation CI is allowed to do)
+ci-bootstrap: ## Install uv $(UV_VERSION) on a bare CI runner (linux x86_64, SHA-256 checked; the only tool installation CI is allowed to do)
 	@# one shell: `exit 0` on a separate recipe line would not skip the install
 	@if command -v $(UV) >/dev/null; then echo "uv present: $$($(UV) --version)"; exit 0; fi; \
-	curl -LsSf https://astral.sh/uv/$(UV_VERSION)/install.sh | sh; \
+	curl -fsSLo /tmp/uv.tar.gz https://github.com/astral-sh/uv/releases/download/$(UV_VERSION)/uv-x86_64-unknown-linux-gnu.tar.gz \
+	  && echo "$(UV_SHA256)  /tmp/uv.tar.gz" | sha256sum -c - \
+	  && mkdir -p "$$HOME/.local/bin" \
+	  && tar -xzf /tmp/uv.tar.gz -C "$$HOME/.local/bin" --strip-components=1 uv-x86_64-unknown-linux-gnu/uv uv-x86_64-unknown-linux-gnu/uvx \
+	  || { echo "ci-bootstrap: uv $(UV_VERSION) download or checksum failed"; exit 1; }; \
+	"$$HOME/.local/bin/uv" --version; \
 	if [ -n "$${GITHUB_PATH:-}" ]; then echo "$$HOME/.local/bin" >> "$$GITHUB_PATH"; echo "ci-bootstrap: $$HOME/.local/bin added to PATH for the next steps"; \
 	else echo 'ci-bootstrap: add $$HOME/.local/bin to PATH if it is not there'; fi
 

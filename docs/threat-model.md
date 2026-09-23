@@ -31,7 +31,7 @@ Mandatory flow: `Internet content → UNTRUSTED DATA → bounded extractor/sampl
 
 - Mechanism: Hash-pinned `uv.lock`, installed with `UV_FROZEN=1` / `--frozen` in CI and in both images; `deps-allowlist.txt` lists every locked package, transitive ones included; a new package needs an ADR and a human (ADR-006: dependency changes are their own gate). `deps-allowlist.txt` and `pyproject.toml` are code-owner paths, and a target PR that touches them is rejected by name. Targets cannot import any third-party package (positive import allowlist, ADR-027 §2), and the sandbox image has no `uv` and no usable `pip`.
 - Gate: C-38 · `deps-allowlist`, `lock-check` · `tests/harness/test_deps_allowlist.py::test_unlisted_package_fails`; C-40 · `pr-surface` · `tests/harness/test_pr_surface.py::test_registry_edit_in_target_pr_rejected`; C-12 · `lint` · `tests/harness/test_target_surface.py::test_parser_import_outside_allowlist_rejected`.
-- Residual risk: The allowlist checks names, not provenance: a typosquatted name that a human approves passes, so the ADR review is the control. `make ci-bootstrap` installs `uv` by `curl | sh` pinned by version but not by checksum (unlike `make ci-terraform`). Other artefacts are pinned (Actions by commit, C-42; images by digest, C-43; Terraform and the k3s installer by checksum) but every update of a pin is a human judgement.
+- Residual risk: The allowlist checks names, not provenance: a typosquatted name that a human approves passes, so the ADR review is the control. Every artefact is pinned (Actions by commit, C-42; images by digest, C-43; `uv` and Terraform in CI by a release asset and its SHA-256, `tests/harness/test_ci_wrappers.py::test_no_ci_reachable_recipe_pipes_a_download_into_a_shell`; the k3s installer by its release checksum), but every update of a pin is a human judgement.
 
 ## 4. Credential exfiltration
 
@@ -67,7 +67,7 @@ Mandatory flow: `Internet content → UNTRUSTED DATA → bounded extractor/sampl
 
 - Mechanism: `main` is protected on GitHub (enforced since the repository went public, 2026-09-23): pull request required, the 12 CI jobs as required checks, code-owner review; admins may bypass and every bypass is logged. `CODEOWNERS` (`*` plus the registries, allowlist, Makefile, `.github/`, ADRs) puts the maintainer on every merge; `pr-surface` rejects a target PR that touches anything outside its `targets/<id>/`, names registry and CI paths, and refuses two targets in one PR. Actions are pinned by commit and images by digest; workflows only call `make` and run on `pull_request` with `contents: read`; an MCP bundle is re-verified (paths confined to one target, hashes) before `scripts/apply_pr_bundle.py` writes it, never onto `main`.
 - Gate: C-39, C-40, C-41 · `pr-surface` · `tests/harness/test_pr_surface.py::test_target_plus_platform_file_rejected`, `tests/harness/test_pr_surface.py::test_registry_edit_in_target_pr_rejected`, `tests/harness/test_pr_surface.py::test_two_targets_in_one_pr_rejected`, `tests/harness/test_pr_surface.py::test_git_diff_integration`; C-42, C-43 · `harness-check` · `tests/harness/test_workloads.py::test_unpinned_action_rejected`, `tests/harness/test_workloads.py::test_mutable_image_tag_rejected`; C-46 · `test` · `tests/harness/test_ci_wrappers.py::test_codeowners_covers_the_protected_paths`; C-37 · `test` · `tests/harness/test_ci_wrappers.py::test_ci_workflow_only_calls_make`; C-53 · `test` · `tests/harness/test_pr_bundle.py::test_apply_never_touches_main`, `tests/harness/test_pr_bundle.py::test_verify_bundle_rejects_tampering`. Branch protection itself is a GitHub setting, not testable offline.
-- Residual risk: CI runs the PR's own code, so a platform PR can edit the gate it is judged by; only code-owner review stops that, and there is one maintainer. The maintainer's own platform commits reach `main` by the logged admin bypass (`docs/plans/phase-6.md`, option (a)), i.e. without a second reviewer. Signed commits are recommended, not required; `ci-bootstrap` fetches `uv` without a checksum (item 3).
+- Residual risk: CI runs the PR's own code, so a platform PR can edit the gate it is judged by; only code-owner review stops that, and there is one maintainer. The maintainer's own platform commits reach `main` by the logged admin bypass (`docs/plans/phase-6.md`, option (a)), i.e. without a second reviewer. Signed commits are recommended, not required.
 
 ## 10. Mapping-level data poisoning (a patch that silently flips a sign or unit)
 
@@ -107,7 +107,7 @@ Mandatory flow: `Internet content → UNTRUSTED DATA → bounded extractor/sampl
 
 ## Residual risks accepted
 
-1. Allowlisted names, not provenance; `uv` bootstrap without a checksum (items 3, 9).
+1. Allowlisted names, not provenance; a pin update is a human judgement (items 3, 9).
 2. A fetched XLSX that fits under the 64 MiB cap can still inflate in the decoder; pod limits bound it (item 2).
 3. Target and platform credentials share a pod environment; the separation is by name (C-63), not by process (item 4).
 4. Tenant CNI enforcement of layer 1 unverified, V-11 closed as not run; the fetch layer carries SSRF there (item 6).
