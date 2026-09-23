@@ -49,6 +49,10 @@ metrics:
   operator:
     enabled: false
 egress:
+  # k3s kube-router applies a new pod's policy asynchronously (measured 2026-09-23: the
+  # metadata service answered a fresh pod, refused it 15 s later): gate every platform pod (05 C-65)
+  policyGate:
+    enabled: true
   clusterCIDRs: [10.42.0.0/16, 10.43.0.0/16]           # k3s cluster-cidr / service-cidr (cloud-init)
   objectStore:
     # Object-store endpoints are public addresses: capture pods reach them through the 443 rule

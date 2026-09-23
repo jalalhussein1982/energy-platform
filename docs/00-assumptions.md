@@ -342,6 +342,20 @@ Access used: kubeconfig for the e-INFRA Rancher cluster (`rancher.cloud.e-infra.
     ID token: "ref": "refs/heads/not-main" ; kubectl auth whoami → error: You must be logged in to the server (Unauthorized)
     journalctl: E0922 01:56:30 authentication.go:75] "Unable to authenticate the request" err="[invalid bearer token, oidc: error evaluating claim validation expression: validation expression 'claims.ref == 'refs/heads/main'' failed: only the main branch may authenticate]"
     cleanup: hcloud server delete energy-platform-v14 ; hcloud ssh-key delete energy-platform-v14 ; probe branch not-main deleted
+
+2026-09-23  V-11  CONFIRMED  The reference cluster's CNI enforces egress `NetworkPolicy` for a tenant namespace: in `hussein-ns` (RKE2 v1.36.4, CNI Calico per the pod's `cni.projectcalico.org/*` annotations; nodes and `kube-system` are Forbidden to the tenant, V-4), a restricted-PSS scratch pod `ep-v11-probe` reached `https://www.ote-cr.cz/en` (200) with no policy; with a policy selecting only its label, `policyTypes: [Egress]` and egress to port 53 alone, the name still resolved but TCP 443 timed out (curl 28); with the policy deleted, 200 again. Pod and policy deleted, the namespace's two existing policies (CloudNativePG pods only) untouched   ADR-026 layer 1 holds on the tenant profile's reference cluster: the chart's default-deny egress with 443 to public ranges for capture/backfill pods only is enforced there, not merely accepted; the fetch layer stays the per-host control. Raw log: ~/.config/energy-platform/evidence/2026-09-23/phase9/v11.log (the first run's step 3 did not execute curl — a read-only root filesystem — so the sequence was repeated in full).
+    $ kubectl -n hussein-ns get networkpolicies   → geoecon-db-netpol (cnpg.io/cluster=geoecon-db), siem-db-network-policy (cnpg.io/cluster=siem-db)   (neither selects the probe)
+    $ kubectl -n hussein-ns apply -f v11-pod.yaml   (curlimages/curl:8.22.0@sha256:58adaa4e…, runAsNonRoot, RuntimeDefault, drop ALL, activeDeadlineSeconds 1800)   → pod/ep-v11-probe created, Ready, IP 10.42.185.53
+    --- A no policy (2026-09-23T17:35:01Z)
+    * Host www.ote-cr.cz:443 was resolved. *   Trying 91.209.101.45:443...   http_code=200 remote_ip=91.209.101.45   curl_exit=0
+    $ kubectl -n hussein-ns apply -f v11-netpol.yaml   (podSelector app=ep-v11-probe; policyTypes [Egress]; egress: ports UDP/TCP 53 only)
+    --- B default-deny egress, DNS allowed (2026-09-23T17:35:20Z)
+    * Host www.ote-cr.cz:443 was resolved. *   Trying 91.209.101.45:443...   curl: (28) Connection timed out after 10001 milliseconds   curl_exit=28
+    $ kubectl -n hussein-ns delete networkpolicy ep-v11-deny-egress
+    --- C policy deleted (2026-09-23T17:35:47Z)
+    * Host www.ote-cr.cz:443 was resolved. *   Trying 91.209.101.45:443...   http_code=200 remote_ip=91.209.101.45   curl_exit=0
+    $ kubectl get nodes -o wide   → Forbidden (cluster scope) ; kubectl -n kube-system get pods → Forbidden ; pod annotations: cni.projectcalico.org/containerID, cni.projectcalico.org/podIP 10.42.185.53/32
+    cleanup: kubectl -n hussein-ns delete pod ep-v11-probe ; get pod,networkpolicy → no ep-v11 object left
 ```
 
 ---

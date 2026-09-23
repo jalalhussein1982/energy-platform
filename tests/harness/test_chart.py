@@ -401,3 +401,47 @@ def test_observability_renders_per_adr_037(tmp_path: Path) -> None:
     flagged = kinds(render(tmp_path, ALL_FLAGS))
     assert flagged["PodMonitor"] == 1 and flagged["PrometheusRule"] == 1
     assert (CHART / "dashboards" / "freshness.json").is_file()
+
+
+def _pod_specs(docs: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
+    out = []
+    for d in docs:
+        if d["kind"] == "CronJob":
+            tpl = d["spec"]["jobTemplate"]["spec"]["template"]
+        elif d["kind"] == "Job":
+            tpl = d["spec"]["template"]
+        else:
+            continue
+        out.append((tpl["metadata"]["labels"].get("energy-platform.io/role", ""), tpl["spec"]))
+    return out
+
+
+def test_policy_gate_runs_first_in_every_payload_pod_behind_its_flag(tmp_path: Path) -> None:
+    """05 C-65: where the CNI applies a pod's policy asynchronously (the demo's kube-router),
+    the work must not start before it is in force; off by default, on for demo and local."""
+    payload_roles = {"capture", "process", "recapture", "backfill", "gaps", "hook"}
+    for _, spec in _pod_specs(render(tmp_path, TENANT)):
+        names = [c["name"] for c in spec.get("initContainers", [])]
+        assert "egress-policy-gate" not in names  # default: no gate
+    demo_endpoint = (
+        "bronze.replica.endpoint=https://ns.compat.objectstorage.eu-frankfurt-1.oraclecloud.com"
+    )
+    for values, extra in ((LOCAL, ()), (DEMO, ("--set", demo_endpoint))):
+        specs = [(r, s) for r, s in _pod_specs(render(tmp_path, TENANT, values, extra=extra))]
+        gated = [  # the platform image's pods (minio-init, a local hook, runs mc)
+            (r, s) for r, s in specs if r in payload_roles and DIGEST in s["containers"][0]["image"]
+        ]
+        assert {r for r, _ in gated} >= {
+            "capture",
+            "process",
+            "recapture",
+            "backfill",
+            "gaps",
+            "hook",
+        }
+        for role, spec in gated:
+            first = spec["initContainers"][0]
+            assert first["name"] == "egress-policy-gate", (values.name, role)
+            assert first["args"][:1] == ["wait-egress-policy"]
+            assert all("valueFrom" not in e for e in first.get("env", []))  # no credential
+            assert first["securityContext"]["readOnlyRootFilesystem"] is True

@@ -19,12 +19,18 @@ Every deploy: `render_target_values` → `helm upgrade --install` with rollback-
 ## Layer-1 egress on a shared cluster (ADR-026, V-11)
 
 The chart **declares** the NetworkPolicies (default deny, DNS, Postgres, object store, TCP 443
-to public ranges for the fetching pods only). Whether the cluster's CNI **enforces** egress
-policy is V-11, still open for the reference cluster; until CONFIRMED the claim for that
-profile is "declared, enforcement unverified", and layer 2 (host allowlist, redirect and
-private-range checks in `energy_platform.fetch`) is the control known to hold. On the demo
-cluster k3s's embedded policy controller enforces it, and `deployment/local/egress-test-job.yaml`
-can be applied there to prove it (the same three assertions as `make local-egress-test`).
+to public ranges for the fetching pods only). **V-11 CONFIRMED (2026-09-23):** the reference
+cluster's CNI (Calico) enforces egress policy for a tenant namespace: a probe pod reached OTE,
+was cut off by a label-scoped default-deny, and reached it again once the policy was removed
+(`00` §5). Layer 2 (host allowlist, redirect and private-range checks in
+`energy_platform.fetch`) stays the per-host control.
+
+Enforcement can lag a pod's start. On the demo (k3s, embedded kube-router) the same test found a
+new pod's **first packets unfiltered** for up to about a second, with the metadata service
+reachable. So `egress.policyGate.enabled` (on in `values-demo.yaml`) makes every platform pod
+wait in an init container until its policy is in force (ADR-026 amendment 2, `05` C-65). Turn it
+on for any CNI that applies policy asynchronously. `deployment/local/egress-test-job.yaml`
+measures the CNI itself (ungated; the same three assertions as `make local-egress-test`).
 
 ## Demo deploy identity (V-14, ADR-015)
 

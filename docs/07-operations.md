@@ -51,6 +51,33 @@ Two things the first attempts taught: an image loaded with `kind load` has no re
 Helm hook's env list may not repeat a key under server-side apply (the smoke's `dir` Bronze is a
 parameter of the container helper, not an override).
 
+### 2.1 Layer 1 on the reference cluster and on the demo (Phase 9, 2026-09-23)
+
+**Reference cluster (V-11, `00` §5): enforced.** In `hussein-ns` (RKE2, Calico) a
+restricted-PSS probe pod reached OTE (200). A NetworkPolicy selecting only its label, with
+egress limited to DNS, made the same request time out (curl 28, name still resolved), and with
+the policy deleted it got 200 again. Nothing was left in the namespace.
+
+**Demo: enforced only after a pod has started.** `deployment/local/egress-test-job.yaml`
+applied in the demo namespace failed twice out of two, on the agent: capture → OTE 302 (right),
+**capture → `169.254.169.254` reachable** and **process → OTE reachable** (wrong), while the
+capture pod's second request (`10.0.0.1`), about a second after its first, was rejected (curl
+7). The chart's seven policies were present and matched the pods' labels, and kube-router's
+netpol chains were programmed on both nodes. The isolating test was one process-role pod that
+made the same request twice, at start and 15 s later:
+
+```text
+first    up=41435.45 http=200 connect=0.002348s rc=0      ← metadata answered at container start
+after15s up=41450.66 http=000 rc=7                        ← refused once the pod's rules existed
+```
+
+Probes with a sub-second timeout were refused from their first attempt in two other runs, so the
+window is short (≤ ~1 s) and varies. The cause is that kube-router programs a new pod's policy
+after the pod is running (Cilium on kind programs it before). The metadata service serves the
+node's `user_data`, which holds the k3s join token. The fix for the platform's own pods is the
+policy gate (`egress.policyGate`, ADR-026 amendment 2, `05` C-65). Blocking pod traffic to the
+metadata address at node level covers every pod; that is a node change left to the author.
+
 ## 3. Terraform (`own-cluster`)
 
 `make terraform-validate` (2026-09-22, OpenTofu 1.12.6): `fmt -check`, `validate` and `test`

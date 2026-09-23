@@ -6,7 +6,7 @@
 | Date | 2026-09-19 |
 | Resolves | Codex review F08; amends ADR-008 "SSRF" mechanism and `03` Phase 5 "NetworkPolicies (egress per target allowlist)" |
 | Supersedes | ADR-008 sentence "Kubernetes egress `NetworkPolicy` so a capture pod can reach only its declared hosts" |
-| Amended | 2026-09-23, amendment 1 (below): a response-body cap in fetch |
+| Amended | 2026-09-23, amendment 1 (below): a response-body cap in fetch; amendment 2: layer 1 is enforced only once a pod's policy is synced — an init-container gate on CNIs that apply it asynchronously |
 
 ## Context
 
@@ -94,7 +94,37 @@ which is never retried. Error bodies are read to 2 KiB, since they only appear i
 Peers are now checked on the open stream, before the body is read. `05` C-64; the live smoke
 passed on the streaming client (2026-09-23).
 
+## Amendment 2 (2026-09-23) — enforced from the pod's first packet, not eventually
+
+**Finding.** V-11 CONFIRMED layer 1 on the reference cluster (Calico, a long-running probe
+pod). The same egress test on the demo (k3s, embedded kube-router) failed. The chart's policies
+were right and enforced in steady state, but **a new pod's first packets left unfiltered**: a
+capture pod reached the metadata service and a process pod reached OTE, each on its first
+request, while the next request about a second later was rejected. A fresh process pod got HTTP
+200 from `169.254.169.254` at start and was refused 15 s later. kube-router programs a pod's
+policy after the pod is running. Cilium on kind programs it before, which is why the kind test
+passed. On Hetzner the metadata service returns the server's `user_data`, which holds the k3s
+join token, and the API port is public.
+
+**Decision.** Chart value `egress.policyGate` (off by default; on in the demo and local values).
+When on, every platform-image pod (capture, process, recapture, backfill, gaps, hooks,
+replicate, tier) runs `energyctl wait-egress-policy` as its first init container. The gate
+starts its main container only after a canary that every role's policy denies (the metadata
+address, port 80) has been refused twice in a row, and it fails the pod closed after
+`timeoutSeconds` if the canary stays reachable. The gate has no credential in its environment.
+kube-router applies one pod's rules together, so once the canary is refused, the pod's egress
+rules are in force. `05` C-65.
+
+**What remains.** The gate protects the platform's pods, the ones that handle source payloads.
+It does not cover other pods on the node, such as k3s's own system pods, which have no
+NetworkPolicy at all. Blocking pod traffic to `169.254.169.254` at node level (an iptables
+rule, or the provider's metadata firewall where one exists) is the complete control. On the demo
+it is a change to the nodes and is recorded as the author's decision (`docs/threat-model.md`
+§6). The egress-test Jobs (`deployment/local/egress-test-job.yaml`) stay ungated on purpose:
+they measure the CNI, not the chart.
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-19 · V-4 · CONFIRMED (NetworkPolicy creatable; enforcement not
-tested → V-11); 2026-09-19 · V-9 · CONFIRMED (no proxy on the reference cluster).
+tested → V-11); 2026-09-19 · V-9 · CONFIRMED (no proxy on the reference cluster); 2026-09-23 · V-11 · CONFIRMED (egress `NetworkPolicy` enforced by the
+reference cluster's Calico for a tenant namespace, steady state).

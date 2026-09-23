@@ -128,7 +128,7 @@ One of them refused a source whose free API is for non-commercial use only
 | Gas intraday, a canary target group | out of v1 | `02` D-11, D-13 |
 | TimescaleDB | plain PostgreSQL is enough at this volume | ADR-030 |
 | A loader for a target's own `parser.py` | every committed target is served by the generic parsers | `05` §5 |
-| One-week publication-latency campaign; V-11 (egress enforcement on the reference cluster) | closed without running for delivery (2026-09-23); no latency figure is quoted; the tenant profile says "declared, enforcement unverified" | `03` Phases 4 and 5 |
+| One-week publication-latency campaign | closed without running for delivery (2026-09-23); no weekly latency figure is quoted | `03` Phase 4 |
 
 ## Assumptions and what they cost
 

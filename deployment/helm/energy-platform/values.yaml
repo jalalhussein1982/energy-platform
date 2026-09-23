@@ -139,6 +139,13 @@ egress:                                  # ADR-026 layer 1
     cidrs: []
     ports: [443]
   fqdnPolicy: none                       # none | cilium (CiliumNetworkPolicy, operator-verified CNI)
+  # 05 C-65: an init container in every platform-image pod waits until the metadata canary
+  # (169.254.169.254:80, denied to every role) is refused, so the work starts under an enforced
+  # policy; a cluster that never blocks it fails the pod after timeoutSeconds (fail closed).
+  # Needed where the CNI applies a new pod's policy asynchronously (k3s kube-router: the demo).
+  policyGate:
+    enabled: false
+    timeoutSeconds: 60
 
 smoke:                                   # ADR-025 hook: one fixture capture+process
   manifest: ote_intraday_market/manifest.yaml

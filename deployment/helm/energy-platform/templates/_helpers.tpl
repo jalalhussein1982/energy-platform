@@ -200,6 +200,25 @@ spec:
 {{- end }}
   securityContext:
 {{ include "energy-platform.podSecurity" (dict "uid" 10001) | indent 4 }}
+{{- if .root.Values.egress.policyGate.enabled }}
+  {{- /* 05 C-65: the work starts only once this pod's NetworkPolicy is in force (a CNI that
+       applies it asynchronously lets the first packets out); no platform credential here */}}
+  initContainers:
+    - name: egress-policy-gate
+      image: {{ include "energy-platform.image" .root }}
+      imagePullPolicy: {{ .root.Values.image.pullPolicy }}
+      args: ["wait-egress-policy", "--timeout", {{ .root.Values.egress.policyGate.timeoutSeconds | quote }}]
+      env:
+        - name: TMPDIR
+          value: /tmp
+      securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 8 }}
+      resources:
+{{ toYaml .root.Values.resources.job | indent 8 }}
+      volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+{{- end }}
   containers:
 {{ .container | indent 4 }}
   volumes:

@@ -44,6 +44,7 @@ from energy_platform.contracts.manifest import (
     validate_manifest,
 )
 from energy_platform.fetch import EnvSecretResolver, Fetcher, ObjectStoreError
+from energy_platform.fetch.policy_gate import PolicyNotEnforced, wait_for_egress_policy
 from energy_platform.harness.admission import write_request
 from energy_platform.harness.fixtures import FixtureError, record_from_file, record_live
 from energy_platform.harness.pr import BundleRefused, prepare_bundle
@@ -480,6 +481,25 @@ def storage_probe_cmd(
     report = storage_probe(store, storage_class)
     _echo(report)
     raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command("wait-egress-policy")
+def wait_egress_policy_cmd(
+    timeout: Annotated[
+        float, typer.Option("--timeout", help="seconds before the pod fails closed")
+    ] = 60.0,
+) -> None:
+    """05 C-65: an init container's gate. Exit 0 once the metadata canary is refused twice in a
+    row (the pod's NetworkPolicy is in force); exit 1 if it is still reachable after --timeout."""
+    try:
+        result = wait_for_egress_policy(timeout=timeout)
+    except PolicyNotEnforced as exc:
+        typer.echo(f"wait-egress-policy: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        f"wait-egress-policy: enforced after {result.waited_seconds:.2f} s "
+        f"({result.attempts} attempts)"
+    )
 
 
 @app.command("process")

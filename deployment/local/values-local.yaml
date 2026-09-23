@@ -36,6 +36,10 @@ secrets:
 metrics:
   enabled: true
 egress:
+  # Cilium enforces before the pod runs, so the gate opens at once; on here so
+  # `make local-up` and the weekly drill exercise it (05 C-65)
+  policyGate:
+    enabled: true
   clusterCIDRs: [10.244.0.0/16, 10.96.0.0/12]   # kind-config.yaml podSubnet / serviceSubnet
 schedule:
   startJitterSeconds: 5
