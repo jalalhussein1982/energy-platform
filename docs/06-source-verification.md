@@ -153,7 +153,7 @@ Outside the server: `scripts/apply_pr_bundle.py` turned the bundle into the bran
 
 **Harness defect found and fixed on the way (platform commit, not part of the target):** the first `scaffold_target` for `ote.dam` produced a manifest the model refused (`emergency_state.unit` rendered as the YAML integer `1`); the scaffolder now quotes every unit and a regression test pins it.
 
-## 6. Polling-observation campaign (defined, not run — P4-D12)
+## 6. Polling-observation campaign (the week defined, not run — P4-D12; 11 hours observed, §6.1)
 
 01 §5 requires one week of polls per target before any latency figure is quoted. Procedure, using only shipped verbs:
 
@@ -167,6 +167,41 @@ afterwards:
 ```
 
 `content_changed` is computed by Bronze from the payload hash, so a stale poll (T2 `304`, or an identical body) is a successful poll and not a data point. Run it on a laptop or the Phase 5 `local` profile; the ledger is the report. **No figure is quoted here.** The single observations above (T1/T2 in step at 14:24, E1 complete by 14:24 on D-1) are anecdotes, not measurements.
+
+### 6.1 An 11-hour observation on the live demo (2026-09-23, Phase 9) — not the week
+
+The week was not run (author decision, 2026-09-23). The demo has polled every target since
+2026-09-23 06:30 UTC. On 23 September, from 06:30 to 17:46 UTC (about 11 hours, every attempt
+`ok`), Silver's first-seen time per period (the earliest `fetched_at` with a value) gives an
+upper bound on publication. A period only counts if it ended after the target's first capture;
+earlier periods would measure when we started, not when the source published. The resolution
+is the polling grid: 15 minutes for T1/T2/T3, one hour for E1. **One day, one source
+behaviour; not a latency SLO.**
+
+| Target | Periods | First seen − period end | Reading |
+|---|---|---|---|
+| T3 `ceps_load` (QH, AVG) | 44 | median 15.8 min, p95 16.3, max 31.0 | A quarter-hour's average is never in the capture at the period's end and is in the next one: published 0–15 min after the period ends |
+| T1 `ote_intraday_market` (SOAP) | 45 | median 0.7 min, p95 1.2, min −14.3 | A quarter's continuous-market result is present by the period's end, some from its start (trading closes before delivery) |
+| T2 `ote_intraday_market_xlsx` | 45 | median 0.9 min, p95 1.1, min −14.1 | In step with T1: the daily file is rewritten during the day |
+| E1 `ote_dam` | 1 delivery day | results for 24 September: absent at 13:00:36, present at 14:01:13 (Prague, D−1) | Published between 13:00 and 14:01 local on D−1 (Bronze capture log, hourly grid). The cron's first poll at 12:00 is early; 14:00 is the first that finds data |
+| `ote_imbalance_settlement` (version 0) | — | every poll of D observed (from 16:23 UTC) got a 248-byte empty answer; D−1 was already out at the first correction (16:37 UTC on D) | Censored: the target started at 16:23 UTC, after D−1 was out |
+
+**Imbalance cadence (F-5).** OTE publishes the daily settlement for D after D (the admission's reads, §9, and every poll
+of D observed here): the target's hourly poll of D (`17 * * * *`) returns an empty answer. What delivers the data is the
+correction (`37 * * * *`, D−1 … D−3), which picks D−1 up within the hour after publication and
+catches later changes for three days. The hourly poll of D costs 24 empty answers of 248 bytes
+a day, and it is also what creates the run of each day that the correction needs (ADR-033 §3
+re-polls only days that have a run). So the cadence is kept, justified by that, not by a
+measured latency. Versions 1 and 2 follow §9.1.
+
+**What the observation surfaced (not latency).** Reading the capture log for this section
+exposed the incident of `docs/07-operations.md` §4.3: T2 backfills and corrections had stored
+today's file under earlier days, and `content_changed` was computed against another day's
+payload. That also means the `content_changed` transitions of every correction before
+2026-09-23 18:15 UTC are not usable as publication evidence. Also seen: for 22 September OTE's
+results page links `IM_STANDARD_TRADE_22_09_2026_EN.xlsx`, and `IM_15MIN_22_09_2026_EN.xlsx`
+returns 404 (bounded reads 2026-09-23 21:35 UTC), so T2 has no file for that day and reports
+`source_unavailable`.
 
 ## 7. One live pass through the platform's own fetch path
 

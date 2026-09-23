@@ -78,6 +78,16 @@ node's `user_data`, which holds the k3s join token. The fix for the platform's o
 policy gate (`egress.policyGate`, ADR-026 amendment 2, `05` C-65). Blocking pod traffic to the
 metadata address at node level covers every pod; that is a node change left to the author.
 
+**The gate, live (2026-09-23, revision 6).** Every platform pod created after the deploy runs
+`egress-policy-gate` first ("enforced after 0.26–0.41 s (2 attempts)"). The same three egress
+Jobs with the gate in front (the platform image as the init container, curl at t=0 in the main
+container) ran three times: **9 of 9 PASS** (capture → OTE 302; capture → metadata and
+`10.0.0.1` refused, curl 7; process → OTE refused), against **0 of 3** passing runs without it.
+In every gated pod the canary was already refused on the first two attempts, so the observed
+safety is partly the delay an init container adds before the main container starts. The gate's
+guarantee is that the work does not start while the canary answers, and that the pod fails
+closed if it keeps answering.
+
 ## 3. Terraform (`own-cluster`)
 
 `make terraform-validate` (2026-09-22, OpenTofu 1.12.6): `fmt -check`, `validate` and `test`
@@ -204,8 +214,28 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
   for any delivery day; the capture baseline was the target's newest entry (another day's
   resource). T1, T3, E1 and the imbalance settlement put the date in the request and are
   unaffected.
-- **Fix:** ADR-033 amendment 2 (`05` C-66). **Repair:** corrective re-capture; Silver is not
-  edited (a production database mutation is Level 3). The wrong versions stay in history.
+- **Fix:** ADR-033 amendment 2 (`05` C-66), live from revision 7 (18:15 UTC). **Repair:**
+  corrective re-capture; Silver is not edited (a production database mutation is Level 3). The
+  wrong versions stay in history.
+- **State at 21:35 UTC:** 21 September is repaired. Its correction now requests the day's own
+  file with that day's validators (a legitimate 304 with that day's blob), and its current view
+  holds no row from another day's file. **22 September cannot be repaired by capture:** OTE has
+  no `IM_15MIN_22_09_2026_EN.xlsx` (404; the page links `IM_STANDARD_TRADE_22_09_2026_EN.xlsx`
+  that day), so T2's corrections for that day end `source_unavailable` (the recapture Job exits
+  1 each hour until the day leaves the 3-day window), and **672 current-view rows of
+  22 September (T2's own metrics) still carry 23 September's values.** T1, the system of record
+  for `price_vwap` and `volume_total`, is correct. Removing the wrong versions is the author's
+  decision (a production database change). They are exactly the T2 rows whose payload is mapped
+  to more than one date:
+
+  ```sql
+  SELECT id FROM observations
+   WHERE dataset_id = 'ote.idm_continuous' AND source_transport = 'xlsx'
+     AND local_date = '2026-09-22'
+     AND payload_sha256 IN (SELECT payload_sha256 FROM observations
+                             WHERE dataset_id = 'ote.idm_continuous' AND source_transport = 'xlsx'
+                             GROUP BY 1 HAVING count(DISTINCT local_date) > 1);
+  ```
 
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
