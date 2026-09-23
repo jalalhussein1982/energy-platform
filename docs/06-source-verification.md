@@ -184,4 +184,35 @@ looked at, and nothing from this run was kept (temporary Bronze).
 - ČEPS `function` values other than AVG, `version` values other than RT, and history depth.
 - OTE history depth beyond the four days read (2024-06-30 works; 01's P2Y is still an assumption).
 - Corrections after a delivery day (no second read of any day).
-- Any 01 §4 candidate (deliberately not read).
+- Any other 01 §4 candidate (deliberately not read). OTE imbalance settlement was read for its
+  Route B admission on 2026-09-23 (§9).
+
+## 9. Held-out admission: OTE imbalance settlement (2026-09-23, ADR-022 §3)
+
+Bounded reads for the Route B admission of `ote.imbalance_settlement` (plan P6-D1), made with
+`curl` against the same public service as T1; payloads stay in local evidence
+(`~/.config/energy-platform/evidence/2026-09-23/`), nothing is committed (01 §10).
+
+| Read | Request | Result | SHA-256 (payload) |
+|---|---|---|---|
+| WSDL | `GET …/PublicDataService?wsdl` | 57 125 B; `GetImbalanceSettlementPeriodE(Version, StartDate, EndDate, StartPeriod?, EndPeriod?)` | — |
+| Daily settlement | `Version 0`, 2026-09-21 | HTTP 200, 60 245 B, 0.07 s, 96 items `PT15M` | `a6a5ecdb62b7d549…` |
+| Monthly settlement | `Version 1`, 2026-08-01 | HTTP 200, 60 690 B, 96 items `PT15M` | `9bf676d837312754…` |
+
+Item fields (every item, both reads): `Version`, `Date`, `PeriodResolution`, `PeriodIndex`,
+`SystemImbalance`, `Sum`, `PositiveImbalance`, `NegativeImbalance`, `RoundedImbalance`,
+`ReCost`, `ImbalanceCost`, `SettlImbalancePrice`, `SettlCounterImbalancePrice`, `PriceWARE`,
+`PriceRE`, `PriceWAIM`, `PriceCurve`; the WSDL also allows an optional `Emerg`. Decimal
+separator: a dot everywhere. Observed ranges: `SystemImbalance` −76.25 … 66.37 (negative in
+42/96 and 86/96 periods), `SettlImbalancePrice` −1 061.42 … 13 481.57 with 41/96 and 9/96
+periods at exactly 0.000 (a published zero, not an absence). Values in the thousands are
+consistent with Kč/MWh, as 01 §4 records; the service does not state the currency in the
+response.
+
+Admission check (not committed, nothing under `targets/`): a scratch manifest for
+`ote.imbalance_settlement` validates **OK** and maps the 2026-09-21 payload through the
+generic SOAP parser to 288 observations (96 periods × 3 metrics), no quality event, the first
+period at 2026-09-20T22:00Z (local midnight), `source_version` = `0`.
+
+Not verified: the meaning of the imbalance sign (`SystemImbalance` published as is), when
+versions 1 and 2 appear for a day, history depth, and the fields not admitted.

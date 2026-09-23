@@ -131,8 +131,32 @@ _CEPS_LOAD = DatasetContract(
     ),
 )
 
+_IMB_NULL = "not yet published for this settlement version"
+
+# Admitted 2026-09-23 through Route B as the Phase 7 held-out source (ADR-022 §3,
+# docs/admissions/ote_imbalance_settlement.md): contract and admission row only, no adapter.
+_OTE_IMBALANCE_SETTLEMENT = DatasetContract(
+    dataset_id="ote.imbalance_settlement",
+    source_id="ote",
+    contract_version="1.0.0",
+    # 0 daily, 1 monthly, 2 final monthly settlement: each version is its own identity (04 §2)
+    identity_key=("bidding_zone", "delivery_start_utc", "resolution", "version"),
+    fixed_dimensions=MappingProxyType({"bidding_zone": "CZ"}),
+    resolutions=("PT15M", "PT60M"),  # 15-minute settlement from 2024-07-01 (01 §2, S08)
+    metrics=_metrics(
+        MetricSpec("system_imbalance", "MWh", None, "negative_allowed", _IMB_NULL, "soap"),
+        MetricSpec("imbalance_price", "CZK/MWh", "CZK", "negative_allowed", _IMB_NULL, "soap"),
+        MetricSpec(
+            "counter_imbalance_price", "CZK/MWh", "CZK", "negative_allowed", _IMB_NULL, "soap"
+        ),
+    ),
+)
+
 DATASETS: Mapping[str, DatasetContract] = MappingProxyType(
-    {c.dataset_id: c for c in (_OTE_IDM_CONTINUOUS, _OTE_DAM, _CEPS_LOAD)}
+    {
+        c.dataset_id: c
+        for c in (_OTE_IDM_CONTINUOUS, _OTE_DAM, _CEPS_LOAD, _OTE_IMBALANCE_SETTLEMENT)
+    }
 )
 
 

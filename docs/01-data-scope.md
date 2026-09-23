@@ -315,6 +315,7 @@ string, extra column, changed unit header.
 | T2 OTE XLSX | as above | allowed | Results page is public; no API statement for the file | synthetic | as above; confirm the file may be polled every 15 minutes |
 | T3 ČEPS SOAP | Not yet reviewed beyond the web-services page (S06) | **disallows all crawling** (S15) | Yes, "structured data delivery" interface with test client | synthetic | Terms of the web service; confirm robots rule does not cover the service; rate expectations |
 | ENTSO-E (candidate) | Not reviewed | n/a | REST with token (S07) | none until admitted | registration, terms, redistribution |
+| OTE imbalance settlement (held-out, admitted 2026-09-23 via Route B, ADR-022 §3; no adapter until Phase 7) | OTE Terms of Use (S09), as T1 | allowed (S15) | Yes, public web-service manual (S10), operation `GetImbalanceSettlementPeriodE` | synthetic with the real shape, as T1 | as T1; imbalance sign meaning and version timing [UNVERIFIED] (06 §9) |
 | Exchange pages (candidate) | Not reviewed | unknown | unknown | none | everything |
 
 Policy changes to this register need maintainer review. No agent or contributor may add a target

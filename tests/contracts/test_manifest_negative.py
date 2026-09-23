@@ -244,13 +244,13 @@ def test_yaml_scalar_document_rejected(tmp_path: Path) -> None:
 
 
 def test_unregistered_dataset_id() -> None:
-    data = with_(t1_manifest(), "contract.dataset_id", "ote.imbalance_settlement")
+    data = with_(t1_manifest(), "contract.dataset_id", "ote.ida")
     result = validate_manifest(Manifest.model_validate(data))
     assert result.status == "ADMISSION_REQUIRED"
-    assert result.missing.datasets == ("ote.imbalance_settlement",)
+    assert result.missing.datasets == ("ote.ida",)
     assert result.missing.metrics == (
-        ("ote.imbalance_settlement", "price_vwap"),
-        ("ote.imbalance_settlement", "volume_total"),
+        ("ote.ida", "price_vwap"),
+        ("ote.ida", "volume_total"),
     )
     assert result.missing.hosts == ()
 

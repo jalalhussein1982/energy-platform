@@ -77,7 +77,7 @@ def test_datetimes_normalised_to_utc() -> None:
 
 def test_unregistered_dataset_rejected() -> None:
     with pytest.raises(ValidationError, match="not registered"):
-        t1_row(dataset_id="ote.imbalance_settlement")
+        t1_row(dataset_id="ote.ida")
 
 
 def test_unregistered_metric_rejected() -> None:
