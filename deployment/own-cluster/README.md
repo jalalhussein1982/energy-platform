@@ -62,6 +62,11 @@ Author checklist, in this order:
    The state is local (`roots/hcloud/terraform.tfstate`, git-ignored): it is the only record of
    what exists, `destroy` needs it, and it holds the k3s token and S3 keys in plain text — keep a
    `chmod 600` copy outside the checkout.
+   *(2026-09-23: applied; the first apply exposed five defects in the node bootstrap and the
+   Role, fixed and tested — `docs/07-operations.md` §4.1.)* Replacing the server re-creates the
+   k3s CA: replace the agent in the same apply (`-replace='module.nodes.hcloud_server.agent[0]'`)
+   and redo `DEMO_CLUSTER_CA`, the admin kubeconfig and the namespace Secrets. With Postgres data
+   on the volume, a server replacement also needs the restore procedure (docs/07 §5).
 6. Deletion of servers is `terraform destroy` (Level 3). **Buckets are never deleted by
    Terraform** (`lifecycle { prevent_destroy }` is deliberately not used because it would also
    block `destroy` of everything else; the bucket resources are simply left out of any destroy

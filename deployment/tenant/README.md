@@ -45,6 +45,9 @@ pods pull with `image.pullSecrets: [ghcr-pull]` (P5-D21).
 
 ## Author checklist before the first demo deploy (Level 3 items)
 
+*(2026-09-23: all done — the agent ran them with the CLIs at the author's request; the demo is
+live. What it took is in `docs/07-operations.md` §4.1.)*
+
 1. `terraform apply` the `hcloud` plan (`deployment/own-cluster/README.md`), then read
    `terraform output demo_cluster_url` and fetch the CA from the server.
 2. Repository variables `DEMO_CLUSTER_URL` and `DEMO_CLUSTER_CA` from step 1

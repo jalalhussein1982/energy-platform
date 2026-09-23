@@ -90,10 +90,41 @@ is built from it), then builds the kube context from the GitHub Actions ID token
 job builds and pushes the amd64 image with the job token and hands the digest to the `deploy`
 job (plan P5-D20); the pods pull the private package with `image.pullSecrets: [ghcr-pull]`
 (P5-D21); the demo values carry the providers' object-store ranges, no placeholders (P5-D22).
-Still **blocked on the author** (Level 3, `deployment/tenant/README.md`): `terraform apply` of
-the `hcloud` plan, the variables `DEMO_CLUSTER_URL` / `DEMO_CLUSTER_CA`, the two namespace
-Secrets (`energy-platform`, `ghcr-pull`), the first workflow run. Nothing runs on the reference
-cluster (ADR-028).
+Nothing runs on the reference cluster (ADR-028).
+
+### 4.1 The demo, live (2026-09-23)
+
+At the author's request the agent ran the Level 3 steps with the CLIs: OCI budget alert (the
+tenancy allows one budget per compartment; the author's €1 `zero-spend-guard`, which mails on
+any spend, gained a €10 forecast rule; Hetzner has no budget API), deletion of the 2026-09-22
+scratch buckets, `terraform apply`, the two repository variables, the two Secrets (`ghcr-pull`
+from a classic PAT with `read:packages` only, verified against `ghcr.io` first), the workflow.
+
+The first real apply and deploy found six defects the mock tests and kind could not, each fixed
+with a test (commits 3b478a8 … 12cc4f6):
+
+| # | Symptom on the demo | Cause | Fix |
+|---|---|---|---|
+| 1 | `terraform apply` partial: "reading S3 Bucket … couldn't find resource" | Hetzner's gateway lists a new bucket late; the provider marked it tainted | untaint, plan the two missing resources (versioning, lock rule), apply |
+| 2 | cloud-init "Failed loading yaml blob", no k3s at all | `indent()` skips the first line and the embed sat at column 0 | embed at the block's indentation; mock tests parse the rendered cloud-init |
+| 3 | `/var/lib/rancher/k3s/storage` on the root disk | the provider pre-formats the volume without a label; `LABEL=` matched nothing, `nofail` hid it | fstab by the by-id path; stop before k3s if not mounted |
+| 4 | Helm: `replicasets.apps is forbidden`, rolled back | `helm --wait` reads ReplicaSets; the deployer Role could not | Role gains read-only `replicasets`, `controllerrevisions` |
+| 5 | k3s crash-loop: node IP `10.10.1.10` not found | the private network arrives after first-boot network setup (a race) | netplan DHCP for the private interface; wait for the address before k3s |
+| 6 | Postgres on the agent's root disk; then `pg-wal-ship` "Connection refused" | local-path is node-local and only the server has the volume; kube-router rejects a new pod's first packets until its policy rule exists | `postgres.nodeSelector` (demo: the server); backup jobs `pg_isready` before connecting; archive paths per Postgres system identifier (ADR-036 amendment 1 §6) so the reinstalled cluster could not collide with the first one's locked WAL |
+
+Replacing the server re-creates the k3s CA: the agent must be replaced with it (`-replace`), and
+`DEMO_CLUSTER_CA`, the admin kubeconfig and the namespace Secrets redone.
+
+State at 13:00 UTC: server `46.225.239.152` (API `:6443`, anonymous → 401, TLS verified against
+the CA for the public address), agent joined, Postgres on the server's 10 GB volume, release
+`energy-platform` revision 2 deployed by `gha:jalalhussein1982/energy-platform` over OIDC (the
+identity can read ReplicaSets, cannot create them, cannot list nodes). Captures, gaps and
+process succeed every 15 minutes against OTE and ČEPS; `pg-wal-ship` every 10 minutes. One manual
+pass of the backup chain on the real stores: WAL ship 8 s, base 15 s (`backups/postgres/
+7688704544311951385/base/20260923T124604Z`), replication Hetzner → OCI 10 s verified, **restore
+drill from OCI 796 s**: restored database 337 s, Bronze-only rebuild 417 s, every target
+identical or live ⊆ rebuild (82–88 replica captures per 15-minute target; the rebuild is ahead
+because live has not yet processed the first release's captures).
 
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
