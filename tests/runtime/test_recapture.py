@@ -111,6 +111,7 @@ def test_a_correction_compares_with_its_own_day_not_the_newest_run() -> None:
     from tests.runtime.harness import T2, payload_for
 
     sent: list[str | None] = []
+    files: dict[str, bytes] = {}  # one file per day: a generated XLSX is not byte-stable
 
     def server(req: Request) -> Response:
         if req.url.path.startswith("/en/"):
@@ -120,7 +121,8 @@ def test_a_correction_compares_with_its_own_day_not_the_newest_run() -> None:
         if req.headers.get("if-none-match") is not None:
             return Response(304)  # a server that answers 304 to any validator
         d = datetime.strptime(day, "%d_%m_%Y").date()  # noqa: DTZ007 (a date, no time)
-        return Response(200, content=payload_for(T2, d), headers={"etag": f'"{day}"'})
+        body = files.setdefault(day, payload_for(T2, d))
+        return Response(200, content=body, headers={"etag": f'"{day}"'})
 
     def factory(manifest: object) -> Fetcher:
         return Fetcher(
@@ -144,8 +146,8 @@ def test_a_correction_compares_with_its_own_day_not_the_newest_run() -> None:
     next_day = rt.bronze.log.entries_for(T2.target_id, second)[-1]
     # a new day sends no validator of another day's file and gets its own content
     assert sent[:2] == [None, None]
-    assert next_day.payload_sha256 == sha256_hex(payload_for(T2, DAY + timedelta(days=1)))
+    assert next_day.payload_sha256 == sha256_hex(files[f"{DAY + timedelta(days=1):%d_%m_%Y}"])
     # the correction of the first day sends that day's validator; the 304 means that day's file
     assert sent[2] == f'"{DAY:%d_%m_%Y}"'
-    assert again.entry.payload_sha256 == own.payload_sha256 == sha256_hex(payload_for(T2, DAY))
+    assert again.entry.payload_sha256 == own.payload_sha256 == sha256_hex(files[f"{DAY:%d_%m_%Y}"])
     assert again.entry.content_changed is False
