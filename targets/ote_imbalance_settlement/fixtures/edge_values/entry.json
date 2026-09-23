@@ -1,0 +1,20 @@
+{
+  "capture_id": "ote_imbalance_settlement:2026-09-21T120000Z:1",
+  "target_id": "ote_imbalance_settlement",
+  "scheduled_for": "2026-09-21T12:00:00Z",
+  "attempt": 1,
+  "fetched_at": "2026-09-21T12:00:00Z",
+  "source_url": "https://www.ote-cr.cz/pw-data/services/PublicDataService",
+  "http_status": 200,
+  "content_type": "text/xml; charset=UTF-8",
+  "payload_sha256": "dc1cedb1ef323e1075c3588e37d8de1ce05272a1f10fc8f6b6c042f93635010d",
+  "raw_ref": "bronze/blobs/dc/dc1cedb1ef323e1075c3588e37d8de1ce05272a1f10fc8f6b6c042f93635010d",
+  "size": 62329,
+  "content_changed": true,
+  "source_transport": "soap",
+  "source_published_at": null,
+  "tier": "hot",
+  "etag": null,
+  "last_modified": null,
+  "hops": []
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic fixture; no live settlement values. -->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <GetImbalanceSettlementPeriodEResponse xmlns="http://www.ote-cr.cz/schema/service/public">
+      <Result>
+      </Result>
+    </GetImbalanceSettlementPeriodEResponse>
+  </soapenv:Body>
+</soapenv:Envelope>

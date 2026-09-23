@@ -1,0 +1,58 @@
+# Admission: docs/admissions/ote_imbalance_settlement.md (Route A).
+# Only the three admitted metrics; all values retain their published sign and currency.
+schema_version: 1
+target_id: ote_imbalance_settlement
+description: OTE imbalance settlement, GetImbalanceSettlementPeriodE, daily version 0 (PT15M; historical PT60M)
+license: "OTE Terms of Use: no reproduction without written consent (docs/06 §1.4); redistribution unconfirmed; repository fixtures are synthetic"
+terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
+allowed_hosts:
+  - www.ote-cr.cz
+modality: soap-xml
+cadence:
+  cron: "17 * * * *"         # Hourly polling assumption; publication latency is unverified.
+  timezone: Europe/Prague
+  correction:
+    cron: "37 * * * *"       # Re-poll D-1..D-3 for delayed daily settlement (assumption).
+    days: 3
+history:
+  max_age: P3D               # Conservative operational bound; source retention is unverified.
+fetch:
+  soap_xml:
+    url: https://www.ote-cr.cz/pw-data/services/PublicDataService
+    soap_action: http://www.ote-cr.cz/schema/service/public/GetImbalanceSettlementPeriodE
+    soap_version: "1.1"
+    body_template: |
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:pub="http://www.ote-cr.cz/schema/service/public">
+        <soapenv:Body>
+          <pub:GetImbalanceSettlementPeriodE>
+            <pub:Version>0</pub:Version>
+            <pub:StartDate>{start_date}</pub:StartDate>
+            <pub:EndDate>{end_date}</pub:EndDate>
+          </pub:GetImbalanceSettlementPeriodE>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    params:
+      start_date: "{delivery_day:%Y-%m-%d}"
+      end_date: "{delivery_day:%Y-%m-%d}"
+contract:
+  dataset_id: ote.imbalance_settlement
+  source_transport: soap
+  decode: soap
+  metrics: [system_imbalance, imbalance_price, counter_imbalance_price]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: period_index
+    timezone: Europe/Prague
+    date: {source: Date}
+    index: {source: PeriodIndex}
+    resolution: {source: PeriodResolution}
+  source_version: {source: Version}
+  source_published_at: null
+  ignore_fields: [Sum, PositiveImbalance, NegativeImbalance, RoundedImbalance, ReCost, ImbalanceCost, PriceWARE, PriceRE, PriceWAIM, PriceCurve, Emerg]
+  metrics:
+    system_imbalance: {source: SystemImbalance, unit: MWh, sign: as_published, decimal_separator: dot}
+    imbalance_price: {source: SettlImbalancePrice, unit: CZK/MWh, sign: as_published, decimal_separator: dot}
+    counter_imbalance_price: {source: SettlCounterImbalancePrice, unit: CZK/MWh, sign: as_published, decimal_separator: dot}

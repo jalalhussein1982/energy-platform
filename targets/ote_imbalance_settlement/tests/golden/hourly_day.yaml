@@ -1,0 +1,9 @@
+fixture: hourly_day
+checked_by: "Codex, 2026-09-23: values read directly from fixtures/hourly_day/blob with ElementTree; counts and UTC offsets calculated by hand, never copied from platform output; human review pending"
+expect:
+  row_count: 72
+  quality_events: [partition_status]
+  rows:
+    - {delivery_start_utc: 2024-06-29T22:00:00Z, resolution: PT60M, period_index: 1, source_version: "0", metric: system_imbalance, value: "1.12500"}
+    - {delivery_start_utc: 2024-06-29T22:00:00Z, resolution: PT60M, period_index: 1, source_version: "0", metric: imbalance_price, value: "1001.250"}
+    - {delivery_start_utc: 2024-06-30T21:00:00Z, resolution: PT60M, period_index: 24, source_version: "0", metric: counter_imbalance_price, value: "2024.750"}
