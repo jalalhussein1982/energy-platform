@@ -140,6 +140,20 @@ type = "forbidden"
 source_modules = ["energy_platform"]
 forbidden_modules = ["targets"]
 
+[[tool.importlinter.contracts]]
+name = "the capture/process path never imports triage (ADR-009: no LLM on the critical path)"
+type = "forbidden"
+source_modules = [
+  "energy_platform.runtime",
+  "energy_platform.fetch",
+  "energy_platform.bronze",
+  "energy_platform.parse",
+  "energy_platform.mapping",
+  "energy_platform.silver",
+  "energy_platform.store",
+]
+forbidden_modules = ["energy_platform.triage"]
+
 # ---------------------------------------------------------------------------
 # pytest
 # ---------------------------------------------------------------------------

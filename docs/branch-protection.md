@@ -18,7 +18,16 @@ authority model; CODEOWNERS is the other half.
 Deploy identities (Phase 5) are repository secrets that no agent session can read: the CI job
 mints a short-lived token from them (ADR-015 two-token pattern) and never writes it to a log.
 
-Until a remote exists this file is the record and **nothing here is enforced**. Locally,
+**Enforced since 2026-09-23** on `github.com/jalalhussein1982/energy-platform` (public): pull
+request required, 1 approval, code-owner review, stale approvals dismissed, the 12 status
+checks above, branches up to date, conversation resolution, no force pushes or deletion. The
+author chose option (a): administrators may bypass, and GitHub records every bypass (a single
+maintainer cannot approve their own PR). Signed commits and push restrictions are not set (push
+restrictions exist only for organisation repositories). An agent session that uses the owner's
+`gh` login is technically an administrator: for it the Level 3 rule is procedural, not
+mechanical (`docs/threat-model.md` §13).
+
+Before the remote existed this file was the record and nothing here was enforced. Locally,
 `uv run pre-commit install` (not automatic) gives the laptop the same three gates as CI: `make check`,
 `make deps-allowlist`, `make secret-scan`. Ownership, protected `main` and the target-only path
-boundary become real only on the Git host. *(2026-09-23: the remote is `github.com/jalalhussein1982/energy-platform`; `CODEOWNERS` names `@jalalhussein1982`, review F09 closed. GitHub offers branch protection on a private repository only with a paid plan; it is enabled when the repository goes public.)*
+boundary become real only on the Git host. *(2026-09-23: `CODEOWNERS` names `@jalalhussein1982`, review F09 closed; protection enforced as above.)*

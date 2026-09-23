@@ -40,7 +40,7 @@
 - [x] Commit `feat(triage): drift-triage pipeline with a stubbed LLM, bounded extraction and a manifest-only proposal (ADR-008, ADR-009, D-10)`.
 
 ### Task 6.3 — Threat model
-- [ ] `docs/threat-model.md` complete. Commit `docs(threat-model): ...`.
+- [x] `docs/threat-model.md` complete. Commit `docs(threat-model): ...`.
 
 ### Task 6.4 — The junior's page and the architecture diagram
 - [ ] `docs/08-adding-a-target.md` (both routes; every command run once while writing it, on a scratch target outside `targets/`); `docs/architecture.md` (Mermaid). Commit `docs: ...`.
