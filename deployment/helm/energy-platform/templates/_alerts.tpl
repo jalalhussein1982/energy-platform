@@ -42,6 +42,13 @@ groups:
           severity: page
         annotations:
           summary: "no freshness metrics at all: exporter, database or scrape path down"
+      - alert: EnergyPlatformReconciliationMismatch
+        expr: energy_platform_quality_events_last_hour{kind="reconciliation_mismatch"} > 0
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ "{{" }} $labels.target {{ "}}" }}: the two OTE transports disagree on a shared metric — one of them holds wrong data (01 §3; 2026-09-23 a backfill stored another day's file and 9 544 of these went unseen)"
       - alert: EnergyPlatformRestoreDrillFailed
         expr: kube_job_status_failed{job_name=~".*restore-drill.*"} > 0
         for: 1m

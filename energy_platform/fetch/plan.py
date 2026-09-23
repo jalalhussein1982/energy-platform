@@ -134,15 +134,23 @@ def _fetch_dated_file(
     fetcher: Fetcher,
     previous: Conditional | None,
 ) -> FetchResult:
+    template_url = render(block.url_template, ctx)
     url: str | None = None
     if block.discovery is not None:
         page = fetcher.fetch(FetchRequest(url=block.discovery.url))
-        url = discover_link(
+        found = discover_link(
             page.body.decode("utf-8", "replace"), page.url, block.discovery.link_regex
         )
-    if url is None:
-        url = render(block.url_template, ctx)
-    return fetcher.fetch(FetchRequest(url=url, conditional=previous))
+        # A run captures its own delivery day. The page lists the newest file, so a link is
+        # taken only if it names the day's file; a backfill or correction of an earlier day
+        # uses the template (2026-09-23: today's XLSX was captured for 21 and 22 September).
+        if found is not None and _file_name(found) == _file_name(template_url):
+            url = found
+    return fetcher.fetch(FetchRequest(url=url or template_url, conditional=previous))
+
+
+def _file_name(url: str) -> str:
+    return urlsplit(url).path.rsplit("/", 1)[-1]
 
 
 def request_headers_for_log(request: FetchRequest) -> Mapping[str, str]:

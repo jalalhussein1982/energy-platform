@@ -372,6 +372,7 @@ def test_observability_renders_per_adr_037(tmp_path: Path) -> None:
         "energy_platform_pipeline_failed",
         "energy_platform_stale_fetch_streak",
         "energy_platform_runs_total",
+        "energy_platform_quality_events_last_hour",
     } <= exported
     rules = yaml.safe_load(
         named(docs, "ConfigMap")["ep-energy-platform-alert-rules"]["data"][
@@ -385,6 +386,7 @@ def test_observability_renders_per_adr_037(tmp_path: Path) -> None:
         "EnergyPlatformSourceUnavailable",
         "EnergyPlatformFreshnessStale",
         "EnergyPlatformRestoreDrillFailed",
+        "EnergyPlatformReconciliationMismatch",
     } <= names
     exporter = named(docs, "Deployment")["ep-energy-platform-metrics"]
     annotations = exporter["spec"]["template"]["metadata"]["annotations"]

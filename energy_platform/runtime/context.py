@@ -6,7 +6,7 @@ import os
 import platform
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from energy_platform.bronze import Bronze
@@ -34,6 +34,14 @@ def delivery_day_for(scheduled_for: datetime, tz: str = SOURCE_TIMEZONE) -> date
     manifest field by ADR; until then every run is for its own day.
     """
     return scheduled_for.astimezone(ZoneInfo(tz)).date()
+
+
+def delivery_day_bounds(day: date, tz: str = SOURCE_TIMEZONE) -> tuple[datetime, datetime]:
+    """``[start, end)`` of a civil day in UTC (23, 24 or 25 hours long)."""
+    zone = ZoneInfo(tz)
+    start = datetime.combine(day, time(), tzinfo=zone)
+    end = datetime.combine(day + timedelta(days=1), time(), tzinfo=zone)
+    return start.astimezone(UTC), end.astimezone(UTC)
 
 
 @dataclass(frozen=True, slots=True)

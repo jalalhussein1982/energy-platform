@@ -17,7 +17,7 @@ from energy_platform.fetch import EgressError, FetchContext, FetchFailed, Render
 from energy_platform.fetch.client import Conditional
 from energy_platform.fetch.plan import fetch_for_manifest
 from energy_platform.fetch.secrets import SecretMissing
-from energy_platform.runtime.context import Runtime, delivery_day_for
+from energy_platform.runtime.context import Runtime, delivery_day_bounds, delivery_day_for
 from energy_platform.store import AttemptOutcome, RunOrigin, RunState, StoreUnavailable
 
 log = logging.getLogger("energy_platform.runtime")
@@ -54,8 +54,8 @@ def capture(
     ctx = FetchContext.for_run(
         scheduled_for, delivery_day=delivery_day or delivery_day_for(scheduled_for, rt.timezone)
     )
-    previous = rt.bronze.log.latest(target)
-    conditional = None if previous is None else Conditional(previous.etag, previous.last_modified)
+    baseline = capture_baseline(rt, scheduled_for)
+    conditional = None if baseline is None else Conditional(baseline.etag, baseline.last_modified)
     try:
         result = fetch_for_manifest(
             rt.manifest,
@@ -80,6 +80,7 @@ def capture(
             result=result,
             transport=rt.manifest.contract.source_transport,
             force=force,
+            baseline=baseline,
         )
     except BronzeError as exc:
         log.error("%s %s: Bronze refused the capture: %s", target, scheduled_for, exc)
@@ -97,6 +98,21 @@ def capture(
         recaptured=force and outcome.created and outcome.entry.content_changed,
     )
     return CaptureReport(scheduled_for, "ok", outcome.entry, outcome.created, None, updated)
+
+
+def capture_baseline(rt: Runtime, scheduled_for: datetime) -> CaptureEntry | None:
+    """The last real payload of this run's request: the newest HTTP 200 entry of the same
+    delivery day. It supplies the conditional validators, what a 304 means and the
+    ``content_changed`` comparison. Never the target's newest run: that is another day's file.
+    A 304 entry is derived, so it is never a baseline."""
+    day = delivery_day_for(scheduled_for, rt.timezone)
+    since, until = delivery_day_bounds(day, rt.timezone)
+    same_day = [
+        e
+        for e in rt.bronze.log.list(rt.target_id, since=since, until=until)
+        if e.http_status == 200 and delivery_day_for(e.scheduled_for, rt.timezone) == day
+    ]
+    return same_day[-1] if same_day else None
 
 
 def _ack(

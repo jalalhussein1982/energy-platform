@@ -69,6 +69,14 @@ data:
         - target: {usage: "LABEL", description: "target id"}
         - state: {usage: "LABEL", description: "ledger run state (ADR-024 §3)"}
         - total: {usage: "GAUGE", description: "runs in this state"}
+    energy_platform_quality_events:
+      query: >-
+        SELECT target_id AS target, kind, count(*) AS last_hour FROM quality_events
+        WHERE created_at > now() - interval '1 hour' AND kind <> 'partition_status' GROUP BY 1, 2
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - kind: {usage: "LABEL", description: "quality event kind (reconciliation_mismatch, …)"}
+        - last_hour: {usage: "GAUGE", description: "quality events of this kind in the last hour"}
 ---
 apiVersion: v1
 kind: Service

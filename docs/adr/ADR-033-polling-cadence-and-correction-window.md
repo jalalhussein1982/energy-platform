@@ -6,7 +6,7 @@
 | Date | 2026-09-20 |
 | Resolves | D-5 (`02-architecture-decisions.md` §4.2), implementing its recorded default; closes the `04-contracts.md` §5 "delivery-day offset" question |
 | Supersedes | — |
-| Amended | 2026-09-23, amendment 1 (below): §4 gains `month_start[k]` / `month_end[k]`; every template field is checked (bare names only) |
+| Amended | 2026-09-23, amendment 1 (below): §4 gains `month_start[k]` / `month_end[k]`; every template field is checked (bare names only). Amendment 2: a capture is about its own delivery day (discovery and the capture baseline) |
 
 ## Context
 
@@ -132,6 +132,37 @@ expressed today: §3's correction window is at most 31 days, and §4 allows only
 and gate for one use); a per-target delivery-day offset (rejected above, for the same reasons);
 raising the correction window to about 130 days (130 requests per firing, and version 1 would
 still not be a month document).
+
+## Amendment 2 (2026-09-23) — a capture is about its own delivery day
+
+**Incident (demo, `docs/07-operations.md` §4.3).** Backfills and corrections of T2 on 21 and
+22 September stored **23 September's XLSX**, and `process` mapped it under those dates (T2's
+rows carry no date; the run's delivery day supplies it). Two defects combined. First, the
+discovery step took the first matching link on the results page, which lists the newest file,
+whatever day the run was for. Second, the capture baseline (conditional validators, the meaning
+of a 304, `content_changed`) was the target's newest entry, i.e. another day's file: three
+corrections were answered 304 and recorded with today's blob, and every correction of a past
+day read as "changed". T1's cross-check flagged it: 9 544 `reconciliation_mismatch` events in
+five hours, none of them alerted.
+
+**Decision.**
+
+1. A discovered link is used only if its file name equals the file name of the run's rendered
+   `url_template`; otherwise the template URL is fetched. For today's run nothing changes. A
+   backfill or correction of an earlier day gets that day's file.
+2. The baseline of a capture is the **newest HTTP 200 entry of the same delivery day**
+   (`runtime.capture.capture_baseline`). A 304 entry is derived and is never a baseline. It
+   supplies the conditional headers, what a 304 means and the `content_changed` comparison.
+   The first run of a day has no baseline: no validators, `content_changed` true.
+3. Bronze refuses a 304 whose URL differs from the baseline's (`BronzeError`, the run fails
+   loudly) instead of attaching another resource's payload.
+4. `EnergyPlatformReconciliationMismatch` pages when the exporter's
+   `energy_platform_quality_events_last_hour{kind="reconciliation_mismatch"}` stays above 0 for
+   15 minutes.
+
+`05` C-66. Repair is by capture, not by editing Silver: the next correction of each affected
+day fetches the right file, its versions carry the newest `fetched_at` and win the current
+view (ADR-023 §3). The wrong versions stay in history, like every Silver version.
 
 ## Verification refs
 

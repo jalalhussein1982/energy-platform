@@ -90,11 +90,12 @@ def test_second_capture_of_the_same_instant_is_a_no_op_unless_forced() -> None:
 def test_unchanged_payload_makes_a_new_entry_but_no_new_blob() -> None:
     b, blobs, log = bronze()
     b.capture(target_id="t", scheduled_for=T0, result=result(b"same"), transport="soap")
-    second = b.capture(
+    second = b.capture(  # the next run of the same day; the runtime passes it as the baseline
         target_id="t",
         scheduled_for=T0 + timedelta(minutes=15),
         result=result(b"same"),
         transport="soap",
+        baseline=log.list("t")[-1],
     ).entry
     assert second.content_changed is False
     assert len(blobs) == 1 and len(log.list("t")) == 2
@@ -102,13 +103,14 @@ def test_unchanged_payload_makes_a_new_entry_but_no_new_blob() -> None:
 
 
 def test_304_reuses_the_previous_blob_and_validators() -> None:
-    b, blobs, _ = bronze()
+    b, blobs, log = bronze()
     b.capture(target_id="t", scheduled_for=T0, result=result(b"x", etag='"e1"'), transport="xlsx")
     nm = b.capture(
         target_id="t",
         scheduled_for=T0 + timedelta(minutes=15),
         result=result(b"", status=304, not_modified=True),
         transport="xlsx",
+        baseline=log.list("t")[-1],
     ).entry
     assert nm.http_status == 304 and nm.content_changed is False
     assert nm.payload_sha256 == sha256_hex(b"x") and nm.etag == '"e1"' and nm.size == 1
@@ -123,6 +125,32 @@ def test_304_without_a_previous_capture_is_an_error() -> None:
             scheduled_for=T0,
             result=result(b"", status=304, not_modified=True),
             transport="xlsx",
+        )
+
+
+def test_304_for_another_resource_than_the_baseline_is_refused() -> None:
+    """A 304 means "the same as the baseline": only if the baseline fetched the same URL."""
+    b, _, log = bronze()
+    b.capture(target_id="t", scheduled_for=T0, result=result(b"x", etag='"e1"'), transport="xlsx")
+    other = FetchResult(
+        url="https://www.ote-cr.cz/another-day.xlsx",
+        status=304,
+        headers={},
+        body=b"",
+        content_type=None,
+        fetched_at=T0 + timedelta(minutes=20),
+        etag=None,
+        last_modified=None,
+        not_modified=True,
+        hops=("https://www.ote-cr.cz/another-day.xlsx",),
+    )
+    with pytest.raises(BronzeError, match="different resource"):
+        b.capture(
+            target_id="t",
+            scheduled_for=T0 + timedelta(minutes=15),
+            result=other,
+            transport="xlsx",
+            baseline=log.list("t")[-1],
         )
 
 

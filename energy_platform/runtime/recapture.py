@@ -10,11 +10,10 @@ only a changed payload lowers the run to ``captured`` (P5-D6, in ``capture``) so
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, time, timedelta
-from zoneinfo import ZoneInfo
+from datetime import date, datetime, timedelta
 
 from energy_platform.runtime.capture import CaptureReport, capture
-from energy_platform.runtime.context import Runtime, delivery_day_for
+from energy_platform.runtime.context import Runtime, delivery_day_bounds, delivery_day_for
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,16 +28,9 @@ class RecaptureReport:
         return self.capture is None
 
 
-def _day_bounds(day: date, tz: str) -> tuple[datetime, datetime]:
-    zone = ZoneInfo(tz)
-    start = datetime.combine(day, time(), tzinfo=zone)
-    end = datetime.combine(day + timedelta(days=1), time(), tzinfo=zone)
-    return start.astimezone(UTC), end.astimezone(UTC)
-
-
 def last_run_of_day(rt: Runtime, day: date) -> datetime | None:
     """The newest ``scheduled_for`` in the capture log whose delivery day is ``day``."""
-    since, until = _day_bounds(day, rt.timezone)
+    since, until = delivery_day_bounds(day, rt.timezone)
     newest: datetime | None = None
     for entry in rt.bronze.log.list(rt.target_id, since=since, until=until):
         if delivery_day_for(entry.scheduled_for, rt.timezone) != day:

@@ -99,3 +99,53 @@ def test_row_10_changed_forced_attempt_is_pending_and_processed_again() -> None:
     current = rt.store.current_rows("ote.idm_continuous", metric="price_vwap")
     assert current[0].value == Decimal("171.99")
     assert current[0].observation.fetched_at > datetime(2026, 9, 18, tzinfo=UTC)
+
+
+def test_a_correction_compares_with_its_own_day_not_the_newest_run() -> None:
+    """The conditional validators, a 304's payload and content_changed come from the same
+    delivery day's last real capture, never from the target's newest run (another day's
+    file): 2026-09-23 on the demo a 304 attached today's XLSX to runs of 21 and 22 September."""
+    from energy_platform.bronze import sha256_hex
+    from energy_platform.fetch import Fetcher
+    from energy_platform.fetch.offline import Request, Response, mock_transport
+    from tests.runtime.harness import T2, payload_for
+
+    sent: list[str | None] = []
+
+    def server(req: Request) -> Response:
+        if req.url.path.startswith("/en/"):
+            return Response(200, content=b"<html>no link</html>")  # the day's template is used
+        day = req.url.path.split("/")[-1][9:19]  # IM_15MIN_DD_MM_YYYY_EN.xlsx
+        sent.append(req.headers.get("if-none-match"))
+        if req.headers.get("if-none-match") is not None:
+            return Response(304)  # a server that answers 304 to any validator
+        d = datetime.strptime(day, "%d_%m_%Y").date()  # noqa: DTZ007 (a date, no time)
+        return Response(200, content=payload_for(T2, d), headers={"etag": f'"{day}"'})
+
+    def factory(manifest: object) -> Fetcher:
+        return Fetcher(
+            allowed_hosts=T2.allowed_hosts,
+            transport=mock_transport(server),
+            offline=True,
+            sleep=lambda s: None,
+        )
+
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    rt = runtime(T2, clock=clock)
+    object.__setattr__(rt, "fetcher_factory", factory)
+    first, second = RUNS[0], RUNS[1]
+    for when in (first, second):
+        clock.now = when + timedelta(minutes=1)
+        assert capture(rt, when).outcome == "ok"
+    own = rt.bronze.log.entries_for(T2.target_id, first)[-1]
+    clock.now = NOW
+    again = capture(rt, first, force=True)
+    assert again.entry is not None
+    next_day = rt.bronze.log.entries_for(T2.target_id, second)[-1]
+    # a new day sends no validator of another day's file and gets its own content
+    assert sent[:2] == [None, None]
+    assert next_day.payload_sha256 == sha256_hex(payload_for(T2, DAY + timedelta(days=1)))
+    # the correction of the first day sends that day's validator; the 304 means that day's file
+    assert sent[2] == f'"{DAY:%d_%m_%Y}"'
+    assert again.entry.payload_sha256 == own.payload_sha256 == sha256_hex(payload_for(T2, DAY))
+    assert again.entry.content_changed is False

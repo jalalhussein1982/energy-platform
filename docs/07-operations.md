@@ -187,6 +187,26 @@ then deleted (`DELETE_SECRETS=1`); the namespace holds only `energy-platform` an
 From here on `deploy-demo` also runs on a push to `main` that touches what the demo runs
 (Phase 9, G6).
 
+### 4.3 Incident, 2026-09-23: T2 backfills and corrections stored today's file (ADR-033 amendment 2)
+
+Found while measuring publication times from the capture log (Phase 9, G8), not by an alert.
+
+- **What the data showed:** 16 T2 payloads (today's XLSX) mapped under 21 and 22 September as
+  well as 23 September. Three corrections of T2 got a 304 and were recorded with the blob of
+  the 23 September run (runs `2026-09-21T08:30Z` attempt 2, `2026-09-21T21:45Z` attempt 3,
+  `2026-09-22T00:30Z` attempt 2). On every target, correction attempts read as
+  `content_changed` even with an identical payload hash (the E1 run of 22 September:
+  the same SHA-256 on ten attempts, "changed" from the third).
+- **Detected but not raised:** T1's cross-check wrote 9 544 `reconciliation_mismatch` events
+  from 12:33 UTC (`price_vwap 2026-09-22T17:30Z: soap=432.00 vs copy=371.86`). No alert rule
+  read them.
+- **Cause:** the T2 discovery page lists the newest file and the fetch took its first link
+  for any delivery day; the capture baseline was the target's newest entry (another day's
+  resource). T1, T3, E1 and the imbalance settlement put the date in the request and are
+  unaffected.
+- **Fix:** ADR-033 amendment 2 (`05` C-66). **Repair:** corrective re-capture; Silver is not
+  edited (a production database mutation is Level 3). The wrong versions stay in history.
+
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
 Measured on the local profile, 2026-09-22 (MinIO A → MinIO B on one kind node; the numbers are

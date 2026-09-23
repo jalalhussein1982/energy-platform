@@ -225,3 +225,22 @@ def test_unvalidated_manifest_naming_a_platform_secret_sends_nothing() -> None:
     with pytest.raises(SecretOutOfScope):
         fetch_for_manifest(crafted, CTX, offline_fetcher(h, crafted), secrets=secrets)
     assert seen == []
+
+
+def test_t2_discovered_link_for_another_day_falls_back_to_the_days_template() -> None:
+    """A run captures its own delivery day: the results page lists today's file, so a backfill
+    or correction of an earlier day must not take it (2026-09-23 on the demo: today's XLSX
+    was stored under 21 and 22 September)."""
+    m = load_manifest(EXAMPLES / "ote_idm_xlsx.yaml")  # CTX: delivery day 2026-09-18
+    calls: list[str] = []
+
+    def todays_link(req: Request) -> Response:
+        calls.append(str(req.url))
+        if req.url.path.startswith("/en/"):
+            return Response(200, content=b'<a href="/pubweb/x/IM_15MIN_23_09_2026_EN.xlsx">f</a>')
+        return Response(200, content=b"PK")
+
+    fetch_for_manifest(m, CTX, offline_fetcher(todays_link, m))
+    assert calls[1] == (
+        "https://www.ote-cr.cz/pubweb/attachments/27/2026/month09/day18/IM_15MIN_18_09_2026_EN.xlsx"
+    )
