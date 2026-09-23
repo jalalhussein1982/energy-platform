@@ -9,13 +9,19 @@ from typing import Any
 
 import pytest
 
-from energy_platform.contracts.manifest import Manifest, load_manifest
+from energy_platform.contracts.manifest import Manifest, SecretRef, load_manifest
 from energy_platform.fetch.client import Fetcher, FetchRequest
 from energy_platform.fetch.offline import Request, Response, mock_transport
 from energy_platform.fetch.plan import discover_link, fetch_for_manifest, soap_request
 from energy_platform.fetch.policy import EgressError
 from energy_platform.fetch.render import FetchContext
-from energy_platform.fetch.secrets import EnvSecretResolver, SecretMissing, env_name
+from energy_platform.fetch.secrets import (
+    EnvSecretResolver,
+    ScopedSecretResolver,
+    SecretMissing,
+    SecretOutOfScope,
+    env_name,
+)
 from tests.contracts.manifest_fixtures import t1_manifest
 
 EXAMPLES = Path("examples/manifests")
@@ -179,3 +185,43 @@ def test_missing_secret_stops_before_any_request() -> None:
 def test_fetch_request_defaults() -> None:
     r = FetchRequest("https://www.ote-cr.cz/a")
     assert (r.method, r.body, r.conditional, r.redact_params) == ("GET", None, None, ())
+
+
+def test_scoped_resolver_refuses_a_platform_or_another_targets_secret() -> None:
+    # 05 C-63: whatever the manifest says, a target resolves only target-<id>/<key>
+    env = {
+        "BRONZE_SECRET_ACCESS_KEY": "platform-secret",
+        "TARGET_OTE_DAM_TOKEN": "dam-token",
+        "TARGET_OTE_INTRADAY_MARKET_TOKEN": "own-token",
+    }
+    scoped = ScopedSecretResolver("ote_intraday_market", EnvSecretResolver(env))
+    for name, key in (("BRONZE", "secret-access-key"), ("target-ote-dam", "token")):
+        with pytest.raises(SecretOutOfScope):
+            scoped.resolve(SecretRef(name=name, key=key))
+    assert scoped.resolve(SecretRef(name="target-ote-intraday-market", key="token")) == "own-token"
+
+
+def test_unvalidated_manifest_naming_a_platform_secret_sends_nothing() -> None:
+    """A manifest that never went through validation still cannot reach BRONZE_*."""
+    good = load_manifest(EXAMPLES / "entsoe_rest_xml.yaml").model_dump(mode="json")
+    good["allowed_hosts"] = ["www.ote-cr.cz"]
+    good["fetch"]["rest_xml"]["url_template"] = "https://www.ote-cr.cz/api"
+    m = Manifest.model_validate(good)
+    assert m.fetch.rest_xml is not None and m.fetch.rest_xml.auth is not None
+    auth = m.fetch.rest_xml.auth.model_construct(
+        secretRef=SecretRef(name="BRONZE", key="secret-access-key"),
+        location="query",
+        param="securityToken",
+    )
+    rest = m.fetch.rest_xml.model_copy(update={"auth": auth})
+    crafted = m.model_copy(update={"fetch": m.fetch.model_copy(update={"rest_xml": rest})})
+    seen: list[str] = []
+
+    def h(req: Request) -> Response:
+        seen.append(str(req.url))
+        return Response(200, content=b"<x/>")
+
+    secrets = EnvSecretResolver({"BRONZE_SECRET_ACCESS_KEY": "platform-secret"})
+    with pytest.raises(SecretOutOfScope):
+        fetch_for_manifest(crafted, CTX, offline_fetcher(h, crafted), secrets=secrets)
+    assert seen == []

@@ -5,7 +5,7 @@
 | Status | ACCEPTED |
 | Date | 2026-09-19 |
 | Resolves | B-1 (`02-architecture-decisions.md` §4.1) |
-| Amended by | ADR-027 (2026-09-19): parser input is a platform-decoded document; `parser.py` imports are positively allowlisted. ADR-022/ADR-026: `contract.dataset_id` and `allowed_hosts` must exist in platform registries |
+| Amended by | ADR-027 (2026-09-19): parser input is a platform-decoded document; `parser.py` imports are positively allowlisted. ADR-022/ADR-026: `contract.dataset_id` and `allowed_hosts` must exist in platform registries. Amendment 1 (2026-09-23, below): a target's `secretRef` is scoped to the target |
 
 ## Context
 
@@ -30,6 +30,16 @@ TOML (weaker nesting for `mapping` blocks); entry-point registration (requires e
 ## Consequences
 
 Phase 1 implements `energy_platform/contracts/manifest.py`; Phase 3 constraint matrix rows "missing `license`", "host not in allowlist", "secret in code" gate this ADR.
+
+## Amendment 1 (2026-09-23) — a target's `secretRef` is its own
+
+The resolver read any `<NAME>_<KEY>` from the pod environment, and the platform's own
+credentials live there (`BRONZE_*`, `POSTGRES_*`). So `{name: BRONZE, key: secret-access-key}`
+in a manifest's `auth` would have sent the store-A key to a registered host (threat model §4).
+From now on `secretRef.name` must be `target-<target_id>` (`_` → `-`) and `key` alphanumeric,
+which gives the environment form `TARGET_<TARGET_ID>_<KEY>`. Manifest validation refuses
+anything else, and `fetch_for_manifest` wraps every resolver in `ScopedSecretResolver`, which
+refuses it again for a manifest that skipped validation. `05` C-63; `04` §3.4.
 
 ## Verification refs
 

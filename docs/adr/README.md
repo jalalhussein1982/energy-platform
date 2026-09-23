@@ -24,7 +24,7 @@ from [`ADR-template.md`](ADR-template.md). Open items `D-1 … D-13` are in `02`
 | [ADR-014](ADR-014-tooling-baseline.md) | Tooling baseline (uv, ruff, mypy strict, import-linter, pytest) | file | — |
 | [ADR-015](ADR-015-ci-platform.md) | CI platform: GitHub Actions as a thin wrapper over Make | file | porting note: [`ci-porting.md`](../ci-porting.md) |
 | [ADR-016](ADR-016-release-and-rollback.md) | Release and rollback model: images by digest, atomic upgrades, rollback drill | file | [ADR-025](ADR-025-upgrade-hooks-and-install-ordering.md): hooks as the upgrade gate |
-| [ADR-017](ADR-017-manifest-format-and-registration.md) | Manifest format and target registration | file | — |
+| [ADR-017](ADR-017-manifest-format-and-registration.md) | Manifest format and target registration | file | amendment 1 (2026-09-23): a target's `secretRef` is `target-<id>` only |
 | [ADR-018](ADR-018-canonical-schema-details.md) | Canonical schema details (bitemporal, identity, current view) | file | — |
 | [ADR-019](ADR-019-generic-parsers-and-allowlist.md) | Generic parsers in v1 and the initial dependency allowlist | file | — |
 | [ADR-020](ADR-020-test-strategy.md) | Test strategy: fixtures are Bronze objects, goldens by hand | file | — |

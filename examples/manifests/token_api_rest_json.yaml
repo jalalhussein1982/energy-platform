@@ -24,7 +24,7 @@ fetch:
     headers:
       Accept: application/json
     auth:
-      secretRef: {name: example-api-token, key: token}
+      secretRef: {name: target-token-api-rest-json, key: token}
       location: header
       param: X-API-Key
     rate_limit: {requests: 60, per: PT1M}

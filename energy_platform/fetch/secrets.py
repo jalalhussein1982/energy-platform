@@ -13,7 +13,7 @@ import re
 from typing import Protocol
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from energy_platform.contracts.manifest import SecretRef
+from energy_platform.contracts.manifest import SecretRef, target_secret_name
 
 REDACTED = "<redacted>"
 
@@ -44,6 +44,29 @@ class EnvSecretResolver:
                 f"secretRef {ref.name}/{ref.key}: environment variable {name} unset"
             )
         return value
+
+
+class SecretOutOfScope(LookupError):
+    """A target asked for a secret that is not its own (05 C-63); the request is not sent."""
+
+
+class ScopedSecretResolver:
+    """A target's view of the secrets: only ``target-<id>`` resolves, whatever the manifest says.
+
+    Manifest validation refuses another name already; this holds for a manifest that never went
+    through validation (``model_construct``) and for every caller of ``fetch_for_manifest``.
+    """
+
+    def __init__(self, target_id: str, inner: SecretResolver) -> None:
+        self._name = target_secret_name(target_id)
+        self._inner = inner
+
+    def resolve(self, ref: SecretRef) -> str:
+        if ref.name != self._name:
+            raise SecretOutOfScope(
+                f"secretRef {ref.name}/{ref.key}: a target may resolve only {self._name}/<key>"
+            )
+        return self._inner.resolve(ref)
 
 
 def redact_query(url: str, params: tuple[str, ...]) -> str:

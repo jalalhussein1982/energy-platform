@@ -195,7 +195,7 @@ def test_secret_ref_is_not_a_secret() -> None:
         "rest_json": {
             "url_template": "https://www.ote-cr.cz/api",
             "auth": {
-                "secretRef": {"name": "entsoe-token", "key": "token"},
+                "secretRef": {"name": "target-ote-idm-soap", "key": "token"},
                 "location": "query",
                 "param": "securityToken",
             },
@@ -236,6 +236,49 @@ def test_month_offsets_are_valid_placeholders() -> None:
     data = with_(t1_manifest(), "fetch.soap_xml.params.start_date", "{month_start[1]:%Y-%m-%d}")
     data = with_(data, "fetch.soap_xml.params.end_date", "{month_end[1]:%Y-%m-%d}")
     Manifest.model_validate(data)
+
+
+def _rest_with_auth(name: str, key: str) -> dict[str, Any]:
+    data = t1_manifest()  # target_id ote_idm_soap
+    data["modality"] = "rest-json"
+    data["fetch"] = {
+        "rest_json": {
+            "url_template": "https://www.ote-cr.cz/api",
+            "auth": {
+                "secretRef": {"name": name, "key": key},
+                "location": "header",
+                "param": "X-Key",
+            },
+        }
+    }
+    data["contract"]["source_transport"] = "rest"
+    data["contract"]["decode"] = "json"
+    return data
+
+
+@pytest.mark.parametrize(
+    ("name", "key"),
+    [
+        ("BRONZE", "secret-access-key"),  # BRONZE_SECRET_ACCESS_KEY: the store-A credential
+        ("bronze", "secretaccesskey"),
+        ("postgres", "password"),
+        ("energy-platform", "dsn"),
+        ("target-ote-dam", "token"),  # another target's
+        ("target-ote-idm-soap-xlsx", "token"),  # a longer id sharing the prefix
+    ],
+)
+def test_secret_ref_must_be_the_targets_own(name: str, key: str) -> None:
+    # 05 C-63: a target resolves only target-<id>, never a platform credential
+    _rejects(_rest_with_auth(name, key), "secretRef.name must be 'target-ote-idm-soap'")
+
+
+@pytest.mark.parametrize("key", ["secret-access-key", "x_token", "a.b", ""])
+def test_secret_ref_key_must_be_alphanumeric(key: str) -> None:
+    _rejects(_rest_with_auth("target-ote-idm-soap", key), "secretRef")
+
+
+def test_own_secret_ref_is_valid() -> None:
+    Manifest.model_validate(_rest_with_auth("target-ote-idm-soap", "securityToken"))
 
 
 # ----------------------------------------------------------------- YAML subset (ADR-017)

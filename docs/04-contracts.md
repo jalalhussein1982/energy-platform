@@ -213,13 +213,21 @@ a credential.
 
 ```yaml
 auth:
-  secretRef: {name: entsoe-token, key: securityToken}   # Kubernetes Secret name and key (env in `local`)
+  secretRef: {name: target-entsoe-dam-prices, key: securityToken}   # always target-<target_id, _ → ->
   location: query | header
-  param: securityToken                                  # query parameter or header name
+  param: securityToken                                              # query parameter or header name
 ```
 
 The platform resolves the reference at fetch time. Fixtures, logs and the manifest itself never
-see the value.
+see the value. **A target resolves only its own secret** (`05` C-63): `name` must be
+`target-<target_id>` with `_` written as `-`, and `key` must be alphanumeric. In the `local`
+profile the value is the environment variable `TARGET_<TARGET_ID>_<KEY>` (upper-cased), e.g.
+`TARGET_ENTSOE_DAM_PRICES_SECURITYTOKEN`. No platform credential starts with `TARGET_`, and the
+alphanumeric key makes the last `_` the boundary between the target id and the key. Manifest
+validation refuses any other name, and at run time `fetch_for_manifest` wraps the resolver in a
+`ScopedSecretResolver` that refuses it again, so neither a platform name such as
+`{name: BRONZE, key: secret-access-key}` nor another target's secret can be resolved. The chart
+does not deliver target secrets yet: no committed target needs one.
 
 ### 3.5 `contract` block (ADR-022, ADR-027)
 

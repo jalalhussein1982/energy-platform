@@ -72,6 +72,19 @@ class SecretRef(_Model):
     key: str = Field(min_length=1)
 
 
+_SECRET_KEY = re.compile(r"^[A-Za-z0-9]+$")
+
+
+def target_secret_name(target_id: str) -> str:
+    """The only ``secretRef.name`` a target may use (05 C-63): ``target-<id>``, ``_`` → ``-``.
+
+    Its environment form is ``TARGET_<ID>_<KEY>``; no platform credential starts with
+    ``TARGET_`` (``BRONZE_*``, ``POSTGRES_*``, ``ENERGY_PLATFORM_*``), and an alphanumeric key
+    makes the last ``_`` the boundary between the target id and the key.
+    """
+    return "target-" + target_id.replace("_", "-")
+
+
 class Auth(_Model):
     secretRef: SecretRef  # Kubernetes spelling (ADR-017)
     location: Literal["query", "header"]
@@ -493,6 +506,19 @@ class Manifest(_Model):
                 f"fetch block contains a credential-looking string ({secret}); "
                 "use secretRef (ADR-017)"
             )
+        auth: Auth | None = getattr(getattr(self.fetch, self.fetch.key), "auth", None)
+        if auth is not None:
+            own = target_secret_name(self.target_id)
+            if auth.secretRef.name != own:
+                raise ValueError(
+                    f"auth.secretRef.name must be {own!r}: a target resolves only its own "
+                    f"credentials, never a platform one (got {auth.secretRef.name!r})"
+                )
+            if not _SECRET_KEY.match(auth.secretRef.key):
+                raise ValueError(
+                    f"auth.secretRef.key must be alphanumeric (got {auth.secretRef.key!r}): "
+                    "it becomes the last part of TARGET_<ID>_<KEY>"
+                )
         for where, template, names, month_index in self.fetch.templates():
             try:
                 check_template(template, names=names, month_index=month_index)

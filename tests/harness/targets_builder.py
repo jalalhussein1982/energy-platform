@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from energy_platform.bronze import CaptureEntry, blob_key, capture_id, sha256_hex, write_fixture
+from energy_platform.contracts.manifest import target_secret_name
 from energy_platform.contracts.registry import Transport
 
 REPO = Path(__file__).resolve().parents[2]
@@ -110,7 +111,11 @@ def make_target(
     (t / "__init__.py").write_text("")
     text = manifest.read_text(encoding="utf-8")
     declared = next(line for line in text.splitlines() if line.startswith("target_id:"))
-    (t / "manifest.yaml").write_text(text.replace(declared, f"target_id: {target_id}"))
+    old_id = declared.split(":", 1)[1].strip()
+    text = text.replace(declared, f"target_id: {target_id}")
+    # a target's secretRef is scoped to its id (05 C-63): renaming the target renames it too
+    text = text.replace(target_secret_name(old_id), target_secret_name(target_id))
+    (t / "manifest.yaml").write_text(text)
     (t / "README.md").write_text(f"# {target_id}\n")
     if with_parser:
         (t / "parser.py").write_text(GOOD_PARSER)

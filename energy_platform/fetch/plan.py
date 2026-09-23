@@ -34,7 +34,7 @@ from energy_platform.fetch.client import (
     RateLimiter,
 )
 from energy_platform.fetch.render import FetchContext, render, render_with
-from energy_platform.fetch.secrets import SecretResolver
+from energy_platform.fetch.secrets import ScopedSecretResolver, SecretResolver
 
 _HREF = re.compile(r"""href\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
 
@@ -112,6 +112,8 @@ def fetch_for_manifest(
 ) -> FetchResult:
     """Execute the manifest's fetch block for one run and return the payload response."""
     block = manifest.fetch
+    if secrets is not None:
+        secrets = ScopedSecretResolver(manifest.target_id, secrets)
     if block.soap_xml is not None:
         # SOAP responses are never cacheable by validators; no conditional headers.
         return fetcher.fetch(soap_request(block.soap_xml, ctx))

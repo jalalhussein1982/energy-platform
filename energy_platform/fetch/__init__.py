@@ -32,7 +32,12 @@ from energy_platform.fetch.offline import FixtureTransport, mock_transport
 from energy_platform.fetch.plan import fetch_for_manifest
 from energy_platform.fetch.policy import EgressError, check_proxy_environment, check_url
 from energy_platform.fetch.render import FetchContext, RenderError, render
-from energy_platform.fetch.secrets import EnvSecretResolver, SecretResolver
+from energy_platform.fetch.secrets import (
+    EnvSecretResolver,
+    ScopedSecretResolver,
+    SecretOutOfScope,
+    SecretResolver,
+)
 
 __all__ = [
     "Conditional",
@@ -53,6 +58,8 @@ __all__ = [
     "RenderError",
     "Retention",
     "RetryPolicy",
+    "ScopedSecretResolver",
+    "SecretOutOfScope",
     "SecretResolver",
     "check_endpoint",
     "check_proxy_environment",

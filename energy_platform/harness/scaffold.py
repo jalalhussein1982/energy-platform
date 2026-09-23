@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from energy_platform.contracts.manifest import Modality
+from energy_platform.contracts.manifest import Modality, target_secret_name
 from energy_platform.contracts.registry import DatasetContract, dataset
 
 TARGET_ID = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
@@ -70,7 +70,7 @@ _FETCH_BLOCKS: dict[Modality, str] = {
     query:
       date: "{{delivery_day:%Y-%m-%d}}"
     headers: {{}}
-    # auth: {{secretRef: {{name: REPLACE_ME, key: REPLACE_ME}}, location: query, param: token}}
+    # auth: {{secretRef: {{name: {secret_name}, key: REPLACE_ME}}, location: query, param: token}}
 """,
     "rest-xml": """fetch:
   rest_xml:
@@ -148,7 +148,9 @@ def render_manifest(
     did = dataset_id or f"{PLACEHOLDER}.dataset"
     transport, decode = _CONTRACT_DEFAULTS[modality]
     metrics = tuple(contract.metrics) if contract is not None else (PLACEHOLDER,)
-    fetch = _FETCH_BLOCKS[modality].format(host=host, file_format="xlsx")
+    fetch = _FETCH_BLOCKS[modality].format(
+        host=host, file_format="xlsx", secret_name=target_secret_name(target_id)
+    )
     head = f"""# {target_id} — scaffolded by `energyctl new-target`; every REPLACE_ME must go before
 # this is a target (05 C-13). Fetch and normalise are declared here, never coded (ADR-005).
 schema_version: 1
