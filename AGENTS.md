@@ -17,12 +17,19 @@ docs/              assumptions (00), decisions (02), contracts, roadmap, threat 
 scripts/           helpers invoked only by Make targets
 
 ## Commands
-make check | make test | make demo | make local-up | make smoke-test
-energyctl new-target <id> --modality <m> | energyctl record-fixture <id> | energyctl validate <id>
+make check | make test | make demo | make local-up | make smoke-test | make harness-check | make pr-surface BASE=<ref>
+energyctl new-target <id> --modality <m> | energyctl record-fixture <id> --name <n> (--live | --from-file F) | energyctl validate <id>
+energyctl run-target-tests <id> | energyctl admission-request <id> | energyctl pr-bundle <id> | energyctl mcp-serve
 
 ## Session protocol (docs/03-roadmap.md §0)
-Plan into docs/plans/phase-N.md before code. One task, one conventional commit, `make check`
-green before every commit. Tick roadmap checkboxes and append to docs/progress.md at the end.
+Maintainer phase sessions: plan into docs/plans/phase-N.md before code. One task, one conventional
+commit, `make check` green before every commit. Tick roadmap checkboxes and append to
+docs/progress.md at the end.
+
+**Contributor sessions** (adding a target or requesting an admission) follow
+docs/08-adding-a-target.md only: no phase plan, no roadmap ticks, no progress entry — that is
+maintainer bookkeeping. The change set is `targets/<id>/` (Route A) or `docs/admissions/<id>.md`
+(Route B) and nothing else, committed or not.
 
 ## Hard rules
 - Never write fetch or normalise code in targets/. Use the manifest.

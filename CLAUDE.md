@@ -22,8 +22,14 @@ energyctl new-target <id> --modality <m> | energyctl record-fixture <id> --name 
 energyctl run-target-tests <id> | energyctl admission-request <id> | energyctl pr-bundle <id> | energyctl mcp-serve
 
 ## Session protocol (docs/03-roadmap.md §0)
-Plan into docs/plans/phase-N.md before code. One task, one conventional commit, `make check`
-green before every commit. Tick roadmap checkboxes and append to docs/progress.md at the end.
+Maintainer phase sessions: plan into docs/plans/phase-N.md before code. One task, one conventional
+commit, `make check` green before every commit. Tick roadmap checkboxes and append to
+docs/progress.md at the end.
+
+**Contributor sessions** (adding a target or requesting an admission) follow
+docs/08-adding-a-target.md only: no phase plan, no roadmap ticks, no progress entry — that is
+maintainer bookkeeping. The change set is `targets/<id>/` (Route A) or `docs/admissions/<id>.md`
+(Route B) and nothing else, committed or not.
 
 ## Hard rules
 - Never write fetch or normalise code in targets/. Use the manifest.

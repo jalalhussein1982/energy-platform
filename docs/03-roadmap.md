@@ -9,7 +9,11 @@
 
 ---
 
-## 0. Session protocol (applies to every Claude Code session)
+## 0. Session protocol (applies to every maintainer phase session)
+
+A contributor session — adding a target or requesting an admission — follows
+`docs/08-adding-a-target.md` instead and does none of the bookkeeping below (Phase 7 finding,
+`docs/09-acceptance-report.md`).
 
 1. **Start**: read `CLAUDE.md`, `docs/00-assumptions.md` §2 (register) and §5 (verification log), `docs/02-architecture-decisions.md` §2 and §4, `docs/adr/`, and the current phase in this file. Nothing else until the plan exists.
 2. **Plan first**: enter plan mode; write the plan to `docs/plans/phase-<N>.md` before touching code. Plan = ordered tasks, each with its acceptance check.

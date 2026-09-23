@@ -23,6 +23,10 @@ Stopping with an admission request is the correct outcome for an unadmitted sour
 failure. Inventing a unit, editing the registry, or widening an allowlist to make validation pass
 is the failure.
 
+This is a contributor task, not a development phase: do not write a phase plan and do not edit
+`docs/plans/`, `docs/03-roadmap.md` or `docs/progress.md` (maintainer bookkeeping), not even
+locally.
+
 ## 2. Setup
 
 ```bash

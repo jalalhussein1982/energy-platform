@@ -166,3 +166,11 @@ def test_makefile_values_carry_no_trailing_comment() -> None:
         line for line in text.splitlines() if re.match(r"^[A-Z_]+\s*[?:]?=\s*\S[^#]*?\s+#", line)
     ]
     assert bad == [], bad
+
+
+def test_agents_md_mirrors_claude_md() -> None:
+    """Claude Code reads CLAUDE.md, Codex and other agents read AGENTS.md: one text, or the agents
+    work to different rules (Phase 7 finding F-2: AGENTS.md had an older command list)."""
+    claude = (REPO / "CLAUDE.md").read_text(encoding="utf-8")
+    assert (REPO / "AGENTS.md").read_text(encoding="utf-8") == claude
+    assert "Contributor sessions" in claude  # Phase 7 finding F-1
