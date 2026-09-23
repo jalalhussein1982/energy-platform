@@ -6,6 +6,7 @@
 | Date | 2026-09-22 |
 | Resolves | D-1 (`02-architecture-decisions.md` §4.2) — the stack details ADR-028 left open; amends ADR-028 §2 (API port reachability for the OIDC deploy) |
 | Supersedes | — |
+| Amended | 2026-09-23, amendment 1 (below): cloud-init is first boot only (`ignore_changes = [user_data]`), later changes to the authentication file and the RBAC go over SSH (`make demo-reconfigure`); the deploy identity is pinned to the deploy workflow; the deployer `Role` loses `secrets`, `pods/exec` and `pods/portforward` |
 
 ## Context
 
@@ -112,6 +113,60 @@ sentence with one variable change.
 - Devil's advocate: a single k3s server is a single control-plane point of failure (ADR-028
   already accepts it: the invariants are about data). Point 4 widens the API port's exposure;
   compensated by authentication and RBAC, and reversible by one variable.
+
+## Amendment 1 (2026-09-23) — reconfigure without replacement; a narrower deploy identity
+
+**Context.** Two residuals of `docs/threat-model.md` §14 sit in the files cloud-init writes. First,
+the claim rules pin `repository` and `ref` only, so **any** workflow on `main` that asks for
+`id-token: write` gets the deploy identity. Second, the deployer `Role` holds every verb on
+namespace `secrets` (Helm's default driver stores its release records there) and `create` on
+`pods/exec` and `pods/portforward`. Changing either file in the template changes the servers'
+`user_data`. The `hcloud` provider keeps only a hash of it, so Terraform would **replace** the
+server: a new k3s CA and datastore, the agent replaced as well (x509 unknown authority), the
+repository variables and the namespace Secrets redone, and Postgres restored from backup (the
+data lives on the volume, the k3s datastore does not). That is a disproportionate price for
+two text files.
+
+**Decision.**
+
+1. **Cloud-init is first boot only.** Every `nodes` module's servers carry
+   `lifecycle { ignore_changes = [user_data] }` (both clouds, one contract). The roots export
+   the rendered `authn_yaml` and `rbac_yaml`. `make demo-reconfigure` reads both from the state,
+   writes them over SSH (the admin key; port 22 is open to `admin_cidr` only) to the paths
+   cloud-init used, keeps the previous authentication file as `authn.yaml.prev`, restarts k3s and
+   waits for `/readyz`. k3s re-applies the RBAC manifest from its manifests directory. The mock
+   tests still parse the rendered cloud-init, so a new node built from scratch gets the same
+   files.
+2. **The deploy identity is pinned to the deploy workflow.** A third claim rule:
+   `claims.job_workflow_ref == '<repository>/.github/workflows/deploy-demo.yml@refs/heads/main'`.
+   Another workflow on `main`, or the deploy workflow run from another ref, is refused with 401.
+   `scripts/oidc_kube_context.sh` logs the claims the rules check (never the token).
+3. **The deployer `Role` has no `secrets` verbs and no `pods/exec` or `pods/portforward`.**
+   `deploy-tenant` runs Helm with `HELM_DRIVER=configmap` (`TENANT_HELM_DRIVER`), and the chart
+   renders no Secret: the platform credentials and the pull secret are created by the operator
+   (`secrets.existingSecret`, `image.pullSecrets`). An existing release is moved once with
+   `make helm-driver-migrate` (an admin kubeconfig; it copies the records, checks `helm history`
+   under the ConfigMap driver, and deletes the Secrets only with `DELETE_SECRETS=1`). An operator
+   reading the release by hand sets `HELM_DRIVER=configmap` too.
+
+**What remains (recorded, not hidden).** An identity that may create pods in a namespace can
+read that namespace's Secrets through a pod it creates (a `secretKeyRef` or a mounted volume,
+then its log). That holds for every deployer. What goes is the direct path (`get secrets`,
+`exec` into a running pod) and the release records as a Secret-shaped target. The claim rules
+still trust whatever reaches `main` in `deploy-demo.yml` itself, so code-owner review of
+`.github/` stays the control (`CODEOWNERS`).
+
+**Rejected.** Replacing the server to re-run cloud-init (see Context). A per-deploy short-lived
+ServiceAccount token minted by an admin (a long-lived credential somewhere to mint it).
+`pull_request_target` or environment protection rules as the pin (the environment `demo` exists
+but carries no protection rule, and a rule on the workflow file is what the threat names).
+
+**Verification (2026-09-23).** `terraform plan` after the change: resource changes none, outputs
+only (applied). `make helm-driver-migrate`: revisions 1–3 readable under the ConfigMap driver.
+`make demo-reconfigure`: pushed, k3s restarted, API ready in 16 s; the scheduled captures
+continued. `kubectl auth can-i --as gha:jalalhussein1982/energy-platform`: `get secrets` no
+(was yes), `create pods --subresource=exec` / `portforward` / `attach` no, the chart's verbs yes.
+The first `deploy-demo` run after the change is recorded in `docs/07-operations.md` §4.1.
 
 ## Verification refs
 

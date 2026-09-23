@@ -72,6 +72,13 @@ resource "hcloud_server" "server" {
 
   user_data = local.server_user_data
 
+  # ADR-035 amendment 1: cloud-init is first boot only. The provider keeps a hash of user_data,
+  # so a template change would REPLACE the node (new k3s CA and datastore on the server); later
+  # changes to authn.yaml / the RBAC manifest go over SSH (`make demo-reconfigure`).
+  lifecycle {
+    ignore_changes = [user_data]
+  }
+
   labels = {
     role      = "server"
     residency = "DE"
@@ -104,6 +111,10 @@ resource "hcloud_server" "agent" {
     k3s_token              = random_password.k3s_token.result
     k3s_version            = var.k3s_version
   })
+
+  lifecycle {
+    ignore_changes = [user_data] # ADR-035 amendment 1 (see the server)
+  }
 
   labels = {
     role      = "agent"

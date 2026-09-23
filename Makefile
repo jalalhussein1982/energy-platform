@@ -25,7 +25,8 @@ IMAGE_DIGEST   ?=                        # sha256:… of a pushed image; deploy-
         ci-bootstrap sync local-up local-down smoke-test demo new-target validate-targets migration-check workload-check \
         harness-check pr-surface live-smoke image image-push image-digest target-values \
         local-cluster local-registry local-cni local-image local-secrets deploy-local local-egress-test terraform-plan-hcloud \
-        deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template rollback-drill ci-kind-tools ci-terraform
+        deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template rollback-drill ci-kind-tools ci-terraform \
+        demo-reconfigure helm-driver-migrate
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -240,9 +241,13 @@ DEMO_SECRET_KEYS := POSTGRES_PASSWORD BRONZE_ACCESS_KEY_ID BRONZE_SECRET_ACCESS_
 DEMO_OCI_NAMESPACE ?=
 DEMO_OCI_ENDPOINT = https://$(DEMO_OCI_NAMESPACE).compat.objectstorage.eu-frankfurt-1.oraclecloud.com
 
+# Tenant deploys keep Helm's release records as ConfigMaps: the deploy identity needs no `secrets`
+# verbs (ADR-035 amendment 1). Read them the same way: HELM_DRIVER=configmap helm history …
+TENANT_HELM_DRIVER ?= configmap
+
 deploy-tenant: target-values ## helm upgrade --install with tenant values + values-$(ENV).yaml (KUBECONFIG = a namespace-scoped kubeconfig); IMAGE_DIGEST, or IMAGE with a RepoDigest
 	@test -f deployment/tenant/values-$(ENV).yaml || { echo "deploy-tenant: deployment/tenant/values-$(ENV).yaml does not exist"; exit 1; }
-	$(HELM) upgrade --install $(RELEASE) $(CHART_DIR) -n $(NAMESPACE) \
+	HELM_DRIVER=$(TENANT_HELM_DRIVER) $(HELM) upgrade --install $(RELEASE) $(CHART_DIR) -n $(NAMESPACE) \
 	  -f deployment/tenant/values-tenant.yaml -f deployment/tenant/values-$(ENV).yaml -f $(TARGET_VALUES) \
 	  --set image.repository=$(IMAGE_REPO) \
 	  --set image.digest=$(or $(IMAGE_DIGEST),$$(make -s image-digest | sed 's/.*@//')) \
@@ -256,6 +261,26 @@ deploy-demo: ## Inside GitHub Actions: DEMO_OCI_NAMESPACE check → OIDC kubecon
 	@test -n "$(DEMO_OCI_NAMESPACE)" || { echo "deploy-demo: DEMO_OCI_NAMESPACE unset (repository variable: the OCI tenancy namespace, oci os ns get)"; exit 1; }
 	$(MAKE) kubeconfig-oidc
 	$(MAKE) deploy-tenant ENV=demo KUBECONFIG=$(OIDC_KUBECONFIG)
+
+# ADR-035 amendment 1: cloud-init is first boot only (the servers ignore user_data changes), so a
+# change to the authentication file or the namespace RBAC reaches the running demo server here.
+DEMO_SSH ?= ssh -o BatchMode=yes -o ConnectTimeout=10
+DEMO_TF_OUT = $(TF) -chdir=$(TF_DIR)/roots/hcloud output -raw
+
+demo-reconfigure: ## Author, admin SSH key: push the rendered authn.yaml + namespace RBAC (Terraform outputs) to the demo server, restart k3s, wait for the API (ADR-035 amendment 1)
+	@test -n "$(TF)" || { echo "demo-reconfigure: neither terraform nor tofu installed"; exit 1; }
+	@tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT; \
+	host="$$($(DEMO_TF_OUT) server_public_address)" || { echo "demo-reconfigure: no server_public_address in the hcloud state"; exit 1; }; \
+	$(DEMO_TF_OUT) authn_yaml > "$$tmp/authn.yaml" || { echo "demo-reconfigure: no authn_yaml output"; exit 1; }; \
+	$(DEMO_TF_OUT) rbac_yaml > "$$tmp/rbac.yaml" || { echo "demo-reconfigure: no rbac_yaml output (apply the outputs first)"; exit 1; }; \
+	$(DEMO_SSH) "root@$$host" 'install -m 0600 /dev/stdin /etc/rancher/k3s/authn.yaml.new' < "$$tmp/authn.yaml" \
+	  && $(DEMO_SSH) "root@$$host" 'install -m 0644 /dev/stdin /var/lib/rancher/k3s/server/manifests/energy-platform-rbac.yaml' < "$$tmp/rbac.yaml" \
+	  && $(DEMO_SSH) "root@$$host" 'cp -a /etc/rancher/k3s/authn.yaml /etc/rancher/k3s/authn.yaml.prev && mv /etc/rancher/k3s/authn.yaml.new /etc/rancher/k3s/authn.yaml && systemctl restart k3s && for i in $$(seq 1 60); do k3s kubectl get --raw /readyz >/dev/null 2>&1 && exit 0; sleep 2; done; echo "k3s API not ready after 120 s" >&2; exit 1' \
+	  || { echo "demo-reconfigure: FAILED (the previous file is /etc/rancher/k3s/authn.yaml.prev on the server)"; exit 1; }; \
+	echo "demo-reconfigure: authn.yaml and the namespace RBAC pushed to $$host, k3s restarted, API ready"
+
+helm-driver-migrate: ## Admin kubeconfig, once: copy $(RELEASE)'s Helm release records from Secrets to ConfigMaps (TENANT_HELM_DRIVER); DELETE_SECRETS=1 removes the Secrets after the history check
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) KUBECTL=$(KUBECTL) HELM=$(HELM) DELETE_SECRETS=$(DELETE_SECRETS) scripts/helm_release_to_configmaps.sh
 
 print-demo-secret-template: ## The kubectl command shape for the demo Secret (values come from the Terraform outputs and verify.env, never from the repo)
 	@echo "kubectl -n $(NAMESPACE) create secret generic $(RELEASE) \\"

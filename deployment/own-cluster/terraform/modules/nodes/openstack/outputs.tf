@@ -19,6 +19,11 @@ output "k3s_token" {
   sensitive = true
 }
 
+output "rbac_yaml" {
+  description = "The rendered namespace RBAC manifest (`make demo-reconfigure` pushes it; ADR-035 amendment 1)."
+  value       = local.rbac_yaml
+}
+
 output "authn_yaml" {
   value = local.authn_yaml
 }

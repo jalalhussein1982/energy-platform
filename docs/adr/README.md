@@ -42,6 +42,6 @@ from [`ADR-template.md`](ADR-template.md). Open items `D-1 … D-13` are in `02`
 | [ADR-032](ADR-032-object-store-client.md) | Object-store client for the Bronze S3 backend (Option B: own SigV4 client) | file | — |
 | [ADR-033](ADR-033-polling-cadence-and-correction-window.md) | Polling cadence, politeness and the correction window | file | amendment 1 (2026-09-23): `month_start[k]` / `month_end[k]`, strict template fields |
 | [ADR-034](ADR-034-mapping-ignore-fields.md) | `mapping.ignore_fields`: display-only source fields | file | — |
-| [ADR-035](ADR-035-own-cluster-stack.md) | `own-cluster` stack: k3s on plain VMs by cloud-init, four Terraform modules, two roots | file | — |
+| [ADR-035](ADR-035-own-cluster-stack.md) | `own-cluster` stack: k3s on plain VMs by cloud-init, four Terraform modules, two roots | file | amendment 1 (2026-09-23): cloud-init first boot only, `make demo-reconfigure`; deploy identity pinned to the workflow; `Role` without `secrets`/`exec` |
 | [ADR-036](ADR-036-object-stores-and-backups-per-profile.md) | Object stores per profile, Bronze replication, Postgres backups without a custom image | file | amendment 1 (2026-09-23): bounded backup footprint, per-cluster archive paths |
 | [ADR-037](ADR-037-freshness-sli.md) | Availability as freshness: the SLI table, the exporter and the alert rules | file | — |

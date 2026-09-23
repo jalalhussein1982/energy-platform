@@ -22,6 +22,11 @@ output "authn_yaml" {
   value = module.nodes.authn_yaml
 }
 
+output "rbac_yaml" {
+  description = "The namespace RBAC manifest cloud-init wrote; `make demo-reconfigure` pushes changes (ADR-035 amendment 1)."
+  value       = module.nodes.rbac_yaml
+}
+
 output "server_cloud_init" {
   description = "The rendered server cloud-init, for the mock tests (holds the k3s token)."
   value       = module.nodes.server_user_data

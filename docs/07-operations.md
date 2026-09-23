@@ -126,6 +126,31 @@ drill from OCI 796 s**: restored database 337 s, Bronze-only rebuild 417 s, ever
 identical or live ⊆ rebuild (82–88 replica captures per 15-minute target; the rebuild is ahead
 because live has not yet processed the first release's captures).
 
+### 4.2 Changing the authentication file or the RBAC without a new server (ADR-035 amendment 1)
+
+The servers ignore `user_data` changes, so a template change never replaces them. To bring a
+change of `authn.yaml.tftpl` or `rbac.yaml.tftpl` to the running demo:
+
+```bash
+make terraform-plan-hcloud             # must show no resource change, outputs only
+terraform -chdir=deployment/own-cluster/terraform/roots/hcloud apply <that plan>   # author
+make demo-reconfigure                  # SSH as root (admin key), writes both files, restarts k3s, waits for /readyz
+kubectl --kubeconfig <admin> -n energy-platform auth can-i get secrets --as gha:<owner>/<repo>
+```
+
+Tenant deploys keep Helm's release records as ConfigMaps (`TENANT_HELM_DRIVER=configmap`), so by
+hand it is `HELM_DRIVER=configmap helm -n energy-platform history energy-platform`. A release
+that still has Secret-stored records is moved once with
+`make helm-driver-migrate KUBECONFIG=<admin>` (then `DELETE_SECRETS=1`). Note that `kubectl auth
+can-i create pods/exec` asks about a pod **named** `exec`; subresources need
+`can-i create pods --subresource=exec`.
+
+2026-09-23, first use (G1, Phase 9): plan = outputs only (`authn_yaml` updated, `rbac_yaml`
+added), applied; revisions 1–3 copied to ConfigMaps; `demo-reconfigure` 16 s; the 17:15 UTC
+captures and gaps ran normally after the restart. The identity `gha:jalalhussein1982/energy-platform`:
+`get`/`list secrets` yes → **no**; `create pods --subresource=exec|portforward|attach` → **no**;
+`create cronjobs`, `create configmaps`, `get replicasets` yes; `list nodes` no.
+
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
 Measured on the local profile, 2026-09-22 (MinIO A → MinIO B on one kind node; the numbers are

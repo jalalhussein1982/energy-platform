@@ -158,6 +158,20 @@ def test_deploy_demo_workflow_uses_oidc_and_nothing_stored() -> None:
     assert "${{ vars.DEMO_CLUSTER_URL }}" in str(deploy["env"]["DEMO_CLUSTER_URL"])
 
 
+def test_tenant_deploy_keeps_helm_records_in_configmaps() -> None:
+    """ADR-035 amendment 1: the deploy Role has no `secrets` verbs, so the tenant deploy must
+    store Helm's release records as ConfigMaps (the default driver would need Secrets)."""
+    text = (REPO / "Makefile").read_text(encoding="utf-8")
+    assert re.search(r"^TENANT_HELM_DRIVER \?= configmap$", text, re.MULTILINE)
+    recipe = text.split("\ndeploy-tenant:", 1)[1].split("\n\n", 1)[0]
+    assert "HELM_DRIVER=$(TENANT_HELM_DRIVER) $(HELM) upgrade --install" in recipe
+    rbac = (
+        REPO / "deployment" / "own-cluster" / "terraform" / "cloud-init" / "rbac.yaml.tftpl"
+    ).read_text(encoding="utf-8")
+    resources = [line for line in rbac.splitlines() if line.strip().startswith("resources:")]
+    assert not [r for r in resources if re.search(r"\bsecrets\b|pods/exec|pods/portforward", r)]
+
+
 def test_makefile_values_carry_no_trailing_comment() -> None:
     """Make keeps the spaces before a trailing `#` in a value (`UV_VERSION ?= 0.11.7   # …`
     broke the ci-bootstrap installer URL): a non-empty assignment ends at its value."""

@@ -23,6 +23,13 @@ NAMESPACE="${DEMO_NAMESPACE:-energy-platform}"
 TOKEN="$(curl -sSf -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
   "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
 
+# the claims the API server's validation rules check (claims are public; the token is not printed)
+printf '%s' "${TOKEN}" | python3 -c '
+import base64, json, sys
+payload = sys.stdin.read().split(".")[1]
+claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+print("oidc_kube_context: claims " + json.dumps({k: claims.get(k) for k in ("repository", "ref", "job_workflow_ref", "event_name")}))'
+
 umask 077
 CA_FILE="$(mktemp)"
 printf '%s\n' "${DEMO_CLUSTER_CA}" > "${CA_FILE}"

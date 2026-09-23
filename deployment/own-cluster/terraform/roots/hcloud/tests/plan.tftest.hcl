@@ -68,6 +68,21 @@ run "demo_sizing_and_controls" {
   }
 
   assert {
+    condition     = strcontains(output.authn_yaml, "claims.job_workflow_ref == 'jalalhussein1982/energy-platform/.github/workflows/deploy-demo.yml@refs/heads/main'")
+    error_message = "ADR-035 amendment 1: only the deploy-demo workflow on main gets the deploy identity, not any workflow on main"
+  }
+
+  assert {
+    condition     = !can(regex("resources: \\[[^\\]]*\\bsecrets\\b", output.rbac_yaml)) && !can(regex("pods/(exec|portforward)\\]", output.rbac_yaml)) && !strcontains(output.rbac_yaml, "resources: [pods/exec")
+    error_message = "ADR-035 amendment 1: the deployer Role has no secrets verbs and no pods/exec or pods/portforward"
+  }
+
+  assert {
+    condition     = strcontains(output.rbac_yaml, "kind: RoleBinding") && strcontains(output.rbac_yaml, "resources: [configmaps, services")
+    error_message = "the Role still manages ConfigMaps (Helm release records, HELM_DRIVER=configmap)"
+  }
+
+  assert {
     condition     = output.lock_mode == "COMPLIANCE" && output.lock_days == 90
     error_message = "V-12: Object Lock COMPLIANCE is the store-A control"
   }
