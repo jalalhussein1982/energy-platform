@@ -23,6 +23,7 @@ from energy_platform.fetch.offline import (
     TransportError,
     mock_transport,
     response,
+    streamed_response,
 )
 from energy_platform.fetch.policy import EgressError
 
@@ -279,3 +280,55 @@ def test_rate_limiter_sleeps_when_the_bucket_is_empty() -> None:
     rl.acquire()
     rl.acquire()  # third within the same instant must wait 30 s for one token
     assert slept == [30.0]
+
+
+# ----------------------------------------------------------------- 05 C-64: response-size cap
+
+
+def test_declared_length_above_the_cap_is_refused_before_reading() -> None:
+    n = {"c": 0}
+
+    def h(req: Request) -> Response:
+        n["c"] += 1
+        return respond(200, body=b"x" * 2048)  # Content-Length 2048
+
+    with pytest.raises(EgressError) as info:
+        fetcher(h, max_body_bytes=1024).fetch(FetchRequest("https://www.ote-cr.cz/a"))
+    assert info.value.code == "response_too_large"
+    assert n["c"] == 1  # never retried
+
+
+def test_streamed_body_without_a_length_is_counted_and_stopped() -> None:
+    # a chunked answer (or a zip bomb's expansion) has no Content-Length to check up front
+    n = {"c": 0}
+
+    def h(req: Request) -> Response:
+        n["c"] += 1
+        return streamed_response(200, [b"x" * 600, b"y" * 600, b"z" * 600], peer=OTE_IP)
+
+    with pytest.raises(EgressError) as info:
+        fetcher(h, max_body_bytes=1024).fetch(FetchRequest("https://www.ote-cr.cz/a"))
+    assert info.value.code == "response_too_large"
+    assert n["c"] == 1
+
+
+def test_body_exactly_at_the_cap_is_accepted() -> None:
+    r = fetcher(
+        lambda req: streamed_response(200, [b"a" * 512, b"b" * 512], peer=OTE_IP),
+        max_body_bytes=1024,
+    ).fetch(FetchRequest("https://www.ote-cr.cz/a"))
+    assert r.body == b"a" * 512 + b"b" * 512
+
+
+def test_error_body_is_read_to_2_kib_only() -> None:
+    with pytest.raises(FetchFailed) as info:
+        fetcher(
+            lambda req: streamed_response(404, [b"e" * 1500, b"f" * 1500], peer=OTE_IP),
+            max_body_bytes=1024,
+        ).fetch(FetchRequest("https://www.ote-cr.cz/a"))
+    assert (info.value.status, len(info.value.body)) == (404, 2048)
+
+
+def test_default_cap_is_64_mib() -> None:
+    f = fetcher(lambda req: respond(200, body=b"ok"))
+    assert f._max_body_bytes == 64 * 1024 * 1024

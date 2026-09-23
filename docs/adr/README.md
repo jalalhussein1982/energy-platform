@@ -33,7 +33,7 @@ from [`ADR-template.md`](ADR-template.md). Open items `D-1 … D-13` are in `02`
 | [ADR-023](ADR-023-derivation-identity.md) | Derivation identity and current-view selection | file | — |
 | [ADR-024](ADR-024-capture-recovery-invariants.md) | Capture durability, orphan reconciliation, backfill versus replay, lease fencing | file | — |
 | [ADR-025](ADR-025-upgrade-hooks-and-install-ordering.md) | Upgrade verification hooks and first-install ordering | file | — |
-| [ADR-026](ADR-026-egress-boundary.md) | Egress boundary: coarse NetworkPolicy plus host enforcement in the fetch layer | file | — |
+| [ADR-026](ADR-026-egress-boundary.md) | Egress boundary: coarse NetworkPolicy plus host enforcement in the fetch layer | file | amendment 1 (2026-09-23): response-body cap (64 MiB, streamed) |
 | [ADR-027](ADR-027-target-capability-boundary.md) | Target capability boundary | file | [ADR-032](ADR-032-object-store-client.md): the object-store client lives in `fetch/` |
 | [ADR-028](ADR-028-demo-environment.md) | Demo environment: Hetzner cluster, OCI second store; MetaCentrum stays reference | file | [ADR-035](ADR-035-own-cluster-stack.md) §4: the API port for GitHub-hosted deploys |
 | [ADR-029](ADR-029-typing-stubs.md) | Typing stubs for allowlisted runtime packages | file | — |

@@ -7,7 +7,7 @@ which is how a Bronze fixture is replayed through the real fetch code path.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 
 import httpx
 
@@ -32,6 +32,32 @@ def response(
     """Build a response; ``peer`` fakes the connected address a real stream would report."""
     extensions = {"network_stream": _Stream(peer)} if peer is not None else {}
     return httpx.Response(status, content=body, headers=dict(headers or {}), extensions=extensions)
+
+
+def streamed_response(
+    status: int = 200,
+    chunks: Iterable[bytes] = (),
+    headers: Mapping[str, str] | None = None,
+    *,
+    peer: str | None = None,
+) -> httpx.Response:
+    """A response whose body arrives in ``chunks`` with no ``Content-Length`` (chunked, or a
+    server that does not say): the fetch cap must count it as it streams (05 C-64)."""
+    extensions = {"network_stream": _Stream(peer)} if peer is not None else {}
+    return httpx.Response(
+        status,
+        headers=dict(headers or {}),
+        stream=_ChunkStream(tuple(chunks)),
+        extensions=extensions,
+    )
+
+
+class _ChunkStream(httpx.SyncByteStream):
+    def __init__(self, chunks: tuple[bytes, ...]) -> None:
+        self._chunks = chunks
+
+    def __iter__(self) -> Iterator[bytes]:
+        yield from self._chunks
 
 
 class _Stream:

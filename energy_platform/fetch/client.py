@@ -33,6 +33,9 @@ from energy_platform.fetch.secrets import redact_query
 log = logging.getLogger("energy_platform.fetch")
 
 _REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+DEFAULT_MAX_BODY_BYTES = 64 * 1024 * 1024
+"""The response-body cap (05 C-64): the largest committed payload is under 2 MiB."""
+_ERROR_BODY_BYTES = 2048
 USER_AGENT = "energy-platform/0.0.1 (+https://github.com/energy-platform; data ingestion)"
 
 
@@ -176,6 +179,7 @@ class Fetcher:
         max_redirects: int = 3,
         retry: RetryPolicy = DEFAULT_RETRY,
         rate_limiter: RateLimiter | None = None,
+        max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
     ) -> None:
         self._allowed_hosts = allowed_hosts
         self._allow_insecure = allow_insecure
@@ -189,6 +193,7 @@ class Fetcher:
         self._max_redirects = max_redirects
         self._retry = retry
         self._rate_limiter = rate_limiter
+        self._max_body_bytes = max_body_bytes
         self.proxies = check_proxy_environment()
 
     # ------------------------------------------------------------------ public
@@ -206,22 +211,60 @@ class Fetcher:
                 destination = check_url(url, self._allowed_hosts, self._allow_insecure)
                 resolved = self._resolve(destination)
                 response = self._send_with_retries(client, method, url, headers, body)
-                self._check_peer(destination, response, resolved)
-                hops.append(redact_query(url, request.redact_params))
-                if response.status_code in _REDIRECT_STATUSES and "location" in response.headers:
-                    url = urljoin(url, response.headers["location"])
-                    if response.status_code == 303 or (
-                        response.status_code in {301, 302} and method == "POST"
+                try:
+                    self._check_peer(destination, response, resolved)
+                    hops.append(redact_query(url, request.redact_params))
+                    if (
+                        response.status_code in _REDIRECT_STATUSES
+                        and "location" in response.headers
                     ):
-                        method, body = "GET", None
-                    log.info("redirect %s -> %s", hops[-1], redact_query(url, ()))
-                    continue
-                return self._result(request, response, hops)
+                        url = urljoin(url, response.headers["location"])
+                        if response.status_code == 303 or (
+                            response.status_code in {301, 302} and method == "POST"
+                        ):
+                            method, body = "GET", None
+                        log.info("redirect %s -> %s", hops[-1], redact_query(url, ()))
+                        continue
+                    return self._result(request, response, hops)
+                finally:
+                    response.close()
         raise EgressError(
             "too_many_redirects", f"more than {self._max_redirects} redirects from {hops[0]}"
         )
 
     # ------------------------------------------------------------------ internals
+
+    def _read_body(self, response: httpx.Response, url: str) -> bytes:
+        """The whole body, or ``response_too_large`` (never retried) past the cap (05 C-64).
+
+        A declared ``Content-Length`` above the cap is refused before a byte is read; a body
+        without one (chunked, or a lie) is counted as it streams, after content decoding, so a
+        compressed bomb is stopped by what it expands to.
+        """
+        cap = self._max_body_bytes
+        declared = response.headers.get("content-length")
+        if declared is not None and declared.isdigit() and int(declared) > cap:
+            raise EgressError(
+                "response_too_large", f"{url}: Content-Length {declared} exceeds {cap} bytes"
+            )
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in response.iter_bytes():
+            total += len(chunk)
+            if total > cap:
+                raise EgressError("response_too_large", f"{url}: body exceeds {cap} bytes")
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+    @staticmethod
+    def _error_body(response: httpx.Response) -> bytes:
+        """At most the first 2 KiB of an error body (it is only ever quoted in a message)."""
+        head = b""
+        for chunk in response.iter_bytes():
+            head += chunk
+            if len(head) >= _ERROR_BODY_BYTES:
+                break
+        return head[:_ERROR_BODY_BYTES]
 
     def _client(self) -> httpx.Client:
         return httpx.Client(
@@ -256,7 +299,10 @@ class Fetcher:
             if self._rate_limiter is not None:
                 self._rate_limiter.acquire()
             try:
-                response = client.request(method, url, headers=dict(headers), content=body)
+                response = client.send(
+                    client.build_request(method, url, headers=dict(headers), content=body),
+                    stream=True,
+                )
             except httpx.TransportError as exc:
                 last_error = exc
                 log.warning(
@@ -264,8 +310,11 @@ class Fetcher:
                 )
             else:
                 if response.status_code < 500:
-                    return response
-                last_error = FetchFailed(response.status_code, url, response.content)
+                    return response  # open: the caller checks the peer, then reads with the cap
+                try:
+                    last_error = FetchFailed(response.status_code, url, self._error_body(response))
+                finally:
+                    response.close()
                 log.warning(
                     "attempt %d/%d %s %s: HTTP %d",
                     attempt,
@@ -289,12 +338,12 @@ class Fetcher:
         elif 200 <= status < 300:
             not_modified = False
         else:
-            raise FetchFailed(status, hops[-1], response.content)
+            raise FetchFailed(status, hops[-1], self._error_body(response))
         return FetchResult(
             url=hops[-1],
             status=status,
             headers=dict(response.headers),
-            body=b"" if not_modified else response.content,
+            body=b"" if not_modified else self._read_body(response, hops[-1]),
             content_type=response.headers.get("content-type"),
             fetched_at=self._clock(),
             etag=response.headers.get("etag"),

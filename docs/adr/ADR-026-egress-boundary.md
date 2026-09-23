@@ -6,6 +6,7 @@
 | Date | 2026-09-19 |
 | Resolves | Codex review F08; amends ADR-008 "SSRF" mechanism and `03` Phase 5 "NetworkPolicies (egress per target allowlist)" |
 | Supersedes | ADR-008 sentence "Kubernetes egress `NetworkPolicy` so a capture pod can reach only its declared hosts" |
+| Amended | 2026-09-23, amendment 1 (below): a response-body cap in fetch |
 
 ## Context
 
@@ -80,6 +81,18 @@ alone is the promise ADR-008 made; together they are, and the tenant chart still
 - Devil's advocate: `ipBlock.except` lists are static; a cloud metadata service on a different
   address (Azure `169.254.169.254` is the same; some private clouds differ) needs a values
   override. Values expose the list; the default covers the common ranges.
+
+## Amendment 1 (2026-09-23) — a response-body cap
+
+Layer 2 checked where a request goes but not how much comes back: a 30 s timeout, then whatever
+the source sent went into memory (threat model §2). `Fetcher` now streams every response and
+enforces `max_body_bytes` (default **64 MiB**; the largest committed payload, a month of SOAP
+settlement, is about 2 MB). A declared `Content-Length` above the cap is refused before a byte is
+read. A body without one is counted after content decoding, so a compressed bomb is measured by
+what it expands to, and it is aborted past the cap. The error is `EgressError("response_too_large")`,
+which is never retried. Error bodies are read to 2 KiB, since they only appear in messages.
+Peers are now checked on the open stream, before the body is read. `05` C-64; the live smoke
+passed on the streaming client (2026-09-23).
 
 ## Verification refs
 
