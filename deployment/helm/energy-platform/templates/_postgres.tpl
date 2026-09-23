@@ -31,6 +31,16 @@ re-initialised cluster (new deploy, Bronze-only rebuild) never collides with the
 an earlier one. Writes the identifier to the given file and refuses anything but digits.
 dict "root" $ "out" "/work/SYSTEM_ID" */}}
 {{- define "energy-platform.systemIdScript" -}}
+{{ include "energy-platform.waitForPostgres" .root }}
 psql -h {{ include "energy-platform.fullname" .root }}-postgres -U {{ .root.Values.postgres.user }} -d {{ .root.Values.postgres.database }} -Atc "select system_identifier from pg_control_system()" > {{ .out }}
 grep -Eq '^[0-9]+$' {{ .out }} || { echo "system identifier unreadable: $(cat {{ .out }})" >&2; exit 1; }
+{{- end -}}
+
+{{/* A pod that connects to Postgres the moment it starts can be refused while the CNI is still
+adding the NetworkPolicy allow rule for its new IP (k3s kube-router rejects until then; the
+first demo runs of pg-wal-ship failed with "Connection refused", the same Job delayed by 15 s
+succeeded). Wait for the server to answer, up to 60 s, before the first connection. */}}
+{{- define "energy-platform.waitForPostgres" -}}
+for i in $(seq 1 30); do pg_isready -q -h {{ include "energy-platform.fullname" . }}-postgres -p 5432 -t 2 && break; sleep 2; done
+pg_isready -h {{ include "energy-platform.fullname" . }}-postgres -p 5432 -t 2 || { echo "Postgres not reachable after 60 s" >&2; exit 1; }
 {{- end -}}

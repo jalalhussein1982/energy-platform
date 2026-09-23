@@ -228,6 +228,7 @@ def test_dr_workloads_render_behind_their_flags(tmp_path: Path) -> None:
     assert "pg_basebackup" in base and "-X stream" in base
     assert "backup_label" in base and "> /backup/base/START_WAL" in base
     assert "> /backup/base/SYSTEM_ID" in base
+    assert base.index("pg_isready") < base.index("pg_basebackup")
     assert "A:bronze/backups/postgres/$SYSID/base/$STAMP/" in backup["containers"][0]["args"][0]
     assert "wal-archive" not in {v["name"] for v in backup["volumes"]}  # base only (amendment 1)
     drill = local["ep-energy-platform-restore-drill"]["spec"]["jobTemplate"]["spec"]["template"][
@@ -275,6 +276,8 @@ def test_wal_archive_is_compressed_shipped_and_pruned(tmp_path: Path) -> None:
     # the archive is named by the cluster (§6): a re-initialised cluster restarts WAL names
     sysid = pod["initContainers"][0]
     assert sysid["name"] == "system-id" and "pg_control_system()" in sysid["args"][0]
+    # connect only once Postgres answers: a new pod's policy rule may lag its first packet
+    assert sysid["args"][0].index("pg_isready") < sysid["args"][0].index("psql")
     assert "SYSID=$(cat /work/SYSTEM_ID)" in script
     claim = next(v for v in pod["volumes"] if v["name"] == "wal-archive")
     assert not claim["persistentVolumeClaim"].get("readOnly")  # move deletes after upload

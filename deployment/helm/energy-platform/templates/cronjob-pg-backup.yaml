@@ -52,6 +52,7 @@ spec:
               command: ["/bin/sh", "-ec"]
               args:
                 - |
+{{ include "energy-platform.waitForPostgres" . | indent 18 }}
                   pg_basebackup -h {{ $fullname }}-postgres -U {{ .Values.postgres.user }} -D /backup/base -Ft -z -X stream --checkpoint=fast --no-password -v
 {{ include "energy-platform.systemIdScript" (dict "root" . "out" "/backup/base/SYSTEM_ID") | indent 18 }}
                   tar -xzOf /backup/base/base.tar.gz backup_label | sed -n 's/^START WAL LOCATION: .* (file \([0-9A-F]\{24\}\))$/\1/p' > /backup/base/START_WAL
