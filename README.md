@@ -4,10 +4,14 @@ High-availability ingestion of public intraday energy data — OTE continuous in
 ČEPS system load; ENTSO-E optional (see `docs/01-data-scope.md` §3) — with a constrained extension path, so that a junior engineer or a coding agent can add a target
 without touching the core.
 
-Status: **Phase 5 done on the local profile (2026-09-22) — deployment, IaC, DR, observability.**
-Four committed targets (T1, T2, T3, E1) run as CronJobs from one Helm chart; the ADR-025 hook
-chain gates every upgrade; backups, cross-store Bronze replication and a restore drill run on a
-schedule and passed on kind; the demo cluster's Terraform is planned and waits on the author.
+Status: **Phase 6 (2026-09-23) — threat model, drift triage, the contributor guide.** Four
+committed targets (T1, T2, T3, E1) run as CronJobs from one Helm chart on the live demo cluster
+(Hetzner k3s, deployed by GitHub OIDC; Bronze replicated to OCI; a restore drill from the replica
+passed), and on a laptop with `make local-up`.
+
+**Adding a target (a data source): read [`docs/08-adding-a-target.md`](docs/08-adding-a-target.md)
+— it is the whole procedure.** Architecture: [`docs/architecture.md`](docs/architecture.md);
+threat model: [`docs/threat-model.md`](docs/threat-model.md).
 Start with `docs/00-assumptions.md`, `docs/02-architecture-decisions.md`, `docs/adr/`,
 `docs/04-contracts.md`, `docs/03-roadmap.md` and the runbook `docs/07-operations.md`; the session
 log is `docs/progress.md`.

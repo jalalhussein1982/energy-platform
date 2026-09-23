@@ -43,7 +43,7 @@
 - [x] `docs/threat-model.md` complete. Commit `docs(threat-model): ...`.
 
 ### Task 6.4 — The junior's page and the architecture diagram
-- [ ] `docs/08-adding-a-target.md` (both routes; every command run once while writing it, on a scratch target outside `targets/`); `docs/architecture.md` (Mermaid). Commit `docs: ...`.
+- [x] `docs/08-adding-a-target.md` (both routes; every command run once while writing it, on a scratch target outside `targets/`); `docs/architecture.md` (Mermaid). Commit `docs: ...`.
 
 ### Task 6.5 — Close-out
 - [ ] Roadmap: Phase 6 ticks, P6-D2 renumbering, the polling campaign and V-11 closed as not run; progress entry with the Phase 7 prompts. Commit `docs(phase-6): ...`.
