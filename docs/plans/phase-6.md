@@ -36,8 +36,8 @@
 - [x] Commit `feat(registry): admit ote.imbalance_settlement through Route B (ADR-022 §3 held-out source)`.
 
 ### Task 6.2 — Triage pipeline with the LLM stubbed
-- [ ] `energy_platform/triage/{__init__,llm,extract,pipeline}.py`, `energyctl triage`, tests P6-D5, `05` rows C-58 … C-61.
-- [ ] Commit `feat(triage): drift-triage pipeline with a stubbed LLM, bounded extraction and a manifest-only proposal (ADR-008, ADR-009, D-10)`.
+- [x] `energy_platform/triage/{__init__,llm,extract,pipeline}.py`, `energyctl triage`, tests P6-D5, `05` rows C-58 … C-61.
+- [x] Commit `feat(triage): drift-triage pipeline with a stubbed LLM, bounded extraction and a manifest-only proposal (ADR-008, ADR-009, D-10)`.
 
 ### Task 6.3 — Threat model
 - [ ] `docs/threat-model.md` complete. Commit `docs(threat-model): ...`.

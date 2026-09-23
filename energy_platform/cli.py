@@ -71,13 +71,19 @@ from energy_platform.silver.migrate import create_schema, drop_schema
 from energy_platform.store import MemoryStore, Store, StoreUnavailable
 from energy_platform.store.postgres import PostgresStore
 from energy_platform.store.unavailable import UnavailableStore
+from energy_platform.triage import (
+    HeuristicStubBackend,
+    LLMBackend,
+    UnavailableBackend,
+    triage,
+)
 
 app = typer.Typer(
     name="energyctl",
     help=(
         "energy-platform command line: validate, capture, recapture, process, replay, gaps, "
         "freshness, smoke, storage-probe, restore-drill, demo; new-target, record-fixture, "
-        "run-target-tests, admission-request, pr-bundle, mcp-serve"
+        "run-target-tests, admission-request, pr-bundle, triage, mcp-serve"
     ),
     no_args_is_help=True,
     pretty_exceptions_enable=False,
@@ -703,6 +709,52 @@ def pr_bundle(
         raise typer.Exit(code=1) from exc
     typer.echo(f"wrote {bundle.path} ({len(bundle.files)} files, branch {bundle.branch})")
     typer.echo(f"next: python -m scripts.apply_pr_bundle {bundle.path} && gh pr create")
+
+
+@app.command("triage")
+def triage_cmd(
+    target_id: TargetArg,
+    capture: Annotated[
+        Path,
+        typer.Option("--capture", help="the drifted capture as a Bronze fixture directory"),
+    ],
+    outbox: Annotated[Path, typer.Option("--outbox", help="where proposals go")] = Path(
+        ".energy_platform/outbox"
+    ),
+    backend: Annotated[
+        str, typer.Option("--backend", help="heuristic-stub (default, no network) | none")
+    ] = "heuristic-stub",
+    targets_root: TargetsRootOpt = TARGETS,
+) -> None:
+    """D-10 drift triage: bounded sample → LLM (stubbed) → a manifest-only proposal; never pushes.
+
+    Exit 0 proposed or no drift, 1 refused, 3 no proposal (no model, or no safe repair).
+    """
+    target = _target_dir(targets_root, target_id)
+    llm: LLMBackend
+    if backend == "heuristic-stub":
+        llm = HeuristicStubBackend()
+    elif backend == "none":
+        llm = UnavailableBackend()
+    else:
+        typer.echo(f"triage: unknown backend {backend!r} (heuristic-stub | none)", err=True)
+        raise typer.Exit(code=2)
+    result = triage(target, capture, llm, outbox)
+    typer.echo(
+        json.dumps(
+            {
+                "status": result.status,
+                "backend": result.backend,
+                "drift": result.drift.as_dict() if result.drift else None,
+                "operations": [dict(op) for op in result.operations],
+                "refusals": list(result.refusals),
+                "proposal": str(result.proposal_path) if result.proposal_path else None,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+    raise typer.Exit(code={"proposed": 0, "no_drift": 0, "refused": 1}.get(result.status, 3))
 
 
 @app.command("mcp-serve")

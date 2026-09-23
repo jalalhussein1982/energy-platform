@@ -518,19 +518,23 @@ class ManifestSyntaxError(ValueError):
 
 def load_manifest(path: Path) -> Manifest:
     """Read one plain YAML document: no anchors, aliases, merge keys, tags or multiple documents."""
-    text = path.read_text(encoding="utf-8")
+    return parse_manifest(path.read_text(encoding="utf-8"), str(path))
+
+
+def parse_manifest(text: str, origin: str = "<manifest>") -> Manifest:
+    """``load_manifest`` for text already in memory (the triage pipeline checks a patched copy)."""
     for token in yaml.scan(text):
         if isinstance(token, yaml.AnchorToken | yaml.AliasToken):
-            raise ManifestSyntaxError(f"{path}: YAML anchors/aliases are not allowed (ADR-017)")
+            raise ManifestSyntaxError(f"{origin}: YAML anchors/aliases are not allowed (ADR-017)")
         if isinstance(token, yaml.TagToken):
-            raise ManifestSyntaxError(f"{path}: YAML tags are not allowed (ADR-017)")
+            raise ManifestSyntaxError(f"{origin}: YAML tags are not allowed (ADR-017)")
         if isinstance(token, yaml.DocumentStartToken | yaml.DocumentEndToken):
-            raise ManifestSyntaxError(f"{path}: exactly one YAML document, no `---` (ADR-017)")
+            raise ManifestSyntaxError(f"{origin}: exactly one YAML document, no `---` (ADR-017)")
     data = yaml.safe_load(text)
     if not isinstance(data, dict):
-        raise ManifestSyntaxError(f"{path}: manifest must be a mapping")
+        raise ManifestSyntaxError(f"{origin}: manifest must be a mapping")
     if "<<" in data:
-        raise ManifestSyntaxError(f"{path}: YAML merge keys are not allowed (ADR-017)")
+        raise ManifestSyntaxError(f"{origin}: YAML merge keys are not allowed (ADR-017)")
     return Manifest.model_validate(data)
 
 

@@ -16,7 +16,7 @@ from decimal import Decimal
 from energy_platform.bronze import BronzeError
 from energy_platform.contracts.manifest import Manifest
 from energy_platform.contracts.observation import EnergyObservation
-from energy_platform.contracts.parser import DecodedDocument
+from energy_platform.contracts.parser import DecodedDocument, SourceRecord
 from energy_platform.contracts.registry import dataset
 from energy_platform.mapping import (
     MappingContext,
@@ -141,6 +141,19 @@ def _fail(rt: Runtime, claim: Claim, derivation: Derivation, error: str) -> Proc
     )
 
 
+def decode_payload(m: Manifest, payload: bytes) -> DecodedDocument:
+    """Raw Bronze bytes → the decoded document the manifest declares (raises ``DecodeError``)."""
+    if m.contract.decode == "html-table" and m.fetch.html_table is not None:
+        return decode_html_table(payload, m.fetch.html_table.table_selector)
+    return decode(payload, m.contract.decode)
+
+
+def source_records(m: Manifest, payload: bytes) -> list[SourceRecord]:
+    """Decode → generic parser: the source-shaped records production maps (raises
+    ``DecodeError`` / ``ParseError``). The triage extractor reads the same documents (D-10)."""
+    return list(generic_parser(m).parse(decode_payload(m, payload)))
+
+
 def map_payload(m: Manifest, payload: bytes, ctx: MappingContext) -> MappingResult:
     """Decode → generic parser → mapping for one payload; raises ``Quarantined`` (01 §9).
 
@@ -148,12 +161,7 @@ def map_payload(m: Manifest, payload: bytes, ctx: MappingContext) -> MappingResu
     golden proves exactly what production would write.
     """
     try:
-        doc: DecodedDocument
-        if m.contract.decode == "html-table" and m.fetch.html_table is not None:
-            doc = decode_html_table(payload, m.fetch.html_table.table_selector)
-        else:
-            doc = decode(payload, m.contract.decode)
-        records = generic_parser(m).parse(doc)
+        records = source_records(m, payload)
     except (DecodeError, ParseError) as exc:
         raise Quarantined(f"{type(exc).__name__}: {exc}") from exc
     return map_records(m, records, ctx)
