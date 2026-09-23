@@ -11,6 +11,18 @@ write_files:
       token: ${k3s_token}
       node-ip: ${private_address}
       flannel-iface: ${private_iface}
+  # the provider attaches the private network in a step after server creation, so it can arrive
+  # after first-boot network setup and stay DOWN (2026-09-23: k3s crash-looped on "node IP not
+  # found"): configure it explicitly and wait for the address before anything uses it
+  - path: /etc/netplan/60-private-network.yaml
+    permissions: "0600"
+    content: |
+      network:
+        version: 2
+        ethernets:
+          ${private_iface}:
+            dhcp4: true
 runcmd:
+  - "netplan apply; for i in $(seq 1 60); do ip -4 addr show ${private_iface} 2>/dev/null | grep -q 'inet ${private_address}/' && break; sleep 5; done; ip -4 addr show ${private_iface} 2>/dev/null | grep -q 'inet ${private_address}/' || { echo 'private network: ${private_address} is not on ${private_iface}' >&2; exit 1; }"
   - "curl -sfL https://get.k3s.io -o /tmp/install-k3s.sh"
   - "INSTALL_K3S_VERSION=${k3s_version} INSTALL_K3S_SKIP_SELINUX_RPM=true sh /tmp/install-k3s.sh agent"

@@ -118,18 +118,26 @@ run "cloud_init_is_valid_yaml" {
   }
 
   assert {
-    condition     = yamldecode(yamldecode(nonsensitive(output.server_cloud_init)).write_files[1].content).anonymous.enabled == false
+    condition     = yamldecode(one([for f in yamldecode(nonsensitive(output.server_cloud_init)).write_files : f.content if f.path == "/etc/rancher/k3s/authn.yaml"])).anonymous.enabled == false
     error_message = "the authn.yaml embedded in cloud-init must decode intact, anonymous auth off"
   }
 
   assert {
-    condition     = strcontains(yamldecode(nonsensitive(output.server_cloud_init)).write_files[2].content, "kind: RoleBinding")
+    condition     = strcontains(one([for f in yamldecode(nonsensitive(output.server_cloud_init)).write_files : f.content if endswith(f.path, "energy-platform-rbac.yaml")]), "kind: RoleBinding")
     error_message = "the namespace RBAC manifest must be embedded in cloud-init"
   }
 
   assert {
-    condition     = strcontains(yamldecode(nonsensitive(output.server_cloud_init)).write_files[2].content, "resources: [replicasets, controllerrevisions]")
+    condition     = strcontains(one([for f in yamldecode(nonsensitive(output.server_cloud_init)).write_files : f.content if endswith(f.path, "energy-platform-rbac.yaml")]), "resources: [replicasets, controllerrevisions]")
     error_message = "the deployer Role must let helm --wait read ReplicaSets and ControllerRevisions (first demo deploy, 2026-09-23)"
+  }
+
+  assert {
+    condition = anytrue([
+      for c in yamldecode(nonsensitive(output.server_cloud_init)).runcmd :
+      startswith(c, "netplan apply;") && strcontains(c, "exit 1")
+    ]) && anytrue([for f in yamldecode(nonsensitive(output.server_cloud_init)).write_files : f.path == "/etc/netplan/60-private-network.yaml"])
+    error_message = "the private interface is configured by netplan and its address awaited before k3s (a late network attach left it DOWN, 2026-09-23)"
   }
 
   assert {
