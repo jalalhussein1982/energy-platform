@@ -88,10 +88,18 @@ platform host registry; resolved addresses re-checked against private ranges; ev
 re-validated). FQDN policies (Cilium) are optional and off in the core chart. Phase 5 must run the
 local test on a CNI that enforces policy (kind's default does not).
 
-### F09 — ownership unenforced (P1) — accepted, blocked on the remote
+### F09 — ownership unenforced (P1) — accepted, **closed 2026-09-23**
 
 No remote, placeholder handle. The PR template no longer claims CI enforces every row today.
 Everything else needs the Git host and is listed under "blocked on the author" below.
+
+*Closed (2026-09-23).* The remote is `github.com/jalalhussein1982/energy-platform`, public since
+2026-09-23. `CODEOWNERS` names `@jalalhussein1982` (commit 378a1f0). Branch protection on `main`
+follows `docs/branch-protection.md`: pull request, one approval, code-owner review, the 12 CI jobs
+as required checks, admins may bypass. The rule is in force: every maintainer push to `main`
+since then is answered by GitHub with "Bypassed rule violations … Changes must be made through a
+pull request … 12 of 12 required status checks are expected" (the logged admin bypass). A push
+*rejected* for a non-admin account was not tested; the bypass record is the evidence.
 
 ### F10 — secret-scan whole-line exemption (P2) — accepted, demonstrated
 
@@ -106,12 +114,19 @@ stated in the script docstring.
 `make lock-check` (`uv lock --check`) is part of `make check` and a CI job; the build backend is
 pinned; the uv installer is pinned to a version; `actions/checkout` is pinned by commit SHA.
 
-### F12 — evidence trail absent (P2) — accepted, open
+### F12 — evidence trail absent (P2) — accepted, **closed 2026-09-20**
 
 The S01–S17 ledger cited by `docs/01-data-scope.md` is not in the repository and was not found
 on this machine. Options: the author supplies `message-board/evidence/`, or Phase 4 regenerates
 an index (`docs/evidence/`: request shape, observation time, digest, bounded extracted facts) with
 the bounded live reads the one-week polling campaign performs anyway. Phase 4 gained that task.
+
+*Closed (2026-09-20, Phase 4).* The original ledger was never supplied, so the index was
+regenerated from Phase 4's own bounded live reads: `docs/evidence/README.md`, 24 rows (request
+shape, observation time, source and version, SHA-256 digest, bounded extracted facts,
+synthetic-fixture policy). Raw captures stay outside the repository until redistribution is
+confirmed (`01` §10). Later reads added to `docs/06` §9 (the imbalance admission, 2026-09-23) and
+§9.1 (settlement versions 1 and 2, 2026-09-23).
 
 ### F13 — ČEPS labelling and completeness (P2) — accepted in part
 
@@ -144,8 +159,8 @@ says "dev packages only; runtime names approved in ADR-019 are added when Phase 
 
 | Item | Needed |
 |---|---|
-| F09 | a Git remote and a real maintainer handle for `CODEOWNERS`; then apply `docs/branch-protection.md` and test a rejected push |
-| F12 | the original `message-board/evidence/` directory for the energy task, or agreement that Phase 4 regenerates it |
+| F09 | ~~a Git remote and a real maintainer handle for `CODEOWNERS`; then apply `docs/branch-protection.md` and test a rejected push~~ — closed 2026-09-23 (see F09; the rejection of a non-admin push was not tested) |
+| F12 | ~~the original `message-board/evidence/` directory for the energy task, or agreement that Phase 4 regenerates it~~ — closed 2026-09-20 by regeneration (`docs/evidence/README.md`) |
 
 ## Not changed, and why
 
