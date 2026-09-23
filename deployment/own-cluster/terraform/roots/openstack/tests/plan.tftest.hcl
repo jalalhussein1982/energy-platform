@@ -78,4 +78,9 @@ run "cloud_init_is_valid_yaml" {
     condition     = strcontains(yamldecode(nonsensitive(output.server_cloud_init)).write_files[2].content, "kind: RoleBinding")
     error_message = "the namespace RBAC manifest must be embedded in cloud-init"
   }
+
+  assert {
+    condition     = strcontains(yamldecode(nonsensitive(output.server_cloud_init)).write_files[2].content, "resources: [replicasets, controllerrevisions]")
+    error_message = "the deployer Role must let helm --wait read ReplicaSets and ControllerRevisions (first demo deploy, 2026-09-23)"
+  }
 }

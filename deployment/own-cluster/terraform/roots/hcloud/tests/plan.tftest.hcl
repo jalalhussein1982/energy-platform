@@ -128,6 +128,11 @@ run "cloud_init_is_valid_yaml" {
   }
 
   assert {
+    condition     = strcontains(yamldecode(nonsensitive(output.server_cloud_init)).write_files[2].content, "resources: [replicasets, controllerrevisions]")
+    error_message = "the deployer Role must let helm --wait read ReplicaSets and ControllerRevisions (first demo deploy, 2026-09-23)"
+  }
+
+  assert {
     condition = anytrue([
       for c in yamldecode(nonsensitive(output.server_cloud_init)).runcmd :
       strcontains(c, "mountpoint -q /var/lib/rancher/k3s/storage") && !strcontains(c, "LABEL=")

@@ -23,6 +23,12 @@ rules:
   - apiGroups: [apps]
     resources: [deployments, statefulsets]
     verbs: [get, list, watch, create, update, patch, delete]
+  # read-only: `helm --wait` tracks a Deployment through its ReplicaSets (and Helm 4's watcher a
+  # StatefulSet through its ControllerRevisions); the first demo deploy (2026-09-23) failed on
+  # "replicasets.apps is forbidden" and rolled back
+  - apiGroups: [apps]
+    resources: [replicasets, controllerrevisions]
+    verbs: [get, list, watch]
   - apiGroups: [batch]
     resources: [cronjobs, jobs]
     verbs: [get, list, watch, create, update, patch, delete]
