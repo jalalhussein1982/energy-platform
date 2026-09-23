@@ -1,0 +1,64 @@
+fixture: autumn_dst
+checked_by: 'Codex, 2026-09-23: read synthetic fixture XML fields; counts and Prague
+  offsets calculated independently by hand, not copied from pipeline output; human
+  sign-off pending ADR-022 review.'
+note: Full civil day, three metrics per period; all non-admitted fields deliberately
+  ignored.
+expect:
+  row_count: 300
+  quality_events: [partition_status]
+  rows:
+  - delivery_start_utc: '2025-10-26T00:00:00+02:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '1.125'
+    source_version: '0'
+    period_index: 1
+  - delivery_start_utc: '2025-10-26T00:00:00+02:00'
+    resolution: PT15M
+    metric: imbalance_price
+    value: '1200.500'
+    source_version: '0'
+    period_index: 1
+  - delivery_start_utc: '2025-10-26T00:00:00+02:00'
+    resolution: PT15M
+    metric: counter_imbalance_price
+    value: '-42.750'
+    source_version: '0'
+    period_index: 1
+  - delivery_start_utc: '2025-10-26T23:45:00+01:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '100.125'
+    source_version: '0'
+    period_index: 100
+  - delivery_start_utc: '2025-10-26T23:45:00+01:00'
+    resolution: PT15M
+    metric: imbalance_price
+    value: '-999.000'
+    source_version: '0'
+    period_index: 100
+  - delivery_start_utc: '2025-10-26T02:00:00+02:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '9.125'
+    source_version: '0'
+    period_index: 9
+  - delivery_start_utc: '2025-10-26T02:45:00+02:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '12.125'
+    source_version: '0'
+    period_index: 12
+  - delivery_start_utc: '2025-10-26T02:00:00+01:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '13.125'
+    source_version: '0'
+    period_index: 13
+  - delivery_start_utc: '2025-10-26T03:00:00+01:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '17.125'
+    source_version: '0'
+    period_index: 17

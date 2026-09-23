@@ -1,0 +1,40 @@
+fixture: ordinary_day
+checked_by: 'Codex, 2026-09-23: read synthetic fixture XML fields; counts and Prague
+  offsets calculated independently by hand, not copied from pipeline output; human
+  sign-off pending ADR-022 review.'
+note: Full civil day, three metrics per period; all non-admitted fields deliberately
+  ignored.
+expect:
+  row_count: 288
+  quality_events: [partition_status]
+  rows:
+  - delivery_start_utc: '2026-09-21T00:00:00+02:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '1.125'
+    source_version: '0'
+    period_index: 1
+  - delivery_start_utc: '2026-09-21T00:00:00+02:00'
+    resolution: PT15M
+    metric: imbalance_price
+    value: '1200.500'
+    source_version: '0'
+    period_index: 1
+  - delivery_start_utc: '2026-09-21T00:00:00+02:00'
+    resolution: PT15M
+    metric: counter_imbalance_price
+    value: '-42.750'
+    source_version: '0'
+    period_index: 1
+  - delivery_start_utc: '2026-09-21T23:45:00+02:00'
+    resolution: PT15M
+    metric: system_imbalance
+    value: '96.125'
+    source_version: '0'
+    period_index: 96
+  - delivery_start_utc: '2026-09-21T23:45:00+02:00'
+    resolution: PT15M
+    metric: imbalance_price
+    value: '-999.000'
+    source_version: '0'
+    period_index: 96
