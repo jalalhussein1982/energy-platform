@@ -38,6 +38,22 @@ ADR-036 amendment 1 (2026-09-23) that is Bronze plus one compressed base backup 
 compressed WAL — tens of MB a day at demo volume (docs/07 §5.2); the first shape (raw WAL,
 96 bases a day, ≈ 4.5 GiB/day) was fixed before any apply.
 
+**Hetzner budget: a console check, not automation (Phase 9, G16).** Hetzner Cloud has no
+budget API or CLI (checked 2026-09-23; the OCI side has a real budget with a €10 forecast rule
+and the author's €1 `zero-spend-guard`). What the author checks in the Hetzner Console, project
+`energy-platform`:
+
+1. **Servers:** exactly `energy-platform-demo-server` and `energy-platform-demo-agent-1`
+   (`cx23`). No `ep-cleanclone-*` or `energy-platform-v14` left over (throwaways are deleted
+   after use).
+2. **Volumes / Primary IPs / Networks / Firewalls:** one 10 GB volume, the servers' primary
+   IPs, one network, one firewall. Nothing unattached.
+3. **Object Storage:** bucket `energy-platform-bronze` (and the author's own bucket).
+   Usage in the tens of MB a day (`docs/07` §5.2).
+4. **Billing → usage for the current month:** on track for about €14. If the account offers a
+   usage or cost notification, set it at €25; otherwise this check is the control, done weekly
+   while the demo runs.
+
 Author checklist, in this order:
 
 1. Create the budget alerts in both consoles at the ceilings above.
