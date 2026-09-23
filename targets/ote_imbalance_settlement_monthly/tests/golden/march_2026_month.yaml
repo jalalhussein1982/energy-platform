@@ -1,0 +1,19 @@
+fixture: march_2026_month
+checked_by: "Claude (maintainer session), 2026-09-23: values read from fixtures/march_2026_month/blob with ElementTree; UTC instants computed with zoneinfo from local midnight, not from platform output; 2026-03-29 has 92 periods (01:45 CET, then 03:00 CEST); 15 March period 50 has no price (NULL); 22 March is published zeros"
+expect:
+  row_count: 8916
+  rows:
+    - {delivery_start_utc: 2026-02-28T23:00:00Z, resolution: PT15M, period_index: 1, source_version: "1", metric: system_imbalance, value: "1.00100"}
+    - {delivery_start_utc: 2026-02-28T23:00:00Z, resolution: PT15M, period_index: 1, source_version: "1", metric: imbalance_price, value: "1010.001"}
+    - {delivery_start_utc: 2026-02-28T23:00:00Z, resolution: PT15M, period_index: 1, source_version: "1", metric: counter_imbalance_price, value: "2010.001"}
+    - {delivery_start_utc: 2026-03-15T11:15:00Z, resolution: PT15M, period_index: 50, source_version: "1", metric: system_imbalance, value: "15.05000"}
+    - {delivery_start_utc: 2026-03-15T11:15:00Z, resolution: PT15M, period_index: 50, source_version: "1", metric: imbalance_price, value: null}
+    - {delivery_start_utc: 2026-03-15T11:15:00Z, resolution: PT15M, period_index: 50, source_version: "1", metric: counter_imbalance_price, value: "2150.050"}
+    - {delivery_start_utc: 2026-03-22T00:30:00Z, resolution: PT15M, period_index: 7, source_version: "1", metric: system_imbalance, value: "0.00000"}
+    - {delivery_start_utc: 2026-03-22T00:30:00Z, resolution: PT15M, period_index: 7, source_version: "1", metric: imbalance_price, value: "0.000"}
+    - {delivery_start_utc: 2026-03-29T00:45:00Z, resolution: PT15M, period_index: 8, source_version: "1", metric: system_imbalance, value: "29.00800"}
+    - {delivery_start_utc: 2026-03-29T01:00:00Z, resolution: PT15M, period_index: 9, source_version: "1", metric: system_imbalance, value: "-29.00900"}
+    - {delivery_start_utc: 2026-03-29T21:45:00Z, resolution: PT15M, period_index: 92, source_version: "1", metric: imbalance_price, value: "1290.092"}
+    - {delivery_start_utc: 2026-03-31T21:45:00Z, resolution: PT15M, period_index: 96, source_version: "1", metric: system_imbalance, value: "-31.09600"}
+    - {delivery_start_utc: 2026-03-31T21:45:00Z, resolution: PT15M, period_index: 96, source_version: "1", metric: imbalance_price, value: "1310.096"}
+    - {delivery_start_utc: 2026-03-31T21:45:00Z, resolution: PT15M, period_index: 96, source_version: "1", metric: counter_imbalance_price, value: "2310.096"}
