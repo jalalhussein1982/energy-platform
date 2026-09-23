@@ -68,9 +68,9 @@ synthetic (first `SystemImbalance` 1.12500); **32 of 32 golden rows** re-derived
 |---|---|---|---|
 | F-1 | defect (docs) | Run 1 followed the **maintainer** session protocol inside a contributor task: it wrote `docs/plans/phase-7.md` and edited `docs/03-roadmap.md` and `docs/progress.md` locally. It kept them out of the PR, so the target-only rule held, but the instructions invited the edits. | **Closed** (f7c77d1): `CLAUDE.md`, `03` §0 and `docs/08` §1 say a contributor session follows `docs/08` only and touches `targets/<id>/` or `docs/admissions/<id>.md`. |
 | F-2 | defect (docs) | `AGENTS.md` — what Codex reads — had drifted from `CLAUDE.md` (an older command list, no admission or PR-bundle commands). | **Closed** (f7c77d1): re-mirrored; `tests/harness/test_ci_wrappers.py::test_agents_md_mirrors_claude_md` keeps them identical. |
-| F-3 | limit of the test | **Not perfectly blind.** Codex's global memory (`~/.codex/memories/MEMORY.md`, read by every run) holds a summary of a 2026-09-19 Phase 0 review of this repository: its existence, the OTE WSDL URL, general data principles. It holds nothing on imbalance settlement, the admission, `docs/08`, the harness or anything built after Phase 0. The user-level skill set was also loaded. | Recorded. A strictly blind re-run uses an agent profile with no memory. |
-| F-4 | capability, not a defect | One target sends one request template, so both runs capture settlement **version 0** (daily) and prove versions 1 and 2 by mapping only. Capturing the monthly and final settlements is one more Route A target per version on the same dataset, or a future manifest capability for several requests per capture. | Recorded for the maintainer. |
-| F-5 | observation | Runs 1 and 3 converged on the same decisions (hourly at :17, a 3-day correction at :37, version 0). Expected from one model reading one admission; the cadence is not backed by an observed publication time (the polling campaign was closed without running). | Reviewer to confirm the cadence when merging. |
+| F-3 | limit of the test | **Not perfectly blind.** Codex's global memory (`~/.codex/memories/MEMORY.md`, read by every run) holds a summary of a 2026-09-19 Phase 0 review of this repository: its existence, the OTE WSDL URL, general data principles. It holds nothing on imbalance settlement, the admission, `docs/08`, the harness or anything built after Phase 0. The user-level skill set was also loaded. | Recorded. A strictly blind re-run uses an agent profile with no memory. **Phase 9:** protocol and prompt handed to the author (below); **not run at hand-over**. |
+| F-4 | capability, not a defect | One target sends one request template, so both runs capture settlement **version 0** (daily) and prove versions 1 and 2 by mapping only. Capturing the monthly and final settlements is one more Route A target per version on the same dataset, or a future manifest capability for several requests per capture. | **Phase 9:** closed for version 1: ADR-033 amendment 1 (`month_start[k]` / `month_end[k]`) and PR #4 `ote_imbalance_settlement_monthly`, target-only, built through the harness. Version 2 is the blind re-run's source. |
+| F-5 | observation | Runs 1 and 3 converged on the same decisions (hourly at :17, a 3-day correction at :37, version 0). Expected from one model reading one admission; the cadence is not backed by an observed publication time (the polling campaign was closed without running). | **Phase 9:** the cadence is justified by what the demo showed (`docs/06` §6.1): version 0 of D is only published after D, the correction delivers it, and the hourly poll creates the day's run. |
 
 ## Verdict
 
@@ -78,6 +78,30 @@ Criterion 4 holds on all three runs: the pre-admitted source became a target-onl
 and correct, hand-checkable goldens twice (agent route and the literal CLI route); the unadmitted
 source stopped at an admission request. The harness needed no change; the two defects were in the
 instructions and are closed with a gate.
+
+## Phase 9 — the strictly blind re-run (F-3), protocol
+
+Run 1's source now has an adapter on `main`, so the unseen Route A source is settlement
+**version 2** (final). It is admitted, has no adapter, and needs the month-offset placeholders.
+The run also tests whether the documentation is enough to find them. Blindness comes from the
+setup: a new folder, an empty `CLAUDE_CONFIG_DIR` (no user memory, settings, plugins or skills)
+and `--strict-mcp-config` (no connectors).
+
+```bash
+mkdir -p ~/ep-phase9-blind/claude-config && cd ~/ep-phase9-blind
+git clone https://github.com/jalalhussein1982/energy-platform.git repo && cd repo
+export CLAUDE_CONFIG_DIR="$HOME/ep-phase9-blind/claude-config"
+claude --strict-mcp-config        # log in if asked; /memory, /mcp, /plugin must show nothing
+```
+
+```text
+Read README.md and docs/08-adding-a-target.md, nothing else first. Add this as a target and open a PR: OTE imbalance settlement, final monthly settlement (Version 2), SOAP operation GetImbalanceSettlementPeriodE at https://www.ote-cr.cz/pw-data/services/PublicDataService
+```
+
+Evaluation, as for runs 1 and 3: files touched (target only), CI, goldens re-derived from the
+fixture bytes, the request (version 2, a month that is actually settled, about 4 months back),
+interventions, and the transcript under `~/ep-phase9-blind/claude-config/projects/`. **Status at
+hand-over (2026-09-23): not run.** F-3 stays open until it is.
 
 ## Maintainer actions (Level 3)
 

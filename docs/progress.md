@@ -12,6 +12,58 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-23 | Phase 6 | held-out admission, drift triage with prompt-injection tests, threat model, the contributor guide |
 | 2026-09-23 | Phase 7 | three blind runs pass; two documentation defects closed |
 | 2026-09-23 | Phase 8 | README, CI-porting note, docs index and ADR log; clean clone on a fresh VM: exit 0 in 199 s |
+| 2026-09-23 | Phase 9 | gap closure: deploy identity, secret scope, body cap, `uv` checksum, drills and deploy-on-push, V-11, an 11-hour observation, settlement v1; three defects found and fixed, one a real incident on the demo |
+
+---
+
+## 2026-09-23 (night) — Phase 9: gap closure, and what verifying it found
+
+**Done** (`docs/plans/phase-9.md`, P9-D1 … P9-D12; one commit per gap, pushed to `main` with the
+logged admin bypass; CI green on every commit). **P1:** G1: the OIDC deploy identity is pinned
+to `deploy-demo.yml` (`job_workflow_ref`), and the deployer Role has no `secrets` verbs and no
+`exec`/`portforward` (`HELM_DRIVER=configmap`, release records migrated). The servers ignore
+`user_data`, so the change went over SSH (`make demo-reconfigure`, ADR-035 amendment 1). The
+Terraform plan was outputs-only (applied), there was no server replacement, `can-i get secrets`
+went from yes to no, and deploys ran (revisions 4–7). G2: a target's `secretRef` is
+`target-<id>` only (C-63, ADR-017 amendment 1). G3: fetch streams bodies under a 64 MiB cap
+(C-64, ADR-026 amendment 1; live smoke 5/5). G4: `uv` in CI comes from the release tarball
+with a pinned SHA-256 (12/12 CI jobs `OK`). G5: `weekly-drills` passed on its first GitHub run.
+G6: `deploy-demo` runs on push (first push deploy: revision 5). **P2:** G7: **V-11 CONFIRMED**
+(reference Calico enforces, probe cleaned up). G8: an 11-hour observation (`docs/06` §6.1).
+G9: `month_start[k]`/`month_end[k]` (ADR-033 amendment 1) and PR **#4**
+`ote_imbalance_settlement_monthly` (12/12 checks). G11: F09/F12 closed. **P3:** G15
+sandbox-image test (C-67), G16 console check, G17 local branches deleted, G18 email drafts
+(**not sent**); G12–G14 are in the README with reasons. Final clean clone on a throwaway `cx33`:
+`docs/07` §8.2.
+
+**Found by verifying, each fixed with a test:**
+1. **Template traversal (C-62).** While adding the month names, `str.format` attribute access
+   rendered `os.environ` from a Python-level context object. Every template field is now
+   checked at validation and at render.
+2. **Asynchronous NetworkPolicy on the demo (C-65).** The egress test, never run on the demo
+   before, failed: k3s's kube-router lets a new pod's first packets out, and the metadata
+   service (which serves the k3s join token) answered a fresh pod. The chart's policy gate is
+   on for the demo: 9/9 gated assertions pass, 0/3 runs without it. Node-level metadata
+   blocking is the author's decision.
+3. **A capture of one day holding another day's payload (C-66; incident `docs/07` §4.3).**
+   Found in the capture log while measuring latency. T2 backfills and corrections had stored
+   today's XLSX under 21 and 22 September: discovery took the newest link, and the baseline was
+   the newest run. T1's cross-check had raised 9 544 `reconciliation_mismatch` events that no
+   rule alerted on (now `EnergyPlatformReconciliationMismatch`). 21 September is repaired by
+   capture. **22 September is not**: the source has no `IM_15MIN` file for that day (404), and
+   672 current-view rows still hold the next day's values. Removing them is the author's
+   decision (the SQL is in §4.3).
+
+**Mistakes, recorded.** Commit 657014c went in with `make check` red. The commit was chained
+with `;` after the check, and a test I had written was flaky (a generated XLSX is not
+byte-stable); fixed forward in d640d45, and from then on commits were gated with `&&`. A
+`kubectl auth can-i create pods/exec` check read `exec` as a pod name; re-checked with
+`--subresource`. The laptop lost its network for about two hours (19:40–21:30 UTC) during a
+demo test; the test's Jobs had completed and were read afterwards.
+
+**Open (the author's):** run the strictly blind re-run (`docs/09`, version 2); merge PR #4;
+decide on the 672 rows of 22 September and on node-level metadata blocking; send or discard the
+email drafts; the Hetzner console check (`deployment/own-cluster/README.md`).
 
 ---
 

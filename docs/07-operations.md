@@ -393,3 +393,19 @@ kubectl v1.37.0, uv 0.11.7. `git clone` of the public repository, then the READM
 
 The README lists libpq among the prerequisites. The VM was deleted after the run.
 
+### 8.2 Final clean clone after Phase 9 (2026-09-23)
+
+The same recipe (P9-D12) on a new throwaway `cx33` (Ubuntu 24.04, GNU Make 4.3; Docker from
+get.docker.com, kind v0.33.0, helm v4.3.0, kubectl v1.37.0, uv 0.11.7 from the release tarball
+checked against its SHA-256; `libpq5`). The run executed under `nohup` on the VM, cloning
+`c3b95f2` at 21:43:24 UTC:
+
+| Step | Result |
+|---|---|
+| `make check` | exit 0, **875 passed** (56 s) |
+| `make local-up && make smoke-test` | **exit 0 in 229 s**; egress 3/3 PASS; smoke hook, gaps + freshness row, freshness metric, restore-drill dry run OK |
+| policy gate on kind | 4 platform pods ran `egress-policy-gate` and started (Cilium: enforced at once) |
+| `make local-down` | exit 0 |
+
+The VM was deleted after the run (`hcloud server list`: only the two demo nodes).
+

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **COMPLETE (2026-09-23).** The ten ADR-008 catalogue items and five items specific to this repository, each with Mechanism / Gate / Residual risk. Items 1, 11 and 12 cite the triage tests of `docs/plans/phase-6.md` P6-D5 and the `05` rows C-58…C-61, which landed with Task 6.2 (commit 638fd3e). |
+| Status | **COMPLETE (2026-09-23); residuals reduced in Phase 9 (2026-09-23):** §2 fetch body cap (C-64), §3/§9 `uv` by checksum, §4 `secretRef` scoped per target (C-63) and template traversal closed (C-62), §6 V-11 confirmed and the demo's policy gate (C-65), §13 the sandbox image tested (C-67), §14 deploy identity pinned to the workflow, `Role` without Secrets or `exec`. The ten ADR-008 catalogue items and five items specific to this repository, each with Mechanism / Gate / Residual risk. Items 1, 11 and 12 cite the triage tests of `docs/plans/phase-6.md` P6-D5 and the `05` rows C-58…C-61, which landed with Task 6.2 (commit 638fd3e). |
 | Reads with | `02-architecture-decisions.md` ADR-006…ADR-010; `docs/adr/` ADR-021, ADR-022, ADR-024, ADR-026, ADR-027, ADR-028, ADR-035, ADR-036; `05-constraint-matrix.md`; `07-operations.md` §4.1; `branch-protection.md`; `architecture.md` |
 | Gate notation | `05` row · Make target (= the CI job of the same name, ADR-015) · negative test `path::name`. `terraform-validate` evidence is a `run` block of a `plan.tftest.hcl`. Where no `05` row exists the entry says so. |
 | Words | *Guardrail* stops the accidental bypass and makes the deliberate one visible in a diff; *boundary* holds against a deliberate attempt (ADR-027 §5). Anything that is neither is called *procedural*. |
@@ -115,7 +115,7 @@ Mandatory flow: `Internet content → UNTRUSTED DATA → bounded extractor/sampl
 6. One maintainer; the maintainer's platform commits reach `main` by the logged admin bypass; CI runs the PR's own gates (item 9).
 7. A sign inversion, field swap or interval-label change with a matching golden passes CI; the human golden check is the control (item 10).
 8. Allowed triage operations can still be wrong; triage stays advisory (items 1, 11).
-9. Runtime/triage separation is by construction, not yet an import contract (item 12).
+9. Triage has run only against the stub and a model that obeys injections in tests; no real LLM backend exists (items 1, 12).
 10. Developer-mode agents hold the owner's authority; Level 3 is procedural outside the sandbox (item 13).
 11. Public API port; the deploy identity can reach namespace Secrets through a pod it creates; `deploy-demo.yml` on `main` is trusted as written (item 14).
 12. Public history is permanent and `secret-scan` does not read it (item 15).

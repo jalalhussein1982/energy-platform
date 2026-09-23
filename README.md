@@ -5,7 +5,7 @@ market (SOAP and daily XLSX), OTE day-ahead results and imbalance settlement, Č
 with a **constrained extension path**: a junior engineer or a coding agent adds a new data source
 by declaring it, and cannot change the platform while doing so.
 
-Status: **complete (2026-09-23).** Five targets run as CronJobs from one Helm chart on a live demo
+Status: **complete (2026-09-23); gaps closed in Phase 9** ([`docs/plans/phase-9.md`](docs/plans/phase-9.md)). Five targets run as CronJobs from one Helm chart on a live demo
 cluster and on a laptop; the fifth was added by a blind agent run through the contributor path
 ([`docs/09-acceptance-report.md`](docs/09-acceptance-report.md)).
 
@@ -66,10 +66,19 @@ decisions: [`docs/adr/README.md`](docs/adr/README.md).
 
 - **Cluster:** two Hetzner `cx23` nodes running k3s (`nbg1`), built by
   [`deployment/own-cluster/terraform/roots/hcloud`](deployment/own-cluster/terraform/roots/hcloud).
-- **Deploys:** the [`deploy-demo`](.github/workflows/deploy-demo.yml) workflow builds the image on
-  GitHub, pushes it to GHCR by digest, and deploys with the job's **OIDC identity**. That identity is
-  mapped to a namespace-scoped Role: no kubeconfig and no long-lived deploy token anywhere. The API
-  refuses anonymous requests.
+- **Deploys:** the [`deploy-demo`](.github/workflows/deploy-demo.yml) workflow runs on every push to
+  `main` that changes what the demo runs. It builds the image on GitHub, pushes it to GHCR by
+  digest, and deploys with the job's **OIDC identity**. The cluster accepts that identity only from
+  this workflow file on `main`, and maps it to a namespace Role without access to Secrets or
+  `exec`. There is no kubeconfig and no long-lived deploy token anywhere, and the API refuses
+  anonymous requests ([ADR-035](docs/adr/ADR-035-own-cluster-stack.md) amendment 1).
+- **Egress:** NetworkPolicy is enforced by k3s. Every platform pod first waits in an init
+  container until its policy is in force, because k3s applies a new pod's policy only after the
+  pod starts ([ADR-026](docs/adr/ADR-026-egress-boundary.md) amendment 2).
+- **Known data defect:** until 2026-09-23 18:15 UTC, backfills of the XLSX target stored the
+  newest file under earlier days. That is fixed (ADR-033 amendment 2). 21 September is repaired.
+  For 22 September the source has no file (404), so 672 rows of that day still hold the next
+  day's XLSX values. Removing them is the owner's decision ([`docs/07-operations.md`](docs/07-operations.md) §4.3).
 - **Storage:** Bronze store A is Hetzner Object Storage (COMPLIANCE Object Lock). Store B is OCI
   Object Storage in Frankfurt (a retention rule): another provider, another country.
 - **Checked live on 2026-09-23:** the backup chain (WAL shipping, base backup, replication) and a
@@ -114,7 +123,7 @@ One of them refused a source whose free API is for non-commercial use only
   bounded sample. Its answer is refused unless it names only the four allowed mapping operations.
   The prompt-injection tests use a model that obeys the injection
   ([`energy_platform/triage/`](energy_platform/triage/)).
-- **The full picture.** [`docs/05-constraint-matrix.md`](docs/05-constraint-matrix.md) has 61
+- **The full picture.** [`docs/05-constraint-matrix.md`](docs/05-constraint-matrix.md) has 67
   failure modes, each with a gate and a negative test. [`docs/threat-model.md`](docs/threat-model.md)
   gives the mechanism, gate and residual risk for 15 threats.
 
@@ -123,12 +132,13 @@ One of them refused a source whose free API is for non-commercial use only
 | Not built | Why | Where decided |
 |---|---|---|
 | A read API or consumer MCP over Silver (D-9) | the brief is ingestion; SQL on Silver is the interface | `02` §4.2 D-9 |
-| The OpenAI-compatible LLM client (triage runs on a deterministic stub) | "pipeline built, LLM step stubbed" (D-10); the client must live in `fetch/` with its host registered | `02` D-10, ADR-009, plan P6-D4 |
+| The OpenAI-compatible LLM client (triage runs on a deterministic stub) (G12) | "pipeline built, LLM step stubbed" (D-10). A real client needs an admitted host whose terms fit a commercial deliverable (the reference environment's inference is academic, ADR-028), and its egress must live in `fetch/` with the host registered. No such host is admitted | `02` D-10, ADR-009, plan P6-D4, `docs/plans/phase-9.md` |
+| A loader for a target's own `parser.py` (G13) | every committed target, including the settlement versions, is served by the generic parsers; dynamic import is banned outside `fetch/` and `scripts/` (ADR-027 §3), so a loader needs an ADR amending ADR-027 first | `05` §5 |
+| `bronze.tiering.mode=move` exercised on kind (G14) | the chart renders the tier CronJob and the unit tests cover the move, but no cluster has run it against a real cold store. The demo runs `mode: none` because its object storage has one class (V-12) | ADR-021, `07` §5 |
 | ENTSO-E adapters | a registration token and an admission row first | `01` §4, §10 |
 | Gas intraday, a canary target group | out of v1 | `02` D-11, D-13 |
 | TimescaleDB | plain PostgreSQL is enough at this volume | ADR-030 |
-| A loader for a target's own `parser.py` | every committed target is served by the generic parsers | `05` §5 |
-| One-week publication-latency campaign | closed without running for delivery (2026-09-23); no weekly latency figure is quoted | `03` Phase 4 |
+| One-week publication-latency campaign | not run for delivery (2026-09-23). An 11-hour observation from the demo is in `docs/06` §6.1 as upper bounds on the polling grid, and no weekly figure is quoted | `03` Phase 4 |
 
 ## Assumptions and what they cost
 

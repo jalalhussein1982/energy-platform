@@ -28,22 +28,31 @@
 
 - [x] 9.1 Plan (this file) and the Phase 9 section of `03`.
 - [x] 9.2 **G9a** — ADR-033 amendment 1: `month_start[k]` / `month_end[k]` in `fetch/render.py` with tests; `04` §3.3 and `08` name them. *Accept:* rendering tests for month edges, DST days and bounds; an unknown name or an index outside 0…12 is still a `RenderError`.
-- [ ] 9.3 **G1** — deploy identity (P9-D1). *Accept:* `terraform plan` shows no resource change; mock tests assert the workflow rule and the Role without `secrets`/`exec`; live `kubectl auth can-i --as gha:… ` says no to `get secrets` and `create pods/exec` and yes to the chart's verbs; `helm history` works with the ConfigMap driver; one `deploy-demo` run is green.
-- [ ] 9.4 **G2** — `secretRef` scoped per target (P9-D2). *Accept:* C-63 negative tests (a platform name refused by validation; a crafted model refused by the resolver).
-- [ ] 9.5 **G3** — fetch response cap (P9-D3). *Accept:* C-64 negative tests (declared length above the cap; streamed body above the cap; no retry), and a positive control at the cap.
-- [ ] 9.6 **G4** — `uv` by checksum (P9-D4). *Accept:* the harness test; the next CI run installs `uv` through the new recipe.
-- [ ] 9.7 **G5** — `weekly-drills` green on GitHub (P9-D5).
-- [ ] 9.8 **G6** — `deploy-demo` on push to `main` (P9-D6). *Accept:* the updated workflow test; the next qualifying push deploys.
-- [ ] 9.9 **G7** — V-11 probe (P9-D7). *Accept:* raw output in `00` §5, nothing left in `hussein-ns`.
-- [ ] 9.10 **G8** — N-hour publication observation (P9-D8).
-- [ ] 9.11 **G9b** — `ote_imbalance_settlement_monthly` through the harness, as a PR (P9-D9). *Accept:* target-only PR, CI green, goldens re-derived from the fixture bytes; the merge command handed to the author.
-- [ ] 9.12 **G10** — blind re-run: instructions to the author; evaluation into `docs/09` once the run exists (P9-D10).
-- [ ] 9.13 **G11** — `docs/reviews/2026-09-19-codex-review-response.md`: F09 and F12 closed with references.
-- [ ] 9.14 **P3** in P9-D11 order: G17 local branches, G18 email drafts (not sent), G16 Hetzner budget instructions, G15 sandbox image test, then G14, G12, G13 as time allows.
-- [ ] 9.15 Finish: README "Deliberately not built", threat-model residuals reduced to what remains, the final clean clone (P9-D12), roadmap ticks, progress entry, memory, hand-over.
+- [x] 9.3 **G1** — deploy identity (P9-D1). *Accept:* `terraform plan` shows no resource change; mock tests assert the workflow rule and the Role without `secrets`/`exec`; live `kubectl auth can-i --as gha:… ` says no to `get secrets` and `create pods/exec` and yes to the chart's verbs; `helm history` works with the ConfigMap driver; one `deploy-demo` run is green.
+- [x] 9.4 **G2** — `secretRef` scoped per target (P9-D2). *Accept:* C-63 negative tests (a platform name refused by validation; a crafted model refused by the resolver).
+- [x] 9.5 **G3** — fetch response cap (P9-D3). *Accept:* C-64 negative tests (declared length above the cap; streamed body above the cap; no retry), and a positive control at the cap.
+- [x] 9.6 **G4** — `uv` by checksum (P9-D4). *Accept:* the harness test; the next CI run installs `uv` through the new recipe.
+- [x] 9.7 **G5** — `weekly-drills` green on GitHub (P9-D5).
+- [x] 9.8 **G6** — `deploy-demo` on push to `main` (P9-D6). *Accept:* the updated workflow test; the next qualifying push deploys.
+- [x] 9.9 **G7** — V-11 probe (P9-D7). *Accept:* raw output in `00` §5, nothing left in `hussein-ns`.
+- [x] 9.10 **G8** — N-hour publication observation (P9-D8).
+- [x] 9.11 **G9b** — `ote_imbalance_settlement_monthly` through the harness, as a PR (P9-D9). *Accept:* target-only PR, CI green, goldens re-derived from the fixture bytes; the merge command handed to the author.
+- [ ] 9.12 **G10** — blind re-run: instructions to the author; evaluation into `docs/09` once the run exists (P9-D10). *Instructions given (`docs/09`); the run has not happened at hand-over.*
+- [x] 9.13 **G11** — `docs/reviews/2026-09-19-codex-review-response.md`: F09 and F12 closed with references.
+- [x] 9.14 **P3** in P9-D11 order: G17 local branches, G18 email drafts (not sent), G16 Hetzner budget instructions, G15 sandbox image test, then G14, G12, G13 as time allows.
+- [x] 9.15 Finish: README "Deliberately not built", threat-model residuals reduced to what remains, the final clean clone (P9-D12), roadmap ticks, progress entry, memory, hand-over.
 
 ## Acceptance
 
 Every G1…G18 is either closed with a commit and its evidence, or listed in the README table with a
 reason; the threat-model residuals name only what really remains; `make check` green before each
 commit; CI green on `main`; the demo healthy after the last deploy; the throwaway VM deleted.
+
+## Outcome (2026-09-23)
+
+All P1 and P2 items are closed except G10, whose run is the author's. P3: G15–G18 built;
+G12–G14 are in the README table with reasons. Found on the way and fixed, each with a test and
+a `05` row: fetch-template traversal to `os.environ` (C-62), the demo's asynchronous NetworkPolicy
+(C-65), and captures of one day holding another day's payload (C-66, a real incident on the
+demo, `docs/07` §4.3). One commit went in with `make check` red (657014c: a flaky test of mine),
+fixed forward in d640d45.
