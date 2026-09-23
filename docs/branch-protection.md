@@ -21,4 +21,4 @@ mints a short-lived token from them (ADR-015 two-token pattern) and never writes
 Until a remote exists this file is the record and **nothing here is enforced**. Locally,
 `uv run pre-commit install` (not automatic) gives the laptop the same three gates as CI: `make check`,
 `make deps-allowlist`, `make secret-scan`. Ownership, protected `main` and the target-only path
-boundary become real only on the Git host (review F09; `CODEOWNERS` still carries a placeholder).
+boundary become real only on the Git host. *(2026-09-23: the remote is `github.com/jalalhussein1982/energy-platform`; `CODEOWNERS` names `@jalalhussein1982`, review F09 closed. GitHub offers branch protection on a private repository only with a paid plan; it is enabled when the repository goes public.)*
