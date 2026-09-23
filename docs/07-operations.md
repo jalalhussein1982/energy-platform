@@ -270,6 +270,16 @@ because the smoke never writes production Bronze (P5-D5). `.github/workflows/wee
 runs the same drill on a kind cluster in CI every Monday (`make ci-kind-tools` installs pinned
 kind and Helm on the runner).
 
+**First run on GitHub** (Phase 9, G5): `weekly-drills` dispatched on `main` at 2026-09-23 16:56 UTC,
+run [35892167897](https://github.com/jalalhussein1982/energy-platform/actions/runs/35892167897),
+**green on the first attempt in 5 min 49 s** on `ubuntu-24.04`: `local-up` 2 min 30 s (kind +
+Cilium + registry + atomic deploy; egress PASS 3/3 — capture → OTE 302, capture → metadata and
+private addresses blocked, process → OTE blocked), `rollback-drill` 3 min (baseline deployed;
+failing smoke and failing storage probe each "upgrade failed as expected", then the nine
+assertions PASS: release deployed, both values restored, schema `0003_freshness`, runs and
+observations unchanged, 25 CronJobs, no smoke schema left behind), `local-down`. No fix was
+needed. The scheduled Monday 04:30 UTC run is the recurring evidence from now on.
+
 ## 8. `make smoke-test` and the clean-clone gate
 
 `make smoke-test` = `helm test --logs` (the smoke hook Job again: one fixture capture+process in
