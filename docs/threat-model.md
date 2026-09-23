@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | **COMPLETE (2026-09-23).** The ten ADR-008 catalogue items and five items specific to this repository, each with Mechanism / Gate / Residual risk. Items 1, 11 and 12 cite the triage tests of `docs/plans/phase-6.md` P6-D5 and the `05` rows C-58…C-61, which land with Task 6.2. |
+| Status | **COMPLETE (2026-09-23).** The ten ADR-008 catalogue items and five items specific to this repository, each with Mechanism / Gate / Residual risk. Items 1, 11 and 12 cite the triage tests of `docs/plans/phase-6.md` P6-D5 and the `05` rows C-58…C-61, which landed with Task 6.2 (commit 638fd3e). |
 | Reads with | `02-architecture-decisions.md` ADR-006…ADR-010; `docs/adr/` ADR-021, ADR-022, ADR-024, ADR-026, ADR-027, ADR-028, ADR-035, ADR-036; `05-constraint-matrix.md`; `07-operations.md` §4.1; `branch-protection.md`; `architecture.md` |
 | Gate notation | `05` row · Make target (= the CI job of the same name, ADR-015) · negative test `path::name`. `terraform-validate` evidence is a `run` block of a `plan.tftest.hcl`. Where no `05` row exists the entry says so. |
 | Words | *Guardrail* stops the accidental bypass and makes the deliberate one visible in a diff; *boundary* holds against a deliberate attempt (ADR-027 §5). Anything that is neither is called *procedural*. |

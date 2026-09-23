@@ -4,6 +4,42 @@ One dated entry per session. Newest first.
 
 ---
 
+## 2026-09-23 (evening) — Phase 6: held-out admission, drift triage, threat model, contributor guide
+
+**Done** (`docs/plans/phase-6.md`, P6-D1 … P6-D6; 5 commits on `main`, `make check` green at each — 804 tests; pushed; branch protection enforced, the maintainer's bypasses logged). **Author decisions (2026-09-23):** held-out source = OTE imbalance settlement; branch protection option (a) — enabled once the repository went public (PR, 1 approval, code-owner review, 12 required checks, admins may bypass); deliver without waiting a week, so the Phase 4 polling campaign and V-11 are **closed without running**. **Admission (Route B):** `ote.imbalance_settlement` 1.0.0 (identity with `version` ← `Version` 0/1/2; `system_imbalance` MWh, `imbalance_price` and `counter_imbalance_price` CZK/MWh), `01` §10 row, `docs/admissions/ote_imbalance_settlement.md`, `docs/06` §9 (WSDL + two bounded live reads); a scratch manifest validates OK and maps a live day to 288 observations; **no adapter** (`targets/ote_imbalance_settlement/` does not exist). **Triage (D-10):** `energy_platform/triage/` + `energyctl triage`: production mapping detects the drift (a renamed T1 `Price` silently yields NULL prices, only an `unknown_field` warning), a bounded sample from the production decoder/parser, a constant system prompt, a closed four-operation schema, minimal manifest text edits with a model-level guard, re-verification, one proposal file; `HeuristicStubBackend` default, `UnavailableBackend`, the OpenAI-compatible client not built; 19 tests incl. 10 answers from a model that obeys the injection; `05` C-58 … C-61; an import-linter contract keeps triage off the capture/process path. **Threat model** complete (15 items; drafted by a sub-agent, every cited test checked by script, corrected here). **`docs/08-adding-a-target.md`** (both routes; every command run on a scratch copy of E1) and **`docs/architecture.md`** (three Mermaid diagrams). README points to both. `CODEOWNERS` names `@jalalhussein1982` (F09 closed).
+
+**Learned.** The tabular parser refuses a header that lacks a mapped column — right for production, fatal for triage, so the extractor reads a table's header from the decoded document before the manifest-dependent parse; source names must admit human headers (spaces, parentheses, any script). A pre-publication check on 2026-09-23 compared the eight credential values in `verify.env` and the hcloud tokens against the full git history: no hit; pattern hits were only AWS's documented example key and a PEM header string in negative tests.
+
+**Residual risks recorded (threat model), not fixed:** `secretRef` names are not scoped per target; the OIDC claim rules pin repository and ref but not the workflow file, and the deployer Role may read namespace Secrets; fetch has no response-size cap; `ci-bootstrap` installs `uv` with `curl | sh`.
+
+**Next: Phase 7 (three blind runs, started by the author).** Each run in a fresh clone and a fresh Claude Code session, `/clear` first, nothing else in context:
+
+```text
+git clone https://github.com/jalalhussein1982/energy-platform.git ~/ep-run1 && cd ~/ep-run1 && claude
+```
+
+Run 1 — Route A, pre-admitted (expected: a PR touching only `targets/<id>/`, green CI, goldens checked by hand):
+
+```text
+Read README.md and docs/08-adding-a-target.md, nothing else first. Add this as a target and open a PR: OTE imbalance settlement, SOAP operation GetImbalanceSettlementPeriodE at https://www.ote-cr.cz/pw-data/services/PublicDataService
+```
+
+Run 2 — Route B trigger, unadmitted (expected: `docs/admissions/<id>.md` and nothing else; a registry edit or invented unit is a defect of the run):
+
+```text
+Read README.md and docs/08-adding-a-target.md, nothing else first. Add this as a target and open a PR: https://api.open-meteo.com/v1/forecast?latitude=50.08&longitude=14.42&hourly=temperature_2m
+```
+
+Run 3 — the junior path (after run 1's PR is recorded and closed unmerged, so the branch name is free):
+
+```text
+Read README.md and docs/08-adding-a-target.md, nothing else first. Follow docs/08-adding-a-target.md literally with the CLI only (do not start the MCP server). Add this as a target and open a PR: OTE imbalance settlement, SOAP operation GetImbalanceSettlementPeriodE at https://www.ote-cr.cz/pw-data/services/PublicDataService
+```
+
+Then (agent): `docs/09-acceptance-report.md` from the three transcripts and PRs; a run that needed a core change is a harness defect to fix; merge of a run's PR is the author's. Phase 8 (README in full, `docs/ci-porting.md`, docs index, clean-clone run on a throwaway VM) follows.
+
+---
+
 ## 2026-09-23 (later) — The demo is live: Level 3 steps run at the author's request, six first-apply defects fixed
 
 **Done** (commits 3b478a8 … 12cc4f6 on `main`, each with `make check` green and a test; pushed, CI green). The author asked the agent to run the remaining steps with the CLIs. **Budget:** OCI allows one budget per compartment and the author's €1 `zero-spend-guard` already mails on any spend, so it gained a €10 forecast rule; Hetzner has no budget API or CLI. **Scratch buckets** from V-12/V-13 deleted (all versions, the retention rule, the buckets; the author's own Hetzner bucket untouched). **`terraform apply`** (Terraform 1.16.3, admin address re-checked), the repository variables `DEMO_CLUSTER_URL` / `DEMO_CLUSTER_CA`, the Secrets `energy-platform` and `ghcr-pull` (classic PAT, `read:packages` only, expires 2027-09-21, verified against `ghcr.io`: 200 with it, 401 without), and `deploy-demo`: **release `energy-platform` revision 2, deployed by `gha:jalalhussein1982/energy-platform` over GitHub OIDC**; captures, gaps and process succeed every 15 minutes; one manual pass of the backup chain on the real stores — WAL ship, base, replication Hetzner → OCI, and a **restore drill from OCI** (796 s; restored database and Bronze-only rebuild both identical or live ⊆ rebuild on every target).
