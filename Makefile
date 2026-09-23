@@ -298,7 +298,7 @@ smoke-test: ## helm test (the smoke hook again) → one gaps+freshness run → f
 	  || { $(KUBE) -n $(NAMESPACE) logs job/gaps-smoke | tail -20; echo "smoke-test: FAIL — gaps+freshness run"; exit 1; }
 	@echo "smoke-test: gaps + freshness row written"
 	@$(KUBE) -n $(NAMESPACE) port-forward svc/$(RELEASE)-metrics 19187:9187 >/dev/null 2>&1 & pf=$$!; sleep 3; \
-	  metrics="$$(curl -s --max-time 10 http://127.0.0.1:19187/metrics)"; kill $$pf 2>/dev/null; wait $$pf 2>/dev/null; \
+	  metrics="$$(curl -s --max-time 10 http://127.0.0.1:19187/metrics)"; kill $$pf 2>/dev/null || true; wait $$pf 2>/dev/null || true; \
 	  echo "$$metrics" | grep -E '^energy_platform_freshness_age_seconds\{.*target="ote_intraday_market"' \
 	    || { echo "smoke-test: FAIL — no freshness metric for ote_intraday_market (is the gaps CronJob running?)"; exit 1; }; \
 	  echo "smoke-test: freshness metric present"
