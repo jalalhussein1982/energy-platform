@@ -583,3 +583,60 @@ def test_iter_rows_streams_every_version_in_id_order_and_filters_by_transport(
     assert list(store.iter_rows("ceps.load")) == []
     # a second full pass works (the cursor is not left open)
     assert len(list(store.iter_rows("ote.idm_continuous"))) == 3
+
+
+def test_review2_dc04_a_returning_payload_is_current_again_and_an_exact_retry_is_not(
+    store: Store,
+) -> None:
+    """Review 2 DC-04 (ADR-023 amendment 2): A → B → A ends at A because the third capture is
+    a new *occurrence* of A's version; replaying the old capture of A after B stays at B
+    because an occurrence carries its capture's ``fetched_at``; no version row is duplicated."""
+    r1 = captured_run(store, when=T0)
+    r2 = captured_run(store, when=T0 + timedelta(minutes=15))
+    r3 = captured_run(store, when=T0 + timedelta(minutes=30))
+    fetch_3 = FETCH_2 + timedelta(minutes=15)
+    a_first = obs(value="170.13", sha=SHA_1, fetched_at=FETCH_1)
+    b = obs(value="171.99", sha=SHA_2, fetched_at=FETCH_2)
+    a_again = obs(value="170.13", sha=SHA_1, fetched_at=fetch_3)
+
+    first = store.commit(
+        claim(store, r1),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[a_first],
+        now=NOW,
+    )
+    assert (first.inserted, first.occurrences) == (1, 0)
+    store.commit(
+        claim(store, r2),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[b],
+        now=NOW,
+    )
+    assert values(store)[1] == Decimal("171.99")
+    # replaying capture 1 after B: its occurrence is older than B's, nothing changes
+    retry = store.commit(
+        claim(store, r1, now=NOW + TTL),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[a_first],
+        now=NOW + TTL,
+    )
+    assert (retry.inserted, retry.occurrences) == (0, 0)
+    assert values(store)[1] == Decimal("171.99")
+    # the provider returns to A: no new version, one new occurrence, A is current again
+    back = store.commit(
+        claim(store, r3, now=NOW + TTL),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[a_again],
+        now=NOW + TTL,
+    )
+    assert (back.inserted, back.occurrences) == (0, 1)
+    assert len(store.all_rows("ote.idm_continuous")) == 2
+    assert values(store)[1] == Decimal("170.13")

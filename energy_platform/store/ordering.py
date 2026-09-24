@@ -39,13 +39,14 @@ def owner_rank(o: EnergyObservation) -> int:
 
 
 def rank(
-    o: EnergyObservation, registered_at: datetime
+    o: EnergyObservation, registered_at: datetime, *, newest: datetime | None = None
 ) -> tuple[int, datetime, tuple[int, ...], datetime, str]:
-    """Higher wins: owner first (amendment 1), then ordering basis, contract semver, derivation
-    registration, derivation id."""
+    """Higher wins: owner first (amendment 1), then ordering basis — the version's **newest
+    occurrence** when ``newest`` is given (amendment 2), else the row's own — contract semver,
+    derivation registration, derivation id."""
     return (
         owner_rank(o),
-        ordering_instant(o),
+        newest if newest is not None else ordering_instant(o),
         semver_key(o.contract_version),
         registered_at,
         o.derivation_id,

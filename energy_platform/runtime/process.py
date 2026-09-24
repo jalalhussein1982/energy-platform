@@ -119,7 +119,8 @@ def process_one(rt: Runtime, claim: Claim, derivation: Derivation) -> ProcessRep
     )
     if commit.lost_lease:
         return ProcessReport(run.id, run.scheduled_for, claim.attempt.kind, "lost_lease", 0, 0)
-    outcome = "ok" if commit.inserted or not result.observations else "noop"
+    # a payload seen before that is current again (ADR-023 amendment 2) is work done, not a noop
+    outcome = "ok" if commit.inserted or commit.occurrences or not result.observations else "noop"
     return ProcessReport(
         run.id, run.scheduled_for, claim.attempt.kind, outcome, commit.inserted, len(events)
     )

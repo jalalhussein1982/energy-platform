@@ -17,7 +17,7 @@ from energy_platform.contracts.observation import (
 )
 from energy_platform.contracts.registry import Transport
 from energy_platform.mapping.quality import QualityEvent
-from energy_platform.store.ordering import ordering_basis, rank
+from energy_platform.store.ordering import ordering_basis, ordering_instant, rank
 from energy_platform.store.protocol import (
     AttemptKind,
     AttemptOutcome,
@@ -43,6 +43,8 @@ class MemoryStore:
         self._attempts: dict[int, RunAttempt] = {}
         self._derivations: dict[str, Derivation] = {}
         self._rows: dict[int, StoredObservation] = {}
+        self._occurrences: dict[int, dict[datetime, datetime]] = {}
+        """Per version row: ``fetched_at`` → ordering instant of that occurrence (amendment 2)."""
         self._events: dict[int, StoredEvent] = {}
         self._freshness: dict[str, Freshness] = {}
         self._seq = {"runs": 0, "attempts": 0, "rows": 0, "events": 0}
@@ -186,16 +188,25 @@ class MemoryStore:
             return CommitResult(inserted=0, lost_lease=True)
         if derivation is not None:
             self.register_derivation(derivation, now=now)
-        existing = {version_identity(r.observation) for r in self._rows.values()}
+        existing = {version_identity(r.observation): rid for rid, r in self._rows.items()}
         inserted = 0
+        occurrences = 0
         for o in observations:
             key = version_identity(o)
-            if key in existing:
-                continue
-            existing.add(key)
-            rid = self._next("rows")
-            self._rows[rid] = StoredObservation(rid, claim.attempt.id, o)
-            inserted += 1
+            rid = existing.get(key)
+            new_version = rid is None
+            if rid is None:
+                rid = self._next("rows")
+                self._rows[rid] = StoredObservation(rid, claim.attempt.id, o)
+                existing[key] = rid
+                inserted += 1
+            # ADR-023 amendment 2: one occurrence per capture (keyed by its fetched_at); an
+            # exact retry of the same capture adds nothing
+            seen = self._occurrences.setdefault(rid, {})
+            if o.fetched_at not in seen:
+                seen[o.fetched_at] = ordering_instant(o)
+                if not new_version:
+                    occurrences += 1
         self.add_events(run.target_id, events, run_attempt_id=claim.attempt.id, now=now)
         attempt = self._attempts[claim.attempt.id]
         self._attempts[attempt.id] = replace(
@@ -208,7 +219,7 @@ class MemoryStore:
         self._runs[run.id] = replace(
             run, state=state, lease_owner=None, lease_until=None, updated_at=now
         )
-        return CommitResult(inserted=inserted, lost_lease=False)
+        return CommitResult(inserted=inserted, lost_lease=False, occurrences=occurrences)
 
     def record_attempt(
         self,
@@ -292,6 +303,11 @@ class MemoryStore:
 
     # ---------------------------------------------------------------- silver
 
+    def _rank(self, row: StoredObservation) -> tuple[int, datetime, tuple[int, ...], datetime, str]:
+        o = row.observation
+        newest = max(self._occurrences.get(row.id, {}).values(), default=None)
+        return rank(o, self._registered_at(o.derivation_id), newest=newest)
+
     def _registered_at(self, derivation_id: str) -> datetime:
         d = self._derivations.get(derivation_id)
         if d is None or d.registered_at is None:
@@ -324,9 +340,7 @@ class MemoryStore:
                     continue
                 key = (*key, o.source_transport)
             current = best.get(key)
-            if current is None or rank(o, self._registered_at(o.derivation_id)) > rank(
-                current.observation, self._registered_at(current.observation.derivation_id)
-            ):
+            if current is None or self._rank(row) > self._rank(current):
                 best[key] = row
         rows = [
             CurrentRow(r.observation, r.run_attempt_id, ordering_basis(r.observation))

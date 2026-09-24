@@ -122,6 +122,34 @@ and a `transport="soap"` filter on the canonical view returned nothing. The live
 (both arrival orders), proof 4 rewritten with differing values;
 `tests/runtime/test_review2.py::test_dc03_…` through capture and process.
 
+## Amendment 2 (2026-09-24) — occurrences: a returning payload is current again
+
+**Context.** Review 2 (DC-04) reproduced a consequence of decision 2: the version identity
+`(observation identity, payload_sha256, derivation_id)` inserts nothing on conflict, so a
+provider's return to an earlier payload (A → B → A) inserted nothing and B stayed current,
+although the third capture is genuinely the newest. Decision 2 could not tell a retry of one
+capture from a *new occurrence* of a payload seen before.
+
+**Decision.**
+
+1. A version row is inserted once. Every capture that produces it again records an
+   **occurrence**: `observation_occurrences(observation_id, run_attempt_id, fetched_at,
+   source_published_at)`, unique on `(observation_id, fetched_at)`, append-only (migration
+   `0005_occurrences`; existing rows get one occurrence each). An exact retry of one capture
+   has the same `fetched_at` and adds nothing.
+2. Decision 3's ordering basis becomes the version's **newest occurrence** (`max` over its
+   occurrences of `COALESCE(source_published_at, fetched_at)`). Decision 4 stands: a replayed
+   older capture carries that capture's `fetched_at`, so it never outranks a newer capture.
+3. `CommitResult.occurrences` counts new occurrences of existing versions; a process that adds
+   occurrences but no versions is `ok`, not `noop`.
+4. The restore drill replays every capture whose payload differs from the run's *previous*
+   capture (consecutive, not global, dedup), so a rebuild records the same occurrences as live
+   and ends on the same current row.
+
+**Proof (both stores):** `tests/store/test_store.py::test_review2_dc04_…` (A → B → A ends at
+A; replay of old A after B stays at B; exact retry adds nothing);
+`tests/runtime/test_review2.py::test_dc04_…` through capture, process and the drill.
+
 ## Verification refs
 
 none — design decision.

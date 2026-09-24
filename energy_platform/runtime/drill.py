@@ -125,23 +125,25 @@ def _rebuild(
     rt: Runtime, scratch: Store, replica: Bronze, clock: Callable[[], datetime]
 ) -> tuple[int, tuple[ProcessReport, ...]]:
     """Rebuild the target in ``scratch`` from the replica: ``reconcile`` gives every run its
-    newest capture and ``process`` maps it; then every run that has **more than one distinct
-    payload** in the replica log is re-processed capture by capture, oldest first and the newest
-    last, so the rebuild holds the version each capture produced and the run ends on its newest
-    capture — exactly as live does after a correction found changed content (ADR-033 §3).
-    ``content_changed`` is not used: it is a flag against the target's newest entry, not against
-    the run's previous capture (docs/07 §4.3); payload hashes are."""
+    newest capture and ``process`` maps it; then every run whose replica log holds **more than
+    one payload change** is re-processed capture by capture, oldest first and the newest last,
+    so the rebuild holds the version each capture produced, in the order live saw them (every
+    occurrence, ADR-023 amendment 2), and the run ends on its newest capture — exactly as live
+    does after a correction found changed content (ADR-033 §3). ``content_changed`` is not
+    used: it is a flag against the target's newest entry, not against the run's previous capture
+    (docs/07 §4.3); payload hashes are."""
     reconciled = reconcile(rt, window=None)
     reports = list(process(rt))
     by_run: dict[datetime, list[CaptureEntry]] = {}
     for entry in replica.log.list(rt.target_id):
         by_run.setdefault(entry.scheduled_for, []).append(entry)
     for scheduled_for, entries in by_run.items():
+        # every capture whose payload differs from the run's *previous* capture — consecutive,
+        # not global: a payload that returns after another (A → B → A, ADR-023 amendment 2) is
+        # replayed again so the rebuild records the same occurrences as live
         distinct: list[CaptureEntry] = []
-        seen: set[str] = set()
         for entry in entries:  # ordered by attempt
-            if entry.payload_sha256 not in seen:
-                seen.add(entry.payload_sha256)
+            if not distinct or entry.payload_sha256 != distinct[-1].payload_sha256:
                 distinct.append(entry)
         if len(distinct) < 2:
             continue

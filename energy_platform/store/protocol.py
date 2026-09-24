@@ -110,7 +110,11 @@ class Claim:
 @dataclass(frozen=True, slots=True)
 class CommitResult:
     inserted: int
+    """New Silver version rows."""
     lost_lease: bool
+    occurrences: int = 0
+    """New occurrences of versions that already existed (ADR-023 amendment 2): a capture that
+    produced a payload seen before adds one per row; an exact retry adds none."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -228,7 +232,8 @@ class Store(Protocol):
         now: datetime,
     ) -> CommitResult:
         """One transaction predicated on ``runs.fence = claim.fence``: register the
-        derivation, insert the rows (version identity conflicts insert nothing), insert the
+        derivation, insert the rows (a version identity conflict inserts no row but records an
+        **occurrence** keyed by the capture's ``fetched_at``, ADR-023 amendment 2), insert the
         events, close the attempt, set the state and release the lease. A stale fence changes
         nothing and returns ``lost_lease=True``."""
         ...

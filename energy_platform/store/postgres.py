@@ -61,8 +61,18 @@ _OBS_COLUMNS = (
 _INSERT_OBSERVATION = sql.SQL(
     "INSERT INTO observations ({cols}) VALUES ("
     "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, tstzrange(%s, %s, '[)'), "
-    "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+    "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+    # the version-identity index (0002); a conflict returns the existing row's id (xmax <> 0)
+    "ON CONFLICT (dataset_id, dimensions, delivery_start_utc, resolution, metric, "
+    "source_version, payload_sha256, derivation_id) "
+    "DO UPDATE SET run_attempt_id = observations.run_attempt_id "
+    "RETURNING id, (xmax = 0) AS inserted"
 ).format(cols=sql.SQL(_OBS_COLUMNS))
+_INSERT_OCCURRENCE = (
+    "INSERT INTO observation_occurrences (observation_id, run_attempt_id, fetched_at, "
+    "source_published_at) VALUES (%s, %s, %s, %s) ON CONFLICT (observation_id, fetched_at) "
+    "DO NOTHING"
+)
 _OBS_SELECT = (
     "id, run_attempt_id, source_id, dataset_id, source_transport, contract_version, "
     "derivation_id, raw_ref, payload_sha256, fetched_at, source_published_at, source_version, "
@@ -350,6 +360,7 @@ class PostgresStore:
             if derivation is not None:
                 self._insert_derivation(cur, derivation, now)
             inserted = 0
+            occurrences = 0
             for o in observations:
                 cur.execute(
                     _INSERT_OBSERVATION,
@@ -380,7 +391,19 @@ class PostgresStore:
                         owner_transport_of(o),  # ADR-023 amendment 1: from the registry
                     ),
                 )
-                inserted += cur.rowcount
+                row = cur.fetchone()
+                if row is None:
+                    raise StoreUnavailable("observation insert returned no row")
+                new_version = bool(row["inserted"])
+                inserted += int(new_version)
+                # ADR-023 amendment 2: every capture that produced this version is an
+                # occurrence; the same capture again (same fetched_at) is not
+                cur.execute(
+                    _INSERT_OCCURRENCE,
+                    (row["id"], claim.attempt.id, o.fetched_at, o.source_published_at),
+                )
+                if cur.rowcount and not new_version:
+                    occurrences += 1
             self._insert_events(cur, claim.run.target_id, events, claim.attempt.id, now)
             cur.execute(
                 "UPDATE run_attempts SET outcome = %s, error = %s, finished_at = %s, "
@@ -399,7 +422,7 @@ class PostgresStore:
                 (state, now, claim.run.id, claim.fence),
             )
         self._conn.commit()
-        return CommitResult(inserted=inserted, lost_lease=False)
+        return CommitResult(inserted=inserted, lost_lease=False, occurrences=occurrences)
 
     def record_attempt(
         self,
@@ -649,8 +672,8 @@ class PostgresStore:
         """Empty every table (tests only). Sequences restart."""
         with self._conn.cursor() as cur:
             cur.execute(
-                "TRUNCATE quality_events, observations, run_attempts, runs, derivations, "
-                "target_freshness RESTART IDENTITY CASCADE"
+                "TRUNCATE quality_events, observation_occurrences, observations, run_attempts, "
+                "runs, derivations, target_freshness RESTART IDENTITY CASCADE"
             )
         self._conn.commit()
 
