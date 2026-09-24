@@ -41,4 +41,4 @@ egress:
   fqdnPolicy: cilium
 drills:
   restore:
-    enabled: true
+    enabled: false   # ADR-036 amendment 3: the drill needs postgres.mode=statefulset; with cnpg the render refuses it

@@ -212,6 +212,24 @@ names the three rules. Rejected: replicating on every capture (a Job per fetch, 
 exporter reads Postgres, the copy lives in object storage; kube-state-metrics already knows
 when the Job last succeeded).
 
+## Amendment 3 (2026-09-24) — modes without a backup chain refuse the drill
+
+**Finding (review 2 DEP-02).** §4 promised `cnpg` (Barman objects behind the flag) and
+`external` (the provider's PITR with an operator-provided scratch database); the chart renders
+neither: `cnpg` renders one `Cluster` and no backup object, `external` nothing, while the
+restore-drill CronJob still searches B for the `<system id>/base/<stamp>` layout and builds its
+scratch DSN from `$POSTGRES_PASSWORD`, which those modes do not supply. A fresh CNPG install
+therefore had a drill that could never restore anything, accepted silently at render time.
+
+**Decision.** `drills.restore.enabled` with `postgres.mode` other than `statefulset` **fails
+the render** and says why. The `ci/all-flags-values.yaml` render (cnpg) disables the drill for
+that reason. The two modes stay selectable for the database itself; their backup and drill
+contracts are implemented when a CNPG cluster exists to test against (own-cluster scenario B),
+together with a version-bearing `imageName`/`imageCatalogRef` for the operator's admission
+(review 2 DEP-02). Until then the README's "deliberately not built" table names both.
+
+**Proof:** `tests/harness/test_chart.py::test_the_drill_refuses_database_modes_without_a_backup_chain`.
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-22 · V-12 · CONFIRMED; 2026-09-22 · V-13 · CONFIRMED;

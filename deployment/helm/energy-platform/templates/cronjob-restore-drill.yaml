@@ -17,6 +17,9 @@ restored is a hypothesis. Every run:
 `RESTORE_DRILL_ARGS` (default empty) lets `make smoke-test` run the dry-run variant.
 */ -}}
 {{- if .Values.drills.restore.enabled }}
+{{- if ne .Values.postgres.mode "statefulset" }}
+{{- fail (printf "drills.restore.enabled needs postgres.mode=statefulset: the drill restores the chart's own base + WAL chain (ADR-036 §4-§5) and mode %q has no backup chain it can read yet (ADR-036 amendment 3, review 2 DEP-02) — set drills.restore.enabled=false, or use statefulset" .Values.postgres.mode) }}
+{{- end }}
 {{- $fullname := include "energy-platform.fullname" . -}}
 {{- $b := printf "B:%s/%s" .Values.bronze.replica.bucket .Values.bronze.backupPrefix -}}
 {{- /* ADR-036 amendment 1: the newest base across clusters (<backupPrefix>/<system identifier>/

@@ -22,6 +22,20 @@ spec:
         operator: In
         values: ["capture", "recapture", "backfill"]
   egress:
+    # DNS through Cilium's proxy: toFQDNs is resolved from the answers the pod itself receives
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: {{ .Values.egress.dns.namespace }}
+{{- range $k, $v := .Values.egress.dns.podLabels }}
+            k8s:{{ $k }}: {{ $v | quote }}
+{{- end }}
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
     - toFQDNs:
 {{- range $hosts | uniq | sortAlpha }}
         - matchName: {{ . | quote }}

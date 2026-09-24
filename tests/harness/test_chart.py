@@ -225,6 +225,8 @@ def test_external_postgres_mode_refuses_an_empty_destination_list(tmp_path: Path
         f"image.digest={DIGEST}",
         "--set",
         "postgres.mode=external",
+        "--set",
+        "drills.restore.enabled=false",  # ADR-036 amendment 3: external has no drill chain
     ]
     refused = subprocess.run(base, capture_output=True, text=True)  # noqa: S603
     assert refused.returncode != 0 and "egress.postgres.cidrs is required" in refused.stderr
@@ -488,7 +490,15 @@ def test_policy_gate_runs_first_in_every_payload_pod_behind_its_flag(tmp_path: P
             first = spec["initContainers"][0]
             assert first["name"] == "egress-policy-gate", (values.name, role)
             assert first["args"][:1] == ["wait-egress-policy"]
-            assert all("valueFrom" not in e for e in first.get("env", []))  # no credential
+            assert "--host-canary" in first["args"]  # ADR-026 amendment 3: the node's IP, port 9
+            assert (
+                first["args"][first["args"].index("--host-canary") + 1]
+                == "$(POLICY_GATE_HOST_IP):9"
+            )
+            env = first.get("env", [])
+            assert all("secretKeyRef" not in e.get("valueFrom", {}) for e in env)  # no credential
+            host_ip = next(e for e in env if e["name"] == "POLICY_GATE_HOST_IP")
+            assert host_ip["valueFrom"] == {"fieldRef": {"fieldPath": "status.hostIP"}}
             assert first["securityContext"]["readOnlyRootFilesystem"] is True
 
 
@@ -509,3 +519,51 @@ def test_demo_replicates_every_fifteen_minutes_and_alerts_on_staleness(tmp_path:
     assert exprs["EnergyPlatformReplicationStale"].endswith("> 2700")
     assert exprs["EnergyPlatformWalShipmentStale"].endswith("> 1800")
     assert exprs["EnergyPlatformBaseBackupStale"].endswith("> 172800")
+
+
+def test_the_drill_refuses_database_modes_without_a_backup_chain(tmp_path: Path) -> None:
+    """ADR-036 amendment 3 (review 2 DEP-02): cnpg / external render no backup objects the drill
+    could restore, so enabling the drill with them is refused instead of silently accepted."""
+    for mode in ("cnpg", "external"):
+        base = [
+            "helm",
+            "template",
+            "ep",
+            str(CHART),
+            "-f",
+            str(TENANT),
+            "-f",
+            str(_targets_file(tmp_path)),
+            "--set",
+            f"image.digest={DIGEST}",
+            "--set",
+            f"postgres.mode={mode}",
+            "--set",
+            "egress.postgres.cidrs[0]=10.9.8.0/24",
+        ]
+        refused = subprocess.run(base, capture_output=True, text=True)  # noqa: S603
+        assert (
+            refused.returncode != 0
+            and "drills.restore.enabled needs postgres.mode=statefulset" in refused.stderr
+        )
+        allowed = subprocess.run(  # noqa: S603
+            [*base, "--set", "drills.restore.enabled=false"], capture_output=True, text=True
+        )
+        assert allowed.returncode == 0, allowed.stderr
+
+
+def test_cilium_fqdn_mode_drops_the_broad_public_rule_and_carries_dns(tmp_path: Path) -> None:
+    """ADR-026 amendment 3 (review 2 DEP-03): Cilium rules are a union, so the coarse public-443
+    NetworkPolicy must not render beside the FQDN allowlist; the allowlist needs DNS visibility."""
+    flagged = render(tmp_path, ALL_FLAGS)
+    assert "ep-energy-platform-allow-internet-fetch" not in named(flagged, "NetworkPolicy")
+    cilium = named(flagged, "CiliumNetworkPolicy")["ep-energy-platform-fqdn-fetch"]
+    egress = cilium["spec"]["egress"]
+    dns = next(rule for rule in egress if "toEndpoints" in rule)
+    assert dns["toPorts"][0]["rules"]["dns"] == [{"matchPattern": "*"}]
+    assert dns["toPorts"][0]["ports"][0]["port"] == "53"
+    fqdn = next(rule for rule in egress if "toFQDNs" in rule)
+    assert {f["matchName"] for f in fqdn["toFQDNs"]} >= {"www.ote-cr.cz", "www.ceps.cz"}
+    assert "ep-energy-platform-allow-internet-fetch" in named(
+        render(tmp_path, TENANT), "NetworkPolicy"
+    )

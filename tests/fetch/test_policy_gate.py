@@ -64,3 +64,52 @@ def test_already_enforced_opens_at_once() -> None:
     connect, _ = connector([False, False])
     result = wait_for_egress_policy(connect=connect, clock=clock, sleep=clock.sleep)
     assert result.attempts == 2
+
+
+HOST = ("10.0.0.5", 9)
+
+
+def two_canaries(metadata: list[bool], host: list[str]) -> Connect:
+    """``metadata``: True = answers; ``host``: "refused" | "dropped" | "open" per attempt."""
+
+    def connect(address: tuple[str, int], timeout: float) -> object:
+        if address == CANARY:
+            if metadata.pop(0) if metadata else False:
+                return None
+            raise ConnectionRefusedError("refused")
+        outcome = host.pop(0) if host else "dropped"
+        if outcome == "refused":
+            raise ConnectionRefusedError("reset by the node: no policy in between")
+        if outcome == "dropped":
+            raise TimeoutError("timed out: dropped by the pod's policy")
+        return None
+
+    return connect
+
+
+def test_host_canary_refused_means_no_policy_even_when_metadata_is_blocked_by_the_node() -> None:
+    """ADR-026 amendment 3 (review 2 DEP-05): after the node-level metadata block the metadata
+    canary is unreachable from the first attempt; only a *dropped* host canary proves the pod's
+    own policy. Refused twice, then dropped twice → opens on the fourth attempt."""
+    clock = Clock()
+    connect = two_canaries([False] * 8, ["refused", "refused", "dropped", "dropped"])
+    result = wait_for_egress_policy(
+        host_canary=HOST, connect=connect, clock=clock, sleep=clock.sleep
+    )
+    assert result.attempts == 4 and result.host_canary_dropped is True
+
+
+def test_host_canary_that_keeps_answering_fails_closed() -> None:
+    clock = Clock()
+    connect = two_canaries([False] * 100, ["open"] * 100)
+    with pytest.raises(PolicyNotEnforced, match="host canary"):
+        wait_for_egress_policy(
+            host_canary=HOST, timeout=5.0, connect=connect, clock=clock, sleep=clock.sleep
+        )
+
+
+def test_without_a_host_canary_the_metadata_rule_stands_alone() -> None:
+    clock = Clock()
+    connect, _ = connector([False, False])
+    result = wait_for_egress_policy(connect=connect, clock=clock, sleep=clock.sleep)
+    assert result.host_canary_dropped is None

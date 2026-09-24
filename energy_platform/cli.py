@@ -488,17 +488,37 @@ def wait_egress_policy_cmd(
     timeout: Annotated[
         float, typer.Option("--timeout", help="seconds before the pod fails closed")
     ] = 60.0,
+    host_canary: Annotated[
+        str | None,
+        typer.Option(
+            "--host-canary",
+            help="HOST:PORT the pod's own policy must drop (the node on a closed port); "
+            "refused = no policy yet (ADR-026 amendment 3)",
+        ),
+    ] = None,
 ) -> None:
-    """05 C-65: an init container's gate. Exit 0 once the metadata canary is refused twice in a
-    row (the pod's NetworkPolicy is in force); exit 1 if it is still reachable after --timeout."""
+    """05 C-65: an init container's gate. Exit 0 once the metadata canary is unreachable twice
+    in a row and, when given, the host canary is dropped twice in a row (the pod's NetworkPolicy
+    is in force); exit 1 if either still answers after --timeout."""
+    host: tuple[str, int] | None = None
+    if host_canary:
+        name, _, port = host_canary.rpartition(":")
+        if not name or not port.isdigit():
+            typer.echo(
+                f"wait-egress-policy: --host-canary must be HOST:PORT, got {host_canary!r}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        host = (name, int(port))
     try:
-        result = wait_for_egress_policy(timeout=timeout)
+        result = wait_for_egress_policy(timeout=timeout, host_canary=host)
     except PolicyNotEnforced as exc:
         typer.echo(f"wait-egress-policy: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    dropped = "" if result.host_canary_dropped is None else "; host canary dropped"
     typer.echo(
         f"wait-egress-policy: enforced after {result.waited_seconds:.2f} s "
-        f"({result.attempts} attempts)"
+        f"({result.attempts} attempts{dropped})"
     )
 
 

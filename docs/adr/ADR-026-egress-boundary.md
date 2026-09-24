@@ -123,6 +123,38 @@ it is a change to the nodes and is recorded as the author's decision (`docs/thre
 §6). The egress-test Jobs (`deployment/local/egress-test-job.yaml`) stay ungated on purpose:
 they measure the CNI, not the chart.
 
+## Amendment 3 (2026-09-24) — the FQDN layer replaces the coarse rule; a canary the pod's own policy drops
+
+**Findings (review 2 DEP-03, DEP-05).** (1) With `egress.fqdnPolicy=cilium` the chart rendered
+the CiliumNetworkPolicy allowlist *beside* the unconditional public-443 NetworkPolicy; Cilium
+rules are a union, so the broad rule still permitted every public HTTPS destination and the
+option restricted nothing. (2) Amendment 2's gate reads "the metadata canary is refused" as
+"the pod's policy is in force"; once the node itself blocks the metadata address (`docs/07`
+§2.1, done on the demo 2026-09-24) that canary is refused from the first attempt whether or not
+the pod's rules exist, so the gate's evidence no longer depended on the pod's policy.
+
+**Decision.**
+
+1. The public-443 NetworkPolicy renders only when `egress.fqdnPolicy=none`. In Cilium mode the
+   CiliumNetworkPolicy carries the DNS rule (`toEndpoints` kube-dns, port 53, `rules.dns
+   matchPattern "*"`) that `toFQDNs` needs and the FQDN allowlist on 443; DNS, Postgres and
+   object-store rules stay as they are. The option is now a restriction.
+2. The gate gets a **host canary**: the node's own address (downward API `status.hostIP`) on a
+   closed port (`egress.policyGate.hostCanaryPort`, default 9). Without the pod's policy the
+   node answers the SYN with a reset (`ConnectionRefusedError`); with the pod's egress policy in
+   force the packet is dropped and the connect times out. The gate opens only when the metadata
+   canary is unreachable **and** the host canary is dropped, twice in a row; a host canary that
+   keeps answering or being refused fails the pod closed. The metadata canary stays the
+   fail-closed floor. The gate still carries no credential (a `fieldRef` is not one).
+3. Residual: a node firewall that drops pod-to-node traffic regardless of the pod's policy makes
+   the host canary vacuous too; the runbook's first-packet egress test (`docs/07` §2.1) is the
+   check that catches that, and it is to be rerun with the node block on.
+
+**Proof:** `tests/fetch/test_policy_gate.py` (refused-then-dropped opens on the fourth attempt;
+answering host canary fails closed; no host canary keeps amendment 2's rule),
+`tests/harness/test_chart.py::test_cilium_fqdn_mode_…`, the gate test asserts the host-canary
+argument and the downward-API env.
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-19 · V-4 · CONFIRMED (NetworkPolicy creatable; enforcement not

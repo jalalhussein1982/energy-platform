@@ -88,6 +88,13 @@ safety is partly the delay an init container adds before the main container star
 guarantee is that the work does not start while the canary answers, and that the pod fails
 closed if it keeps answering.
 
+**2026-09-24 (ADR-026 amendment 3, review 2 DEP-05).** With the node-level metadata block in
+place the metadata canary is refused from the first attempt whatever the pod's policy, so the
+gate now also probes a **host canary**: the node's own IP on port 9. A reset means no policy
+stands between the pod and its node yet; a dropped connect means the pod's egress rules are in
+force. The three egress Jobs are to be rerun with the node block on to confirm the first-packet
+behaviour under the new gate (author's action; the previous 9 of 9 predate the node block).
+
 ## 3. Terraform (`own-cluster`)
 
 `make terraform-validate` (2026-09-22, OpenTofu 1.12.6): `fmt -check`, `validate` and `test`

@@ -183,6 +183,9 @@ spec:
         - protocol: TCP
           port: 9000
 {{- end }}
+{{- /* ADR-026 amendment 3 (review 2 DEP-03): the coarse public-443 rule renders only when no FQDN
+layer is selected — Cilium rules are a union, so it would nullify the allowlist */ -}}
+{{- if eq .Values.egress.fqdnPolicy "none" }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -210,3 +213,4 @@ spec:
       ports:
         - protocol: TCP
           port: 443
+{{- end }}
