@@ -55,7 +55,7 @@ def process(rt: Runtime, *, limit: int | None = None) -> tuple[ProcessReport, ..
     reconcile(rt, window=rt.reconcile_window, now=now)
     derivation = derivation_for(rt.manifest, parser_ref(rt.manifest))
     reports: list[ProcessReport] = []
-    for run in rt.store.pending_runs(rt.target_id):
+    for run in rt.store.pending_runs(rt.target_id, now=now):
         if limit is not None and len(reports) >= limit:
             break
         claim = rt.store.claim(run.id, rt.owner, rt.lease_ttl, now=rt.clock())

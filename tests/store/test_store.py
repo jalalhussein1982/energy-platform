@@ -418,7 +418,7 @@ def test_ensure_run_is_idempotent_and_records_the_capture_once(store: Store) -> 
 
 def test_pending_runs_and_replay_queue(store: Store) -> None:
     run = captured_run(store)
-    assert [r.id for r in store.pending_runs("ote_idm_soap")] == [run]
+    assert [r.id for r in store.pending_runs("ote_idm_soap", now=NOW)] == [run]
     store.commit(
         claim(store, run),
         state="processed",
@@ -427,17 +427,17 @@ def test_pending_runs_and_replay_queue(store: Store) -> None:
         observations=[obs()],
         now=NOW,
     )
-    assert store.pending_runs("ote_idm_soap") == ()
+    assert store.pending_runs("ote_idm_soap", now=NOW) == ()
     queued = store.enqueue_replay(run, now=NOW)
     assert queued is not None and queued.kind == "replay" and queued.pending
     assert store.enqueue_replay(run, now=NOW) is None  # one pending replay at a time
-    assert [r.id for r in store.pending_runs("ote_idm_soap")] == [run]
+    assert [r.id for r in store.pending_runs("ote_idm_soap", now=NOW)] == [run]
     c = claim(store, run, now=NOW + TTL)
     assert c.attempt.id == queued.id and c.attempt.kind == "replay" and c.attempt.capture_id == "c1"
     store.commit(
         c, state="processed", outcome="noop", derivation=D_A, observations=[obs()], now=NOW + TTL
     )
-    assert store.pending_runs("ote_idm_soap") == ()
+    assert store.pending_runs("ote_idm_soap", now=NOW) == ()
     kinds = [a.kind for a in store.attempts(run)]
     assert kinds == ["process", "replay"]
 
@@ -497,10 +497,10 @@ def test_mark_recaptured_lowers_a_processed_run_to_captured(store: Store) -> Non
     """ADR-033 §3 / P5-D6: a changed forced attempt makes the run pending again."""
     run_id = captured_run(store)
     store.commit(claim(store, run_id), state="processed", outcome="ok", derivation=D_A, now=NOW)
-    assert store.pending_runs("ote_idm_soap") == ()
+    assert store.pending_runs("ote_idm_soap", now=NOW) == ()
     run = store.mark_recaptured(run_id, "c2", now=NOW + TTL)
     assert run.state == "captured" and run.capture_id == "c2" and run.updated_at == NOW + TTL
-    assert [r.id for r in store.pending_runs("ote_idm_soap")] == [run_id]
+    assert [r.id for r in store.pending_runs("ote_idm_soap", now=NOW)] == [run_id]
     c = claim(store, run_id, now=NOW + 2 * TTL)
     assert c.attempt.capture_id == "c2"  # the new attempt is what gets processed
 
@@ -668,3 +668,41 @@ def test_review2_dc02_a_recapture_fences_the_in_flight_claim(store: Store) -> No
         now=NOW + timedelta(seconds=3),
     )
     assert done.inserted == 1 and values(store)[1] == Decimal("171.99")
+
+
+def test_review2_dc05_an_abandoned_replay_is_reclaimed_after_its_lease_expires(
+    store: Store,
+) -> None:
+    """Review 2 DC-05 (ADR-024 amendment 2): a worker dies holding a replay attempt; once the
+    lease expires the run is pending again, the dead attempt is closed as lost_lease and a
+    fresh replay attempt is opened for the next worker."""
+    run_id = captured_run(store)
+    store.commit(
+        claim(store, run_id),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs()],
+        now=NOW,
+    )
+    assert store.enqueue_replay(run_id, now=NOW) is not None
+    dead = claim(store, run_id, "crashed-replay", now=NOW + TTL)
+    assert dead.attempt.kind == "replay"
+    still_leased = NOW + TTL + timedelta(minutes=1)
+    assert store.pending_runs("ote_idm_soap", now=still_leased) == ()
+    after_expiry = NOW + 2 * TTL + timedelta(seconds=1)
+    assert [r.id for r in store.pending_runs("ote_idm_soap", now=after_expiry)] == [run_id]
+    fresh = claim(store, run_id, "w2", now=after_expiry)
+    assert fresh.attempt.kind == "replay" and fresh.attempt.lease_owner == "w2"
+    outcomes = {a.id: a.outcome for a in store.attempts(run_id)}
+    assert outcomes[dead.attempt.id] == "lost_lease" and outcomes[fresh.attempt.id] is None
+    done = store.commit(
+        fresh,
+        state="processed",
+        outcome="noop",
+        derivation=D_A,
+        observations=[obs()],
+        now=after_expiry,
+    )
+    assert not done.lost_lease
+    assert store.pending_runs("ote_idm_soap", now=after_expiry + TTL) == ()

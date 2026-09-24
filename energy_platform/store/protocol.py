@@ -72,6 +72,16 @@ class RunAttempt:
     def pending(self) -> bool:
         return self.outcome is None and self.lease_owner is None
 
+    def expired(self, now: datetime) -> bool:
+        """Unfinished, leased, and the lease ran out: a worker died holding it (ADR-024
+        amendment 2, review 2 DC-05); ``claim`` closes it as ``lost_lease`` and reopens."""
+        return (
+            self.outcome is None
+            and self.lease_owner is not None
+            and self.lease_until is not None
+            and self.lease_until < now
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class Derivation:
@@ -217,7 +227,9 @@ class Store(Protocol):
     # ---------------------------------------------------------------- ledger: attempts
     def claim(self, run_id: int, owner: str, ttl: timedelta, *, now: datetime) -> Claim | None:
         """ADR-024 §4: bump the fence and take the lease if it is free or expired; adopt a
-        pending replay attempt if one exists, else open a ``process`` attempt."""
+        pending replay attempt if one exists, else open a ``process`` attempt. Amendment 2: an
+        unfinished replay attempt whose lease expired is closed as ``lost_lease`` and a fresh
+        replay attempt is opened for the new owner (the repair is not abandoned)."""
         ...
 
     def renew(self, claim: Claim, ttl: timedelta, *, now: datetime) -> bool: ...
@@ -260,8 +272,9 @@ class Store(Protocol):
 
     def attempts(self, run_id: int) -> tuple[RunAttempt, ...]: ...
 
-    def pending_runs(self, target_id: str) -> tuple[Run, ...]:
-        """Runs to process: ``state = captured`` or with a pending replay attempt (P2-D11)."""
+    def pending_runs(self, target_id: str, *, now: datetime) -> tuple[Run, ...]:
+        """Runs to process: ``state = captured``, or with a replay attempt that is pending or
+        whose holder's lease expired before ``now`` (P2-D11; ADR-024 amendment 2)."""
         ...
 
     def runs_with_derivation(self, derivation_id: str) -> tuple[Run, ...]:

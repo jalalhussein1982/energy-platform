@@ -12,7 +12,14 @@ from datetime import datetime, timedelta
 
 from energy_platform.contracts.manifest import Correction
 from energy_platform.parse import parser_ref
-from energy_platform.runtime import capture, process, process_one, reconcile, restore_drill
+from energy_platform.runtime import (
+    capture,
+    process,
+    process_one,
+    reconcile,
+    replay_range,
+    restore_drill,
+)
 from energy_platform.store import (
     MemoryStore,
     Run,
@@ -221,3 +228,23 @@ def test_dc02_a_recapture_during_an_in_flight_claim_fences_the_old_worker() -> N
     assert run.capture_id == correction.entry.capture_id
     later = process(rt)
     assert [r.outcome for r in later] == ["ok"] and _price(rt.store) == "171.99"
+
+
+def test_dc05_a_replay_claimed_by_a_dead_worker_is_completed_after_lease_expiry() -> None:
+    """DC-05 (ADR-024 amendment 2): the planned repair does not stop with the worker."""
+    rt = runtime(T1)
+    capture(rt, SCHEDULED)
+    process(rt)
+    assert replay_range(rt, SCHEDULED, SCHEDULED + timedelta(minutes=1))
+    run = rt.store.get_run(T1.target_id, SCHEDULED)
+    assert run is not None
+    dead = rt.store.claim(run.id, "crashed-replay", rt.lease_ttl, now=rt.clock())
+    assert dead is not None and dead.attempt.kind == "replay"
+    rt.clock.advance(rt.lease_ttl + timedelta(seconds=1))  # type: ignore[attr-defined]
+    reports = process(rt)
+    assert [(r.attempt_kind, r.outcome) for r in reports] == [("replay", "noop")]
+    outcomes = [a.outcome for a in rt.store.attempts(run.id)]
+    # capture, the first process, the dead replay, the completed replay (a noop report is a
+    # committed "ok" attempt: same capture, same derivation, nothing new to insert)
+    assert outcomes.count("lost_lease") == 1 and outcomes.count("ok") == 3
+    assert rt.store.pending_runs(T1.target_id, now=rt.clock()) == ()

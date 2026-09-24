@@ -142,7 +142,29 @@ class MemoryStore:
             run, fence=run.fence + 1, lease_owner=owner, lease_until=now + ttl, updated_at=now
         )
         self._runs[run_id] = run
+        # ADR-024 amendment 2: a replay attempt abandoned by a dead worker is closed and
+        # reopened for this owner
+        reopened = False
+        for dead in self.attempts(run_id):
+            if dead.kind == "replay" and dead.expired(now):
+                self._attempts[dead.id] = replace(dead, outcome="lost_lease", finished_at=now)
+                reopened = True
         pending = next((a for a in self.attempts(run_id) if a.kind == "replay" and a.pending), None)
+        if pending is None and reopened:
+            pending = RunAttempt(
+                id=self._next("attempts"),
+                run_id=run_id,
+                kind="replay",
+                lease_owner=None,
+                lease_until=None,
+                fence=None,
+                capture_id=run.capture_id,
+                derivation_id=None,
+                outcome=None,
+                error=None,
+                started_at=now,
+                finished_at=None,
+            )
         if pending is not None:
             attempt = replace(
                 pending,
@@ -280,12 +302,14 @@ class MemoryStore:
     def attempts(self, run_id: int) -> tuple[RunAttempt, ...]:
         return tuple(a for a in self._attempts.values() if a.run_id == run_id)
 
-    def pending_runs(self, target_id: str) -> tuple[Run, ...]:
+    def pending_runs(self, target_id: str, *, now: datetime) -> tuple[Run, ...]:
         out = [
             r
             for r in self.runs(target_id)
             if r.state == "captured"
-            or any(a.kind == "replay" and a.pending for a in self.attempts(r.id))
+            or any(
+                a.kind == "replay" and (a.pending or a.expired(now)) for a in self.attempts(r.id)
+            )
         ]
         return tuple(out)
 

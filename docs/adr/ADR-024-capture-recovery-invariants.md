@@ -130,6 +130,21 @@ commit is `lost_lease`, no rows, the new claim completes);
 `tests/runtime/test_review2.py::test_dc01_…` (outage, subsequent unchanged poll, D-3) and
 `::test_dc02_…` through capture, claim and process.
 
+## Amendment 2 (2026-09-24) — an abandoned replay attempt is reclaimed
+
+**Context.** Review 2 (DC-05): a queued replay is pending only while its attempt has no
+lease owner; a worker that claimed it and died left an unfinished, leased attempt on a
+`processed` run, which neither `pending_runs` nor `claim` looked at again — the repair
+stopped permanently after one worker failure.
+
+**Decision.** `pending_runs(target, now=…)` also returns runs with an unfinished replay
+attempt whose lease expired before `now`. `claim` closes every such attempt as `lost_lease`
+(its outcome is recorded) and opens a fresh replay attempt for the new owner, under the run's
+new fence. The lease model (§4) is unchanged: the dead holder, if it ever commits, loses.
+
+**Proof:** `tests/store/test_store.py::test_review2_dc05_…` (both stores);
+`tests/runtime/test_review2.py::test_dc05_…` through `replay_range`, `claim` and `process`.
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-19 · V-6 · CONFIRMED (object store listing and object lock, on which

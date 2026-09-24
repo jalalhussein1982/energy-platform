@@ -298,6 +298,28 @@ class PostgresStore:
             self._conn.rollback()
             return None
         run = self._run(row)
+        # ADR-024 amendment 2: close replay attempts abandoned by a dead worker, reopen one
+        dead = self._all(
+            """
+            UPDATE run_attempts SET outcome = 'lost_lease', finished_at = %s
+            WHERE run_id = %s AND kind = 'replay' AND outcome IS NULL
+              AND lease_owner IS NOT NULL AND lease_until < %s
+            RETURNING id
+            """,
+            (now, run_id, now),
+        )
+        if dead:
+            self._one(
+                """
+                INSERT INTO run_attempts (run_id, kind, capture_id, started_at)
+                SELECT %s, 'replay', %s, %s WHERE NOT EXISTS (
+                    SELECT 1 FROM run_attempts a
+                    WHERE a.run_id = %s AND a.kind = 'replay' AND a.outcome IS NULL
+                      AND a.lease_owner IS NULL)
+                RETURNING id
+                """,
+                (run_id, run.capture_id, now, run_id),
+            )
         pending = self._one(
             """
             UPDATE run_attempts SET lease_owner = %s, lease_until = %s, fence = %s,
@@ -470,7 +492,7 @@ class PostgresStore:
         self._conn.rollback()
         return tuple(self._attempt(r) for r in rows)
 
-    def pending_runs(self, target_id: str) -> tuple[Run, ...]:
+    def pending_runs(self, target_id: str, *, now: datetime) -> tuple[Run, ...]:
         rows = self._all(
             """
             SELECT r.* FROM runs r
@@ -478,10 +500,10 @@ class PostgresStore:
                 r.state = 'captured' OR EXISTS (
                     SELECT 1 FROM run_attempts a
                     WHERE a.run_id = r.id AND a.kind = 'replay' AND a.outcome IS NULL
-                      AND a.lease_owner IS NULL))
+                      AND (a.lease_owner IS NULL OR a.lease_until < %s)))
             ORDER BY r.scheduled_for
             """,
-            (target_id,),
+            (target_id, now),
         )
         self._conn.rollback()
         return tuple(self._run(r) for r in rows)
