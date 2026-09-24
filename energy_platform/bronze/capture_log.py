@@ -15,6 +15,7 @@ from typing import Literal, Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.contracts.registry import Transport
 
 Tier = Literal["hot", "cold"]
@@ -104,6 +105,15 @@ class CaptureLog(Protocol):
         """Newest entry by (scheduled_for, attempt): the baseline for ``content_changed``."""
         ...
 
+    def put_invalidation(self, inv: Invalidation) -> bool:
+        """Record a durable invalidation decision beside the capture log (ADR-038): create
+        only, ``False`` when that decision already exists. Never touches the capture."""
+        ...
+
+    def invalidations(self, target_id: str) -> tuple[Invalidation, ...]:
+        """Every invalidation recorded for the target, ordered by key."""
+        ...
+
 
 def _ordered(entries: list[CaptureEntry]) -> tuple[CaptureEntry, ...]:
     return tuple(sorted(entries, key=lambda e: (e.scheduled_for, e.attempt)))
@@ -118,7 +128,22 @@ def _in_window(e: CaptureEntry, since: datetime | None, until: datetime | None) 
 class MemoryCaptureLog:
     def __init__(self) -> None:
         self._entries: dict[str, CaptureEntry] = {}
+        self._invalidations: dict[str, Invalidation] = {}
         self._lock = threading.Lock()
+
+    def put_invalidation(self, inv: Invalidation) -> bool:
+        with self._lock:
+            if inv.key in self._invalidations:
+                return False
+            self._invalidations[inv.key] = inv
+            return True
+
+    def invalidations(self, target_id: str) -> tuple[Invalidation, ...]:
+        return tuple(
+            self._invalidations[k]
+            for k in sorted(self._invalidations)
+            if self._invalidations[k].target_id == target_id
+        )
 
     def put(self, entry: CaptureEntry) -> None:
         self._entries[entry.key] = entry
@@ -208,3 +233,22 @@ class FileCaptureLog:
     def latest(self, target_id: str) -> CaptureEntry | None:
         entries = self.list(target_id)
         return entries[-1] if entries else None
+
+    def put_invalidation(self, inv: Invalidation) -> bool:
+        path = self._root / inv.key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with path.open("x", encoding="utf-8") as f:
+                f.write(inv.to_json())
+        except FileExistsError:
+            return False
+        return True
+
+    def invalidations(self, target_id: str) -> tuple[Invalidation, ...]:
+        prefix = self._root / "invalidations" / target_id
+        if not prefix.exists():
+            return ()
+        return tuple(
+            Invalidation.from_json(p.read_text(encoding="utf-8"))
+            for p in sorted(prefix.glob("*.json"))
+        )

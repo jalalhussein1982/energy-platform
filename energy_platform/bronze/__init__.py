@@ -24,6 +24,7 @@ from energy_platform.bronze.store import (
     blob_key,
     sha256_hex,
 )
+from energy_platform.contracts.invalidation import Invalidation, invalidation_key
 
 __all__ = [
     "BlobStore",
@@ -35,6 +36,7 @@ __all__ = [
     "CaptureOutcome",
     "FileBlobStore",
     "FileCaptureLog",
+    "Invalidation",
     "MemoryBlobStore",
     "MemoryCaptureLog",
     "S3BlobStore",
@@ -43,6 +45,7 @@ __all__ = [
     "capture_id",
     "entry_key",
     "import_fixture",
+    "invalidation_key",
     "load_fixture",
     "sha256_hex",
     "write_fixture",

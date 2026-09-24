@@ -29,7 +29,7 @@ from typing import Annotated, Any, cast
 import typer
 from pydantic import ValidationError
 
-from energy_platform.bronze import Bronze, FileBlobStore, FileCaptureLog, load_fixture
+from energy_platform.bronze import Bronze, FileBlobStore, FileCaptureLog, Invalidation, load_fixture
 from energy_platform.bronze.config import (
     BronzeConfigError,
     bronze_from_env,
@@ -83,8 +83,8 @@ app = typer.Typer(
     name="energyctl",
     help=(
         "energy-platform command line: validate, capture, recapture, process, replay, gaps, "
-        "freshness, smoke, storage-probe, restore-drill, demo; new-target, record-fixture, "
-        "run-target-tests, admission-request, pr-bundle, triage, mcp-serve"
+        "freshness, invalidate, smoke, storage-probe, restore-drill, demo; new-target, "
+        "record-fixture, run-target-tests, admission-request, pr-bundle, triage, mcp-serve"
     ),
     no_args_is_help=True,
     pretty_exceptions_enable=False,
@@ -597,6 +597,50 @@ def gaps_cmd(
             _echo(gap)
         if with_freshness:
             _echo(record_freshness(rt))
+
+
+@app.command("invalidate")
+def invalidate_cmd(
+    manifest: ManifestOpt,
+    captures: Annotated[
+        list[str], typer.Option("--capture", help="capture id `<target>:<stamp>:<attempt>`")
+    ],
+    reason: Annotated[str, typer.Option("--reason", help="why this capture's output is wrong")],
+    by: Annotated[str, typer.Option("--by", help="who decided (a person, a ticket)")],
+    derivation: Annotated[
+        str | None,
+        typer.Option("--derivation", help="only this derivation's output; default: every one"),
+    ] = None,
+    dsn: DsnOpt = None,
+    bronze_dir: BronzeOpt = None,
+) -> None:
+    """Record a durable invalidation (ADR-038): the capture's output is never current, replayed
+    or restored again. Writes a Bronze object beside the capture log (replicated with it) and,
+    when a DSN is given, mirrors it into the ledger now (reconcile does it otherwise). The raw
+    capture itself is never touched."""
+    m = _manifest(manifest)
+    bronze = _bronze(bronze_dir)
+    store = _store(dsn, required=False) if dsn else None
+    now = datetime.now(UTC)
+    for capture_id in captures:
+        if not capture_id.startswith(f"{m.target_id}:"):
+            typer.echo(f"invalidate: {capture_id!r} is not a capture of {m.target_id}", err=True)
+            raise typer.Exit(code=1)
+        if bronze.log.get(capture_id) is None:
+            typer.echo(f"invalidate: {capture_id!r} not found in the capture log", err=True)
+            raise typer.Exit(code=1)
+        inv = Invalidation(
+            target_id=m.target_id,
+            capture_id=capture_id,
+            derivation_id=derivation,
+            reason=reason,
+            recorded_by=by,
+            recorded_at=now,
+        )
+        created = bronze.log.put_invalidation(inv)
+        if store is not None:
+            store.add_invalidation(inv)
+        _echo({"capture_id": capture_id, "key": inv.key, "created": created})
 
 
 @app.command("freshness")

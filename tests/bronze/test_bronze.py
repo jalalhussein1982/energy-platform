@@ -16,6 +16,7 @@ from energy_platform.bronze import (
     CaptureOutcome,
     FileBlobStore,
     FileCaptureLog,
+    Invalidation,
     MemoryBlobStore,
     MemoryCaptureLog,
     blob_key,
@@ -308,3 +309,26 @@ def test_capture_gives_up_after_repeated_collisions() -> None:
     b = Bronze(MemoryBlobStore(), Taken())
     with pytest.raises(BronzeError, match="collided"):
         b.capture(target_id="t", scheduled_for=T0, result=result(b"x"), transport="soap")
+
+
+def test_invalidation_objects_are_create_only_and_listed_per_target(tmp_path: Path) -> None:
+    """ADR-038: one immutable JSON object per decision, beside the capture log, on both
+    offline backends; the key names the capture and, when scoped, the derivation."""
+    decision = Invalidation(
+        target_id="t",
+        capture_id="t:2026-09-17T220000Z:1",
+        derivation_id=None,
+        reason="wrong day",
+        recorded_by="maintainer",
+        recorded_at=T0,
+    )
+    scoped = decision.model_copy(update={"derivation_id": "a" * 16})
+    assert decision.key == "invalidations/t/2026-09-17T220000Z_1.json"
+    assert scoped.key == "invalidations/t/2026-09-17T220000Z_1.aaaaaaaaaaaaaaaa.json"
+    for log in (MemoryCaptureLog(), FileCaptureLog(tmp_path)):
+        assert log.put_invalidation(decision) is True
+        assert log.put_invalidation(decision) is False
+        assert log.put_invalidation(scoped) is True
+        assert set(log.invalidations("t")) == {decision, scoped}  # listed, key order
+        assert log.invalidations("u") == ()
+    assert Invalidation.from_json(decision.to_json()) == decision

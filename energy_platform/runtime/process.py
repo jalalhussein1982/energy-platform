@@ -72,6 +72,8 @@ def process_one(rt: Runtime, claim: Claim, derivation: Derivation) -> ProcessRep
     entry = None if capture_id is None else rt.bronze.log.get(capture_id)
     if entry is None:
         return _fail(rt, claim, derivation, f"capture entry {capture_id!r} not found in Bronze")
+    if rt.store.is_invalidated(entry.capture_id, derivation.derivation_id):
+        return _refuse_invalidated(rt, claim, derivation, entry.capture_id)
     try:
         payload = rt.bronze.read(entry.raw_ref).payload
     except BronzeError as exc:
@@ -123,6 +125,34 @@ def process_one(rt: Runtime, claim: Claim, derivation: Derivation) -> ProcessRep
     outcome = "ok" if commit.inserted or commit.occurrences or not result.observations else "noop"
     return ProcessReport(
         run.id, run.scheduled_for, claim.attempt.kind, outcome, commit.inserted, len(events)
+    )
+
+
+def _refuse_invalidated(
+    rt: Runtime, claim: Claim, derivation: Derivation, capture_id: str
+) -> ProcessReport:
+    """ADR-038: a capture whose output was invalidated commits no rows — the run fails with a
+    ``quarantined`` attempt that names the decision, whoever asked (process, replay, drill)."""
+    reasons = [
+        i.reason
+        for i in rt.store.invalidations(rt.target_id)
+        if i.capture_id == capture_id
+        and (i.derivation_id is None or i.derivation_id == derivation.derivation_id)
+    ]
+    error = f"invalidated: {'; '.join(reasons) or 'recorded decision'} ({capture_id})"
+    log.warning("%s %s: %s", rt.target_id, claim.run.scheduled_for, error)
+    commit = rt.store.commit(
+        claim,
+        state="failed",
+        outcome="quarantined",
+        error=error,
+        derivation=derivation,
+        events=[QualityEvent("invalidated", "warning", error)],
+        now=rt.clock(),
+    )
+    outcome: AttemptOutcome = "lost_lease" if commit.lost_lease else "quarantined"
+    return ProcessReport(
+        claim.run.id, claim.run.scheduled_for, claim.attempt.kind, outcome, 0, 1, error
     )
 
 

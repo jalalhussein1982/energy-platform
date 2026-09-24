@@ -20,6 +20,7 @@ from decimal import Decimal
 from typing import Any, Literal, Protocol
 
 import energy_platform
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.contracts.manifest import Manifest
 from energy_platform.contracts.observation import EnergyObservation, derivation_id
 from energy_platform.contracts.registry import Transport, dataset
@@ -279,6 +280,23 @@ class Store(Protocol):
 
     def runs_with_derivation(self, derivation_id: str) -> tuple[Run, ...]:
         """Runs whose Silver rows carry ``derivation_id`` (ADR-023 §4 repair)."""
+        ...
+
+    # ---------------------------------------------------------------- invalidations (ADR-038)
+    def add_invalidation(self, inv: Invalidation) -> bool:
+        """Mirror a Bronze invalidation into the ledger (idempotent); ``True`` when new."""
+        ...
+
+    def invalidations(self, target_id: str) -> tuple[Invalidation, ...]: ...
+
+    def is_invalidated(self, capture_id: str, derivation_id: str | None) -> bool:
+        """Whether ``capture_id``'s output is invalid for ``derivation_id`` (a decision with
+        ``derivation_id=None`` covers every derivation)."""
+        ...
+
+    def attempt_captures(self, target_id: str) -> Mapping[int, str]:
+        """``run_attempt id → capture id`` for the target: what a Silver row was produced from
+        (the drill excludes invalidated versions from its comparison with it)."""
         ...
 
     # ---------------------------------------------------------------- derivations

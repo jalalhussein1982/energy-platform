@@ -9,6 +9,7 @@ from typing import Any
 from energy_platform.bronze import (
     Bronze,
     CaptureEntry,
+    Invalidation,
     S3BlobStore,
     S3CaptureLog,
     blob_key,
@@ -266,3 +267,20 @@ def test_entry_create_on_a_gateway_that_ignores_the_header_is_verified_by_read_b
     assert log.put_new(mine) is False
     stored = log.get(mine.capture_id)
     assert stored is not None and stored.payload_sha256 == theirs.payload_sha256
+
+
+def test_invalidations_live_under_their_own_prefix_on_s3() -> None:
+    fake = FakeS3()
+    log = S3CaptureLog(store(fake))
+    decision = Invalidation(
+        target_id="t",
+        capture_id="t:2026-09-17T220000Z:1",
+        reason="wrong day",
+        recorded_by="maintainer",
+        recorded_at=T0,
+    )
+    assert log.put_invalidation(decision) is True
+    assert log.put_invalidation(decision) is False  # 412 from the create-only PUT
+    assert "invalidations/t/2026-09-17T220000Z_1.json" in fake.objects
+    assert log.invalidations("t") == (decision,)
+    assert log.list("t") == ()  # the capture log itself is untouched

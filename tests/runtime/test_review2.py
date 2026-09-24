@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.contracts.manifest import Correction
 from energy_platform.parse import parser_ref
 from energy_platform.runtime import (
@@ -248,3 +249,45 @@ def test_dc05_a_replay_claimed_by_a_dead_worker_is_completed_after_lease_expiry(
     # committed "ok" attempt: same capture, same derivation, nothing new to insert)
     assert outcomes.count("lost_lease") == 1 and outcomes.count("ok") == 3
     assert rt.store.pending_runs(T1.target_id, now=rt.clock()) == ()
+
+
+def test_dc07_an_invalidated_capture_is_not_current_not_replayed_and_not_restored() -> None:
+    """DC-07 (ADR-038): the decision is a Bronze object; reconcile mirrors it; the current
+    view drops the output without deleting rows; a replay refuses it; the Bronze-only rebuild
+    excludes it and the drill passes with nothing 'extra'."""
+    rt = runtime(T1)
+    first = capture(rt, SCHEDULED)
+    process(rt)
+    assert first.entry is not None
+    assert len(rt.store.current_rows("ote.idm_continuous")) == 192
+    decision = Invalidation(
+        target_id=T1.target_id,
+        capture_id=first.entry.capture_id,
+        derivation_id=None,
+        reason="another day's file was stored under this run (docs/07 §4.3)",
+        recorded_by="maintainer",
+        recorded_at=rt.clock(),
+    )
+    assert rt.bronze.log.put_invalidation(decision) is True
+    assert rt.bronze.log.put_invalidation(decision) is False  # immutable: one decision
+
+    reconcile(rt)  # mirrors the decision into the ledger
+    assert rt.store.is_invalidated(first.entry.capture_id, None)
+    assert rt.store.current_rows("ote.idm_continuous") == ()  # hidden, not deleted
+    assert len(rt.store.all_rows("ote.idm_continuous")) == 192
+
+    replay_range(rt, SCHEDULED, SCHEDULED + timedelta(minutes=1))
+    reports = process(rt)
+    assert [(r.attempt_kind, r.outcome) for r in reports] == [("replay", "quarantined")]
+    assert reports[0].error is not None and reports[0].error.startswith("invalidated:")
+    assert [e.kind for e in rt.store.quality_events(T1.target_id, kind="invalidated")] == [
+        "invalidated"
+    ]
+
+    scratch = MemoryStore()
+    report = restore_drill((T1,), scratch=scratch, replica=rt.bronze, live=rt.store, clock=rt.clock)
+    target = report.targets[0]
+    assert report.ok, target.message
+    assert target.extra_versions == 0 and target.missing_versions == 0
+    assert scratch.current_rows("ote.idm_continuous") == ()
+    assert [i.capture_id for i in scratch.invalidations(T1.target_id)] == [first.entry.capture_id]

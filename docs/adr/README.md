@@ -45,3 +45,4 @@ from [`ADR-template.md`](ADR-template.md). Open items `D-1 … D-13` are in `02`
 | [ADR-035](ADR-035-own-cluster-stack.md) | `own-cluster` stack: k3s on plain VMs by cloud-init, four Terraform modules, two roots | file | amendment 1 (2026-09-23): cloud-init first boot only, `make demo-reconfigure`; deploy identity pinned to the workflow; `Role` without `secrets`/`exec` |
 | [ADR-036](ADR-036-object-stores-and-backups-per-profile.md) | Object stores per profile, Bronze replication, Postgres backups without a custom image | file | amendment 1 (2026-09-23): bounded backup footprint, per-cluster archive paths |
 | [ADR-037](ADR-037-freshness-sli.md) | Availability as freshness: the SLI table, the exporter and the alert rules | file | — |
+| [ADR-038](ADR-038-durable-invalidation-decisions.md) | Durable invalidation decisions: a Bronze object per decision, mirrored by reconcile; never current, replayed or restored (review 2 DC-07) | file | — |

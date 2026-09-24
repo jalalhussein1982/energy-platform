@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from datetime import datetime, timedelta
 from typing import Any, cast
 
@@ -20,6 +20,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from energy_platform.contracts.intervals import DeliveryInterval
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.contracts.observation import EnergyObservation
 from energy_platform.contracts.registry import Transport
 from energy_platform.mapping.quality import QualityEvent
@@ -522,6 +523,71 @@ class PostgresStore:
         self._conn.rollback()
         return tuple(self._run(r) for r in rows)
 
+    # ---------------------------------------------------------------- invalidations (ADR-038)
+
+    def add_invalidation(self, inv: Invalidation) -> bool:
+        row = self._one(
+            """
+            INSERT INTO invalidations (target_id, capture_id, derivation_id, reason, recorded_by,
+                                       recorded_at)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (target_id, capture_id, derivation_id) DO NOTHING
+            RETURNING id
+            """,
+            (
+                inv.target_id,
+                inv.capture_id,
+                inv.derivation_id,
+                inv.reason,
+                inv.recorded_by,
+                inv.recorded_at,
+            ),
+        )
+        self._conn.commit()
+        return row is not None
+
+    def invalidations(self, target_id: str) -> tuple[Invalidation, ...]:
+        rows = self._all(
+            "SELECT * FROM invalidations WHERE target_id = %s ORDER BY capture_id, derivation_id",
+            (target_id,),
+        )
+        self._conn.rollback()
+        return tuple(
+            Invalidation(
+                target_id=r["target_id"],
+                capture_id=r["capture_id"],
+                derivation_id=r["derivation_id"],
+                reason=r["reason"],
+                recorded_by=r["recorded_by"],
+                recorded_at=r["recorded_at"],
+            )
+            for r in rows
+        )
+
+    def is_invalidated(self, capture_id: str, derivation_id: str | None) -> bool:
+        row = self._one(
+            """
+            SELECT 1 AS hit FROM invalidations
+            WHERE capture_id = %s AND (derivation_id IS NULL OR derivation_id = %s)
+            LIMIT 1
+            """,
+            (capture_id, derivation_id),
+        )
+        self._conn.rollback()
+        return row is not None
+
+    def attempt_captures(self, target_id: str) -> Mapping[int, str]:
+        rows = self._all(
+            """
+            SELECT a.id, a.capture_id FROM run_attempts a
+            JOIN runs r ON r.id = a.run_id
+            WHERE r.target_id = %s AND a.capture_id IS NOT NULL
+            """,
+            (target_id,),
+        )
+        self._conn.rollback()
+        return {int(r["id"]): str(r["capture_id"]) for r in rows}
+
     # ---------------------------------------------------------------- derivations
 
     def _insert_derivation(self, cur: psycopg.Cursor[Any], d: Derivation, now: datetime) -> None:
@@ -697,7 +763,7 @@ class PostgresStore:
         with self._conn.cursor() as cur:
             cur.execute(
                 "TRUNCATE quality_events, observation_occurrences, observations, run_attempts, "
-                "runs, derivations, target_freshness RESTART IDENTITY CASCADE"
+                "runs, derivations, target_freshness, invalidations RESTART IDENTITY CASCADE"
             )
         self._conn.commit()
 

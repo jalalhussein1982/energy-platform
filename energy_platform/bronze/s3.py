@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 
 from energy_platform.bronze.capture_log import CaptureEntry, entry_key
 from energy_platform.bronze.store import blob_key, sha256_hex
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.fetch.objectstore import ObjectStore
 
 _STAMP = "%Y-%m-%dT%H%M%SZ"
@@ -125,6 +126,17 @@ class S3CaptureLog:
             return None
         key, _ = max(instants, key=lambda item: item[1])
         return self._read(key)
+
+    def put_invalidation(self, inv: Invalidation) -> bool:
+        return self._store.put_new(inv.key, inv.to_json().encode(), content_type=ENTRY_CONTENT_TYPE)
+
+    def invalidations(self, target_id: str) -> tuple[Invalidation, ...]:
+        found: list[Invalidation] = []
+        for info in self._store.list(f"invalidations/{target_id}/"):
+            raw = self._store.get(info.key)
+            if raw is not None:
+                found.append(Invalidation.from_json(raw.decode("utf-8")))
+        return tuple(sorted(found, key=lambda i: i.key))
 
     # ------------------------------------------------------------------ internals
 

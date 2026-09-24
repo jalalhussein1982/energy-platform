@@ -10,6 +10,7 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.mapping.quality import QualityEvent
 from energy_platform.store import Claim, Freshness, Store
 from tests.store.rows import D_A, D_B, FETCH_1, FETCH_2, SHA_1, SHA_2, T0, obs
@@ -706,3 +707,59 @@ def test_review2_dc05_an_abandoned_replay_is_reclaimed_after_its_lease_expires(
     )
     assert not done.lost_lease
     assert store.pending_runs("ote_idm_soap", now=after_expiry + TTL) == ()
+
+
+def _invalidation(capture_id: str, derivation_id: str | None = None) -> Invalidation:
+    return Invalidation(
+        target_id="ote_idm_soap",
+        capture_id=capture_id,
+        derivation_id=derivation_id,
+        reason="wrong file stored under this day (docs/07 §4.3)",
+        recorded_by="maintainer",
+        recorded_at=NOW,
+    )
+
+
+def test_review2_dc07_an_invalidated_capture_leaves_the_current_view_without_deletion(
+    store: Store,
+) -> None:
+    """Review 2 DC-07 (ADR-038): the decision hides every occurrence the capture produced; the
+    version rows stay (evidence), a derivation-scoped decision hides only that derivation."""
+    c1, c2 = "ote_idm_soap:2026-09-17T220000Z:1", "ote_idm_soap:2026-09-17T220000Z:2"
+    r1 = store.ensure_run(
+        "ote_idm_soap", T0, state="captured", origin="scheduled", capture_id=c1, now=NOW
+    ).id
+    store.commit(
+        claim(store, r1),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(value="170.13", sha=SHA_1, fetched_at=FETCH_1)],
+        now=NOW,
+    )
+    store.mark_recaptured(r1, c2, now=NOW)
+    store.commit(
+        claim(store, r1, now=NOW + TTL),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(value="999.00", sha=SHA_2, fetched_at=FETCH_2)],
+        now=NOW + TTL,
+    )
+    assert values(store)[1] == Decimal("999.00")
+
+    assert store.add_invalidation(_invalidation(c2)) is True
+    assert store.add_invalidation(_invalidation(c2)) is False  # idempotent
+    assert store.is_invalidated(c2, D_A.derivation_id) and not store.is_invalidated(c1, None)
+    assert values(store)[1] == Decimal("170.13")  # the earlier capture is current again
+    assert len(store.all_rows("ote.idm_continuous")) == 2  # nothing deleted
+
+    # a derivation-scoped decision on c1 for another derivation changes nothing for D_A
+    assert store.add_invalidation(_invalidation(c1, D_B.derivation_id))
+    assert values(store)[1] == Decimal("170.13")
+    assert store.add_invalidation(_invalidation(c1))
+    assert values(store) == {}  # every occurrence voided: no current row, rows still stored
+    assert len(store.all_rows("ote.idm_continuous")) == 2
+    assert [i.capture_id for i in store.invalidations("ote_idm_soap")] == [c1, c1, c2]
+    captures = store.attempt_captures("ote_idm_soap")
+    assert set(captures.values()) == {c1, c2}

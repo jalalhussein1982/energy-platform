@@ -6,10 +6,11 @@ nothing: the fence is checked first and nothing is mutated when it is stale.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import replace
 from datetime import datetime, timedelta
 
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.contracts.observation import (
     EnergyObservation,
     observation_identity,
@@ -43,8 +44,10 @@ class MemoryStore:
         self._attempts: dict[int, RunAttempt] = {}
         self._derivations: dict[str, Derivation] = {}
         self._rows: dict[int, StoredObservation] = {}
-        self._occurrences: dict[int, dict[datetime, datetime]] = {}
-        """Per version row: ``fetched_at`` → ordering instant of that occurrence (amendment 2)."""
+        self._occurrences: dict[int, dict[datetime, tuple[datetime, int]]] = {}
+        """Per version row: ``fetched_at`` → (ordering instant, attempt id) of that occurrence
+        (ADR-023 amendment 2); the attempt names the capture, which an invalidation may void."""
+        self._invalidations: dict[tuple[str, str, str | None], Invalidation] = {}
         self._events: dict[int, StoredEvent] = {}
         self._freshness: dict[str, Freshness] = {}
         self._seq = {"runs": 0, "attempts": 0, "rows": 0, "events": 0}
@@ -235,7 +238,7 @@ class MemoryStore:
             # exact retry of the same capture adds nothing
             seen = self._occurrences.setdefault(rid, {})
             if o.fetched_at not in seen:
-                seen[o.fetched_at] = ordering_instant(o)
+                seen[o.fetched_at] = (ordering_instant(o), claim.attempt.id)
                 if not new_version:
                     occurrences += 1
         self.add_events(run.target_id, events, run_attempt_id=claim.attempt.id, now=now)
@@ -322,6 +325,38 @@ class MemoryStore:
         run_ids = {self._attempts[a].run_id for a in attempt_ids}
         return tuple(sorted((self._runs[i] for i in run_ids), key=lambda r: r.scheduled_for))
 
+    # ---------------------------------------------------------------- invalidations (ADR-038)
+
+    def add_invalidation(self, inv: Invalidation) -> bool:
+        key = (inv.target_id, inv.capture_id, inv.derivation_id)
+        if key in self._invalidations:
+            return False
+        self._invalidations[key] = inv
+        return True
+
+    def invalidations(self, target_id: str) -> tuple[Invalidation, ...]:
+        return tuple(
+            sorted(
+                (i for i in self._invalidations.values() if i.target_id == target_id),
+                key=lambda i: i.key,
+            )
+        )
+
+    def is_invalidated(self, capture_id: str, derivation_id: str | None) -> bool:
+        target_id = capture_id.split(":", 1)[0]
+        return (target_id, capture_id, None) in self._invalidations or (
+            derivation_id is not None
+            and (target_id, capture_id, derivation_id) in self._invalidations
+        )
+
+    def attempt_captures(self, target_id: str) -> Mapping[int, str]:
+        runs = {r.id for r in self._runs.values() if r.target_id == target_id}
+        return {
+            a.id: a.capture_id
+            for a in self._attempts.values()
+            if a.run_id in runs and a.capture_id is not None
+        }
+
     # ---------------------------------------------------------------- derivations
 
     def register_derivation(self, d: Derivation, *, now: datetime) -> Derivation:
@@ -336,10 +371,23 @@ class MemoryStore:
 
     # ---------------------------------------------------------------- silver
 
-    def _rank(self, row: StoredObservation) -> tuple[int, datetime, tuple[int, ...], datetime, str]:
+    def _valid_occurrences(self, row: StoredObservation) -> list[datetime]:
+        """Ordering instants of the row's occurrences not produced by an invalidated capture
+        (ADR-038): an empty list means the version is not current anywhere."""
+        out: list[datetime] = []
+        for instant, attempt_id in self._occurrences.get(row.id, {}).values():
+            capture_id = self._attempts[attempt_id].capture_id
+            if capture_id is None or not self.is_invalidated(
+                capture_id, row.observation.derivation_id
+            ):
+                out.append(instant)
+        return out
+
+    def _rank(
+        self, row: StoredObservation, valid: list[datetime]
+    ) -> tuple[int, datetime, tuple[int, ...], datetime, str]:
         o = row.observation
-        newest = max(self._occurrences.get(row.id, {}).values(), default=None)
-        return rank(o, self._registered_at(o.derivation_id), newest=newest)
+        return rank(o, self._registered_at(o.derivation_id), newest=max(valid))
 
     def _registered_at(self, derivation_id: str) -> datetime:
         d = self._derivations.get(derivation_id)
@@ -372,8 +420,13 @@ class MemoryStore:
                 if o.source_transport != transport:
                     continue
                 key = (*key, o.source_transport)
+            valid = self._valid_occurrences(row)
+            if not valid:
+                continue  # every occurrence came from an invalidated capture (ADR-038)
             current = best.get(key)
-            if current is None or self._rank(row) > self._rank(current):
+            if current is None or self._rank(row, valid) > self._rank(
+                current, self._valid_occurrences(current)
+            ):
                 best[key] = row
         rows = [
             CurrentRow(r.observation, r.run_attempt_id, ordering_basis(r.observation))

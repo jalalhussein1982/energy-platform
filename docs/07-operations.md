@@ -243,7 +243,14 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
   wrong blobs stay in Bronze and the attempts in the fetch log. After the deletion, **do not `replay`** the 22 September runs of
   `ote_intraday_market_xlsx`: a replay re-processes each run's recorded capture, and those
   captures are the wrong blob (`energy_platform/runtime/replay.py`). Silver loses nothing that
-  Bronze and the fetch log do not keep):
+  Bronze and the fetch log do not keep). **Superseded 2026-09-24 by ADR-038:** deleting Silver is
+  retired as a repair; the decision is recorded as an invalidation that the current view, replay and
+  the restore drill honour. **Author action (Level 3):** record the nine wrong captures of
+  22 September, one `energyctl invalidate -m targets/ote_intraday_market_xlsx/manifest.yaml
+  --capture <id> --reason "23 September's file stored under 22 September (ADR-033 amendment 2)"
+  --by <you>` each (the ids are the nine xlsx attempts of that day fetched 13:37–18:10 UTC on
+  23 September, listed by `energyctl gaps`'s ledger or the SQL below), so the next Bronze-only rebuild
+  no longer reports them as extra:
 
   ```sql
   SELECT id FROM observations

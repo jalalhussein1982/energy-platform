@@ -95,16 +95,39 @@ def _fingerprint(o: Any) -> Fingerprint:
     return hashlib.blake2b(line.encode(), digest_size=16).digest()
 
 
+def _invalidated(store: Store, target_id: str) -> Callable[[int, str], bool]:
+    """``(run_attempt id, derivation id) → produced by an invalidated capture`` (ADR-038): one
+    read of the target's invalidations and attempts, then a local check per row."""
+    decisions = {(i.capture_id, i.derivation_id) for i in store.invalidations(target_id)}
+    if not decisions:
+        return lambda attempt_id, derivation_id: False
+    captures = store.attempt_captures(target_id)
+
+    def check(attempt_id: int, derivation_id: str) -> bool:
+        capture_id = captures.get(attempt_id)
+        return capture_id is not None and (
+            (capture_id, None) in decisions or (capture_id, derivation_id) in decisions
+        )
+
+    return check
+
+
 def silver_fingerprints(store: Store, manifest: Manifest) -> set[Fingerprint]:
-    """Every stored Silver version this target's transport produced, as fingerprints. Versions
-    are a pure function of Bronze + derivation, so a rebuild from the replica must reproduce
-    each of them; the current view is not compared because which transport wins a shared
-    identity may depend on processing order (ADR-023 §3 tie-break), and live may lag the
+    """Every stored Silver version this target's transport produced, as fingerprints, minus
+    those produced by an invalidated capture (ADR-038: not current, not rebuilt, not expected).
+    Versions are a pure function of Bronze + derivation, so a rebuild from the replica must
+    reproduce each of them; the current view is not compared because which transport wins a
+    shared identity may depend on processing order (ADR-023 §3 tie-break), and live may lag the
     rebuild on pending captures. Rows are streamed (``Store.iter_rows``), never materialised."""
     dataset_id = manifest.contract.dataset_id
     transport = manifest.contract.source_transport
+    voided = _invalidated(store, manifest.target_id)
     rows = store.iter_rows(dataset_id, transport=transport)
-    return {_fingerprint(row.observation) for row in rows}
+    return {
+        _fingerprint(row.observation)
+        for row in rows
+        if not voided(row.run_attempt_id, row.observation.derivation_id)
+    }
 
 
 def _digest(fingerprints: set[Fingerprint]) -> SilverDigest:
@@ -140,6 +163,10 @@ def _rebuild(
     for entry in replica.log.list(rt.target_id):
         by_run.setdefault(entry.scheduled_for, []).append(entry)
     for scheduled_for, entries in by_run.items():
+        # ADR-038: an invalidated capture is never replayed
+        entries = [
+            e for e in entries if not scratch.is_invalidated(e.capture_id, derivation.derivation_id)
+        ]
         # every capture whose payload differs from the run's *previous* capture — consecutive,
         # not global: a payload that returns after another (A → B → A, ADR-023 amendment 2) is
         # replayed again so the rebuild records the same occurrences as live
@@ -177,11 +204,14 @@ def _live_side(
     replica_ids = {e.capture_id for e in entries}
     bound = max((e.fetched_at for e in entries), default=None)
     fingerprints: set[Fingerprint] = set()
+    voided = _invalidated(live, target)
     rows = live.iter_rows(
         manifest.contract.dataset_id, transport=manifest.contract.source_transport
     )
     for row in rows:
         o = row.observation
+        if voided(row.run_attempt_id, o.derivation_id):
+            continue  # ADR-038: invalidated output is not expected from the rebuild
         if bound is None or o.fetched_at <= bound:
             fingerprints.add(_fingerprint(o))
     processed = 0

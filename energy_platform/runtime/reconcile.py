@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from energy_platform.bronze import CaptureEntry
+from energy_platform.parse import parser_ref
 from energy_platform.runtime.context import Runtime
-from energy_platform.store import Run
+from energy_platform.store import Run, derivation_for
 
 
 def _attempt_of(capture_id: str) -> int:
@@ -28,10 +29,17 @@ def reconcile(
     if window is not None:
         correction = rt.manifest.cadence.correction
         since = now - window - timedelta(days=correction.days if correction else 0)
+    # ADR-038: invalidation decisions live in Bronze and are mirrored here first, so the
+    # ledger never names an invalidated capture as a run's generation
+    for inv in rt.bronze.log.invalidations(rt.target_id):
+        rt.store.add_invalidation(inv)
+    derivation = derivation_for(rt.manifest, parser_ref(rt.manifest)).derivation_id
     entries = rt.bronze.log.list(rt.target_id, since=since)
     by_id: dict[str, CaptureEntry] = {e.capture_id: e for e in entries}
     latest_by_instant: dict[datetime, CaptureEntry] = {}
     for entry in entries:
+        if rt.store.is_invalidated(entry.capture_id, derivation):
+            continue
         latest_by_instant[entry.scheduled_for] = entry  # ordered by attempt: last wins
     touched: list[Run] = []
     for scheduled_for, entry in latest_by_instant.items():

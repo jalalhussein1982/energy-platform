@@ -11,6 +11,7 @@ pytestmark = pytest.mark.db
 
 TABLES = (
     "derivations",
+    "invalidations",
     "observation_occurrences",
     "observations",
     "quality_events",
@@ -31,7 +32,7 @@ def test_sqlalchemy_url_maps_the_libpq_dsn() -> None:
 def test_upgrade_downgrade_upgrade_round_trip(migrated_dsn: str) -> None:
     store = PostgresStore(migrated_dsn)
     try:
-        assert current_revision(migrated_dsn) == "0005_occurrences"
+        assert current_revision(migrated_dsn) == "0006_invalidations"
         assert all(t in store.table_names() for t in TABLES)
         downgrade(migrated_dsn, "0001_ledger")
         assert current_revision(migrated_dsn) == "0001_ledger"
@@ -40,7 +41,7 @@ def test_upgrade_downgrade_upgrade_round_trip(migrated_dsn: str) -> None:
         assert current_revision(migrated_dsn) is None
         assert not any(t in store.table_names() for t in TABLES)
         upgrade(migrated_dsn)
-        assert current_revision(migrated_dsn) == "0005_occurrences"
+        assert current_revision(migrated_dsn) == "0006_invalidations"
         assert all(t in store.table_names() for t in TABLES)
     finally:
         store.close()

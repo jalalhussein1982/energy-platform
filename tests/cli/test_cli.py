@@ -312,3 +312,62 @@ def test_restore_drill_rebuilds_into_a_scratch_schema_and_matches_live(tmp_path:
         store.truncate_all()
     finally:
         store.close()
+
+
+def test_invalidate_writes_a_bronze_decision_beside_the_capture_log(tmp_path: Path) -> None:
+    """ADR-038: the verb needs no database; it refuses a capture id that is not in the log."""
+    from energy_platform.bronze import FileCaptureLog
+
+    bronze_dir = tmp_path / "bronze"
+    fixture = Path("targets/ote_intraday_market/fixtures/ordinary_day")
+    captured = runner.invoke(
+        app,
+        [
+            "capture",
+            "-m",
+            "targets/ote_intraday_market/manifest.yaml",
+            "--fixture",
+            str(fixture),
+            "--bronze-dir",
+            str(bronze_dir),
+        ],
+    )
+    assert captured.exit_code == 0, captured.output
+    entry = FileCaptureLog(bronze_dir).latest("ote_intraday_market")
+    assert entry is not None
+    result = runner.invoke(
+        app,
+        [
+            "invalidate",
+            "-m",
+            "targets/ote_intraday_market/manifest.yaml",
+            "--capture",
+            entry.capture_id,
+            "--reason",
+            "test decision",
+            "--by",
+            "maintainer",
+            "--bronze-dir",
+            str(bronze_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    decisions = FileCaptureLog(bronze_dir).invalidations("ote_intraday_market")
+    assert [d.capture_id for d in decisions] == [entry.capture_id]
+    unknown = runner.invoke(
+        app,
+        [
+            "invalidate",
+            "-m",
+            "targets/ote_intraday_market/manifest.yaml",
+            "--capture",
+            "ote_intraday_market:2000-01-01T000000Z:9",
+            "--reason",
+            "x",
+            "--by",
+            "y",
+            "--bronze-dir",
+            str(bronze_dir),
+        ],
+    )
+    assert unknown.exit_code == 1 and "not found" in unknown.output
