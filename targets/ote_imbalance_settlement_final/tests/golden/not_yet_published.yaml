@@ -1,0 +1,5 @@
+fixture: not_yet_published
+checked_by: "Claude (contributor session), 2026-09-24: an empty Result, the answer before the month's final settlement is out (byte-identical to OTE's empty answer, no values; docs/06 §9.1 saw it for Version 2 of June-August 2026)"
+expect:
+  row_count: 0
+  quality_events: []

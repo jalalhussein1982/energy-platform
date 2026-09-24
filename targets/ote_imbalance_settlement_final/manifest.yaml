@@ -1,0 +1,59 @@
+# Admission: docs/admissions/ote_imbalance_settlement.md (Route A). Settlement version 2 (final monthly).
+# Only the three admitted metrics; all values retain their published sign and currency.
+schema_version: 1
+target_id: ote_imbalance_settlement_final
+description: OTE imbalance settlement, GetImbalanceSettlementPeriodE, final monthly version 2 of the month four months back (PT15M)
+license: "OTE Terms of Use: no reproduction without written consent (docs/06 §1.4); redistribution unconfirmed; repository fixtures are synthetic"
+terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
+allowed_hosts:
+  - www.ote-cr.cz
+modality: soap-xml
+cadence:
+  cron: "37 7 1 * *"         # One run a month, on the 1st: it asks for the whole month four months back.
+  timezone: Europe/Prague
+  correction:
+    cron: "57 7 * * *"       # Daily re-poll of that run for 31 days: on 2026-09-23 version 2 of May was
+    days: 31                 # out and of June not (docs/06 §9.1), i.e. ~85–115 days after month end; the
+                             # run plus its correction window covers ~92–123 days.
+history:
+  max_age: P1Y               # Version 2 of September 2025 was still served on 2026-09-23 (docs/06 §9.1).
+fetch:
+  soap_xml:
+    url: https://www.ote-cr.cz/pw-data/services/PublicDataService
+    soap_action: http://www.ote-cr.cz/schema/service/public/GetImbalanceSettlementPeriodE
+    soap_version: "1.1"
+    body_template: |
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:pub="http://www.ote-cr.cz/schema/service/public">
+        <soapenv:Body>
+          <pub:GetImbalanceSettlementPeriodE>
+            <pub:Version>2</pub:Version>
+            <pub:StartDate>{start_date}</pub:StartDate>
+            <pub:EndDate>{end_date}</pub:EndDate>
+          </pub:GetImbalanceSettlementPeriodE>
+        </soapenv:Body>
+      </soapenv:Envelope>
+    params:
+      start_date: "{month_start[4]:%Y-%m-%d}"   # the whole month four months back (ADR-033 amendment 1)
+      end_date: "{month_end[4]:%Y-%m-%d}"
+contract:
+  dataset_id: ote.imbalance_settlement
+  source_transport: soap
+  decode: soap
+  metrics: [system_imbalance, imbalance_price, counter_imbalance_price]
+mapping:
+  dimensions:
+    bidding_zone: CZ
+  time:
+    kind: period_index
+    timezone: Europe/Prague
+    date: {source: Date}
+    index: {source: PeriodIndex}
+    resolution: {source: PeriodResolution}
+  source_version: {source: Version}
+  source_published_at: null
+  ignore_fields: [Sum, PositiveImbalance, NegativeImbalance, RoundedImbalance, ReCost, ImbalanceCost, PriceWARE, PriceRE, PriceWAIM, PriceCurve, Emerg]
+  metrics:
+    system_imbalance: {source: SystemImbalance, unit: MWh, sign: as_published, decimal_separator: dot}
+    imbalance_price: {source: SettlImbalancePrice, unit: CZK/MWh, sign: as_published, decimal_separator: dot}
+    counter_imbalance_price: {source: SettlCounterImbalancePrice, unit: CZK/MWh, sign: as_published, decimal_separator: dot}
