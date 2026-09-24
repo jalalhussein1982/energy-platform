@@ -5,8 +5,8 @@ market (SOAP and daily XLSX), OTE day-ahead results and imbalance settlement, Č
 with a **constrained extension path**: a junior engineer or a coding agent adds a new data source
 by declaring it, and cannot change the platform while doing so.
 
-Status: **complete (2026-09-23); gaps closed in Phase 9** ([`docs/plans/phase-9.md`](docs/plans/phase-9.md)). Five targets run as CronJobs from one Helm chart on a live demo
-cluster and on a laptop; the fifth was added by a blind agent run through the contributor path
+Status: **complete (2026-09-23); gaps closed in Phase 9** ([`docs/plans/phase-9.md`](docs/plans/phase-9.md)). Seven targets run as CronJobs from one Helm chart on a live demo
+cluster and on a laptop; the fifth and the seventh were added by blind agent runs through the contributor path
 ([`docs/09-acceptance-report.md`](docs/09-acceptance-report.md)).
 
 ## Reproduce it
@@ -36,6 +36,8 @@ offline path on fixtures), `make rollback-drill`, `make helm-lint terraform-vali
 | `ceps_load` (T3) | ČEPS SOAP `Load` | `ceps.load` | Phase 4 |
 | `ote_dam` (E1) | OTE SOAP `GetDamPricePeriodE` | `ote.dam` | Phase 4, through the MCP server |
 | `ote_imbalance_settlement` | OTE SOAP `GetImbalanceSettlementPeriodE` | `ote.imbalance_settlement` | Phase 7, **by a blind agent**, CLI only |
+| `ote_imbalance_settlement_monthly` | OTE SOAP `GetImbalanceSettlementPeriodE`, version 1 (monthly, previous month) | `ote.imbalance_settlement` | Phase 9, maintainer through the harness, PR #4 |
+| `ote_imbalance_settlement_final` | OTE SOAP `GetImbalanceSettlementPeriodE`, version 2 (final, four months back) | `ote.imbalance_settlement` | Phase 9, **by a strictly blind agent** (empty profile, no connectors), PR #5 |
 
 Each target is a directory under [`targets/`](targets/): a manifest, Bronze fixtures, and golden
 values written by hand. The scope and the contracts are in
