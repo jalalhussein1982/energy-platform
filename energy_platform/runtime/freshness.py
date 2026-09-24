@@ -18,14 +18,23 @@ deployment is a gap-detector matter, not a freshness one.
 incident; a decode failure is (ADR-012). ``last_capture_outcome`` is the newest capture or
 backfill attempt's outcome, whatever ran after it.
 
+ADR-037 amendment 1 (review 2 DC-08): ``observed_periods`` counts the **target's own** current
+rows with every mapped metric non-NULL, so another target's rows of the same dataset and
+transport (daily settlement version 0 beside the monthly version 1) never complete a partition
+and a NULL correction withdraws a period. A target whose request names a month
+(``month_start[k]``) has a **month** partition: the month *k* months before the delivery day's,
+expected from the calendar, expected by the first cadence instant of the current month (the run
+that asks for it) plus the correction window.
+
 Known weakness (ADR-037): a day-ahead source (E1) is expected per the partition's own cadence
 instants, so its lateness is detected up to a day late; a manifest-level override is the fix.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from energy_platform.contracts.intervals import local_day_intervals, parse_duration
@@ -34,6 +43,7 @@ from energy_platform.runtime.context import Runtime, delivery_day_for
 from energy_platform.runtime.cron import cadence_of, cron_instants
 from energy_platform.store import Freshness, FreshnessStatus, RunAttempt
 
+_MONTH_INDEX = re.compile(r"month_start\[(\d{1,2})\]")
 FETCH_FAILURES = frozenset({"source_unavailable"})
 PIPELINE_FAILURES = frozenset({"failed", "quarantined", "lost_lease"})
 _MINUTE = timedelta(minutes=1)
@@ -53,6 +63,29 @@ def _finest_resolution(resolutions: tuple[str, ...]) -> str:
     return min(resolutions, key=parse_duration)
 
 
+def month_offset(rt: Runtime) -> int | None:
+    """``k`` when the request names ``month_start[k]`` (ADR-033 amendment 1), else ``None``."""
+    for _, template, _, _ in rt.manifest.fetch.templates():
+        found = _MONTH_INDEX.search(template)
+        if found:
+            return int(found.group(1))
+    return None
+
+
+def _shift_month(day: date, months_back: int) -> tuple[int, int]:
+    year, month = day.year, day.month - months_back
+    while month < 1:
+        month += 12
+        year -= 1
+    return year, month
+
+
+def _month_days(year: int, month: int) -> list[date]:
+    first = date(year, month, 1)
+    nxt = date(year + (month // 12), month % 12 + 1, 1)
+    return [first + timedelta(days=i) for i in range((nxt - first).days)]
+
+
 def partition_bounds(
     rt: Runtime, now: datetime, *, back: int = 0
 ) -> tuple[datetime, datetime, int]:
@@ -62,6 +95,11 @@ def partition_bounds(
     if contract is None:
         raise ValueError(f"{rt.manifest.contract.dataset_id!r} is not registered")
     resolution = _finest_resolution(contract.resolutions)
+    offset = month_offset(rt)
+    if offset is not None:
+        year, month = _shift_month(delivery_day_for(now, rt.timezone), offset + back)
+        days = [local_day_intervals(d, resolution) for d in _month_days(year, month)]
+        return days[0][0].start, days[-1][-1].end, sum(len(d) for d in days)
     if contract.partition == "hour":
         local = now.astimezone(ZoneInfo(rt.timezone)).replace(minute=0, second=0, microsecond=0)
         start = local.astimezone(UTC) - timedelta(hours=back)
@@ -75,15 +113,37 @@ def partition_bounds(
 def classify_partition(rt: Runtime, now: datetime, *, back: int = 0) -> PartitionStatus:
     cadence = rt.manifest.cadence
     start, end, expected = partition_bounds(rt, now, back=back)
-    instants = list(cron_instants(cadence.cron, cadence.timezone, start - _MINUTE, end - _MINUTE))
-    tolerance = 2 * cadence_of(cadence.cron, cadence.timezone, now)
-    first_instant = instants[0] if instants else start
-    expected_by = (instants[-1] if instants else end) + tolerance
+    if month_offset(rt) is not None:
+        # the run that asks for this month fires in the current month (ADR-033 amendment 1);
+        # its correction re-polls for `days` days: that is the publication window
+        this_month = now.astimezone(ZoneInfo(cadence.timezone)).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        month_instants = list(
+            cron_instants(
+                cadence.cron,
+                cadence.timezone,
+                this_month - _MINUTE,
+                this_month + timedelta(days=62),
+            )
+        )
+        first_instant = month_instants[0] if month_instants else this_month.astimezone(UTC)
+        window = cadence.correction.days if cadence.correction else 0
+        expected_by = first_instant + timedelta(days=window)
+    else:
+        instants = list(
+            cron_instants(cadence.cron, cadence.timezone, start - _MINUTE, end - _MINUTE)
+        )
+        tolerance = 2 * cadence_of(cadence.cron, cadence.timezone, now)
+        first_instant = instants[0] if instants else start
+        expected_by = (instants[-1] if instants else end) + tolerance
     observed = rt.store.count_periods(
         rt.manifest.contract.dataset_id,
         start,
         end,
+        target_id=rt.target_id,
         transport=rt.manifest.contract.source_transport,
+        metrics=tuple(rt.manifest.mapping.metrics),
     )
     status: FreshnessStatus
     if observed >= expected:
@@ -145,7 +205,7 @@ def compute_freshness(rt: Runtime, *, now: datetime | None = None) -> Freshness:
         observed_periods=chosen.observed_periods,
         expected_periods=chosen.expected_periods,
         newest_delivery_start=rt.store.newest_delivery_start(
-            rt.manifest.contract.dataset_id, transport=transport
+            rt.manifest.contract.dataset_id, target_id=rt.target_id, transport=transport
         ),
         last_capture_at=last_capture.fetched_at if last_capture is not None else None,
         last_capture_outcome=newest_capture.outcome if newest_capture is not None else None,

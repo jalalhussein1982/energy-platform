@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from energy_platform.contracts.invalidation import Invalidation
+from energy_platform.contracts.registry import Transport
 from energy_platform.mapping.quality import QualityEvent
 from energy_platform.store import Claim, Freshness, Store
 from tests.store.rows import D_A, D_B, FETCH_1, FETCH_2, SHA_1, SHA_2, T0, obs
@@ -506,6 +507,20 @@ def test_mark_recaptured_lowers_a_processed_run_to_captured(store: Store) -> Non
     assert c.attempt.capture_id == "c2"  # the new attempt is what gets processed
 
 
+def _periods(
+    store: Store,
+    start: datetime,
+    end: datetime,
+    *,
+    target_id: str = "ote_idm_soap",
+    transport: Transport = "soap",
+    metrics: tuple[str, ...] = ("price_vwap",),
+) -> int:
+    return store.count_periods(
+        "ote.idm_continuous", start, end, target_id=target_id, transport=transport, metrics=metrics
+    )
+
+
 def test_freshness_row_is_upserted_and_period_helpers_agree(store: Store) -> None:
     """ADR-037: one row per target; count_periods / newest_delivery_start over the current view."""
     run_id = captured_run(store)
@@ -529,11 +544,14 @@ def test_freshness_row_is_upserted_and_period_helpers_agree(store: Store) -> Non
         observations=[obs(period=3, value=None)],
         now=NOW + TTL,
     )
-    assert store.count_periods(dataset_id, day, T0) == 2
-    assert store.count_periods(dataset_id, day, day + timedelta(minutes=15)) == 1
-    assert store.count_periods(dataset_id, day, T0, transport="xlsx") == 0
-    assert store.newest_delivery_start(dataset_id) == day + timedelta(minutes=15)
-    assert store.newest_delivery_start("nope") is None
+    assert _periods(store, day, T0) == 2
+    assert _periods(store, day, day + timedelta(minutes=15)) == 1
+    assert _periods(store, day, T0, transport="xlsx") == 0
+    assert _periods(store, day, T0, target_id="other") == 0
+    assert store.newest_delivery_start(
+        dataset_id, target_id="ote_idm_soap", transport="soap"
+    ) == day + timedelta(minutes=15)
+    assert store.newest_delivery_start("nope", target_id="ote_idm_soap", transport="soap") is None
     row = Freshness(
         target_id="ote_idm_soap",
         computed_at=NOW,
@@ -763,3 +781,53 @@ def test_review2_dc07_an_invalidated_capture_leaves_the_current_view_without_del
     assert [i.capture_id for i in store.invalidations("ote_idm_soap")] == [c1, c1, c2]
     captures = store.attempt_captures("ote_idm_soap")
     assert set(captures.values()) == {c1, c2}
+
+
+def test_review2_dc08_freshness_counts_the_targets_own_current_rows_only(store: Store) -> None:
+    """Review 2 DC-08 (ADR-037 amendment 1): another target's rows of the same dataset and
+    transport never count; a NULL correction withdraws the period; a period counts only when
+    every asked metric is present."""
+    dataset_id = obs().dataset_id
+    day = T0 - timedelta(days=1)
+    mine = captured_run(store, "ote_idm_soap")
+    theirs = store.ensure_run(
+        "ote_other_soap",
+        T0 + timedelta(hours=2),
+        state="captured",
+        origin="scheduled",
+        capture_id="ote_other_soap:2026-09-18T000000Z:1",
+        now=NOW,
+    ).id
+    store.commit(
+        claim(store, theirs),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(period=5, source_version="0"), obs(period=6, source_version="0")],
+        now=NOW,
+    )
+    assert _periods(store, day, T0) == 0  # not mine
+    store.commit(
+        claim(store, mine),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(period=1), obs(period=2), obs("volume_total", "1.5", period=1)],
+        now=NOW,
+    )
+    assert _periods(store, day, T0) == 2
+    assert _periods(store, day, T0, metrics=("price_vwap", "volume_total")) == 1  # 2 lacks volume
+    # a newer NULL for period 1 is current (ADR-023) and withdraws it (01 §5)
+    later = captured_run(store, "ote_idm_soap", T0 + timedelta(minutes=15))
+    store.commit(
+        claim(store, later, now=NOW + TTL),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(period=1, value=None, sha=SHA_2, fetched_at=FETCH_2)],
+        now=NOW + TTL,
+    )
+    assert _periods(store, day, T0) == 1
+    assert store.newest_delivery_start(dataset_id, target_id="ote_idm_soap", transport="soap") == (
+        day + timedelta(minutes=15)
+    )

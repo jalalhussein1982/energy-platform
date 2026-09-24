@@ -495,33 +495,46 @@ class MemoryStore:
 
     # ---------------------------------------------------------------- freshness (ADR-037)
 
-    def _delivered(
-        self, dataset_id: str, transport: Transport | None
-    ) -> Iterable[EnergyObservation]:
-        for row in self._rows.values():
-            o = row.observation
-            if o.dataset_id != dataset_id or o.value is None:
-                continue
-            if transport is not None and o.source_transport != transport:
-                continue
-            yield o
+    def _target_current(
+        self,
+        dataset_id: str,
+        target_id: str,
+        transport: Transport,
+        start: datetime | None = None,
+        end: datetime | None = None,
+    ) -> Iterable[CurrentRow]:
+        """The target's own rows among the transport's current rows, non-NULL (ADR-037 am. 1)."""
+        runs = {r.id for r in self._runs.values() if r.target_id == target_id}
+        for row in self.current_rows(dataset_id, start=start, end=end, transport=transport):
+            attempt = self._attempts.get(row.run_attempt_id)
+            if attempt is not None and attempt.run_id in runs and row.value is not None:
+                yield row
 
     def count_periods(
-        self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
+        self,
+        dataset_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        target_id: str,
+        transport: Transport,
+        metrics: tuple[str, ...],
     ) -> int:
-        return len(
-            {
-                o.delivery_start_utc
-                for o in self._delivered(dataset_id, transport)
-                if start <= o.delivery_start_utc < end
-            }
-        )
+        seen: dict[datetime, set[str]] = {}
+        for row in self._target_current(dataset_id, target_id, transport, start, end):
+            seen.setdefault(row.observation.delivery_start_utc, set()).add(row.observation.metric)
+        wanted = set(metrics)
+        return sum(1 for present in seen.values() if wanted <= present)
 
     def newest_delivery_start(
-        self, dataset_id: str, *, transport: Transport | None = None
+        self, dataset_id: str, *, target_id: str, transport: Transport
     ) -> datetime | None:
         return max(
-            (o.delivery_start_utc for o in self._delivered(dataset_id, transport)), default=None
+            (
+                row.observation.delivery_start_utc
+                for row in self._target_current(dataset_id, target_id, transport)
+            ),
+            default=None,
         )
 
     def upsert_freshness(self, row: Freshness) -> None:

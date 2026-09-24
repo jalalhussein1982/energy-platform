@@ -779,31 +779,47 @@ class PostgresStore:
     # ---------------------------------------------------------------- freshness (ADR-037)
 
     def count_periods(
-        self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
+        self,
+        dataset_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        target_id: str,
+        transport: Transport,
+        metrics: tuple[str, ...],
     ) -> int:
+        # ADR-037 amendment 1: the target's own current rows (per transport), every metric
         row = self._one(
             """
-            SELECT count(DISTINCT lower(delivery_interval)) AS n FROM observations
-            WHERE dataset_id = %s AND value IS NOT NULL
-              AND lower(delivery_interval) >= %s
-              AND lower(delivery_interval) < %s
-              AND (%s::text IS NULL OR source_transport = %s)
+            SELECT count(*) AS n FROM (
+                SELECT lower(c.delivery_interval) AS s
+                FROM observations_current_by_transport c
+                JOIN run_attempts a ON a.id = c.run_attempt_id
+                JOIN runs r ON r.id = a.run_id
+                WHERE c.dataset_id = %s AND c.source_transport = %s AND r.target_id = %s
+                  AND c.value IS NOT NULL
+                  AND lower(c.delivery_interval) >= %s AND lower(c.delivery_interval) < %s
+                  AND c.metric = ANY(%s)
+                GROUP BY 1 HAVING count(DISTINCT c.metric) = %s) periods
             """,
-            (dataset_id, start, end, transport, transport),
+            (dataset_id, transport, target_id, start, end, list(metrics), len(set(metrics))),
         )
         self._conn.rollback()
         return int(row["n"]) if row else 0
 
     def newest_delivery_start(
-        self, dataset_id: str, *, transport: Transport | None = None
+        self, dataset_id: str, *, target_id: str, transport: Transport
     ) -> datetime | None:
         row = self._one(
             """
-            SELECT max(lower(delivery_interval)) AS t FROM observations
-            WHERE dataset_id = %s AND value IS NOT NULL
-              AND (%s::text IS NULL OR source_transport = %s)
+            SELECT max(lower(c.delivery_interval)) AS t
+            FROM observations_current_by_transport c
+            JOIN run_attempts a ON a.id = c.run_attempt_id
+            JOIN runs r ON r.id = a.run_id
+            WHERE c.dataset_id = %s AND c.source_transport = %s AND r.target_id = %s
+              AND c.value IS NOT NULL
             """,
-            (dataset_id, transport, transport),
+            (dataset_id, transport, target_id),
         )
         self._conn.rollback()
         value = row["t"] if row else None

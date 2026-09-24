@@ -348,18 +348,27 @@ class Store(Protocol):
 
     # ---------------------------------------------------------------- freshness (ADR-037)
     def count_periods(
-        self, dataset_id: str, start: datetime, end: datetime, *, transport: Transport | None = None
+        self,
+        dataset_id: str,
+        start: datetime,
+        end: datetime,
+        *,
+        target_id: str,
+        transport: Transport,
+        metrics: tuple[str, ...],
     ) -> int:
-        """Distinct delivery starts within ``[start, end)`` for which *this transport* delivered a
-        non-NULL value — over every stored version, not the current view: a target's freshness
-        is what the target itself delivered, even where another transport's row wins the current
-        view (ADR-023 §3), and a NULL is "not yet published" (01 §5), never an observation."""
+        """Distinct delivery starts within ``[start, end)`` for which **this target's own rows**
+        (through ``run_attempts`` → ``runs.target_id``) are current for their transport
+        (ADR-023 amendment 1) with a non-NULL value for **every** metric in ``metrics``
+        (ADR-037 amendment 1; review 2 DC-08): another target's rows of the same dataset and
+        transport never count, a NULL correction withdraws the period (01 §5), and a period with
+        one of two owning metrics missing is not observed (01 §3 rule 4)."""
         ...
 
     def newest_delivery_start(
-        self, dataset_id: str, *, transport: Transport | None = None
+        self, dataset_id: str, *, target_id: str, transport: Transport
     ) -> datetime | None:
-        """Newest delivery start with a non-NULL value from this transport (same rule as above)."""
+        """Newest delivery start among this target's current non-NULL rows (same scope)."""
         ...
 
     def upsert_freshness(self, row: Freshness) -> None: ...

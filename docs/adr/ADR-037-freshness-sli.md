@@ -108,6 +108,35 @@ fails, the table is still queryable by SQL and `energyctl freshness` prints the 
 - Devil's advocate: `postgres_exporter` is one more third-party image (pinned by digest, no
   cluster rights, read-only DSN role). Accepted over writing a server.
 
+## Amendment 1 (2026-09-24) — a target's freshness is its own current rows; month partitions
+
+**Context.** Review 2 (DC-08) reproduced on PostgreSQL two ways the SLI lied: `count_periods`
+grouped the whole `observations` table by dataset, transport and delivery start, so (a) a period
+whose newest version is NULL still counted from its older non-NULL version, and (b) the monthly
+settlement target, with no run and no version-1 row, reported `complete` 96/96 from the daily
+target's version-0 rows of the same dataset and transport. The live demo showed both monthly
+targets carrying the daily target's newest-delivery timestamp.
+
+**Decision.**
+
+1. `observed_periods` counts delivery starts for which the **target's own rows** (through
+   `run_attempts` → `runs.target_id`) are current for their transport (ADR-023 amendment 1) with
+   a non-NULL value for **every** metric the manifest maps (`01` §3 rule 4). Another target's rows
+   never count; a NULL correction withdraws a period (`01` §5). `newest_delivery_start` has the
+   same scope. Decision 2's "current view" wording is thereby made precise.
+2. A target whose request names `month_start[k]` (ADR-033 amendment 1) has a **month
+   partition**: the calendar month *k* months before the delivery day's month, `expected_periods`
+   from the DST-aware calendar of its days, `expected_by` = the first cadence instant of the
+   current month (the run that asks for that month) + `cadence.correction.days` (the publication
+   window the manifest already declares). `pending` before that instant, `late` after
+   `expected_by`, `partial` in between, `complete` when every period is observed.
+3. Seven configured targets are not seven proven streams: a target with no run reports nothing
+   observed, whatever its siblings hold.
+
+**Proof (both stores):** `tests/store/test_store.py::test_review2_dc08_…`;
+`tests/runtime/test_review2.py::test_dc08_…` (NULL withdrawal; the monthly target beside daily
+version-0 rows: August 2026, 2 976 expected, 0 observed, expected by 2 October).
+
 ## Verification refs
 
 none — design decision; it builds on 2026-09-19 · V-4 · CONFIRMED (prometheus-operator

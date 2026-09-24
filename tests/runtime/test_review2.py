@@ -8,10 +8,11 @@ fix. The store-level halves live in ``tests/store/test_store.py`` and run on Pos
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from energy_platform.contracts.invalidation import Invalidation
-from energy_platform.contracts.manifest import Correction
+from energy_platform.contracts.manifest import Correction, load_manifest
 from energy_platform.parse import parser_ref
 from energy_platform.runtime import (
     capture,
@@ -21,6 +22,7 @@ from energy_platform.runtime import (
     replay_range,
     restore_drill,
 )
+from energy_platform.runtime.freshness import compute_freshness, partition_bounds
 from energy_platform.store import (
     MemoryStore,
     Run,
@@ -31,6 +33,7 @@ from energy_platform.store import (
     derivation_for,
 )
 from tests.runtime.harness import DAY, SCHEDULED, T1, T2, Clock, runtime
+from tests.store.rows import D_A, FETCH_1, FETCH_2, SHA_1, SHA_2, obs
 from tests.synthetic import ote_im_price_period_response
 
 
@@ -291,3 +294,80 @@ def test_dc07_an_invalidated_capture_is_not_current_not_replayed_and_not_restore
     assert target.extra_versions == 0 and target.missing_versions == 0
     assert scratch.current_rows("ote.idm_continuous") == ()
     assert [i.capture_id for i in scratch.invalidations(T1.target_id)] == [first.entry.capture_id]
+
+
+def _write_rows(store: MemoryStore, target: str, when: datetime, observations: list) -> None:  # type: ignore[type-arg]
+    run = store.ensure_run(
+        target,
+        when,
+        state="captured",
+        origin="scheduled",
+        capture_id=f"{target}:{when:%Y-%m-%dT%H%M%SZ}:1",
+        now=when,
+    )
+    claim = store.claim(run.id, "probe", timedelta(minutes=5), now=when)
+    assert claim is not None
+    store.commit(
+        claim, state="processed", outcome="ok", derivation=D_A, observations=observations, now=when
+    )
+
+
+def test_dc08_a_null_correction_withdraws_the_period_from_freshness() -> None:
+    """DC-08 (ADR-037 amendment 1): freshness reads the target's current rows, so a newer NULL
+    version of a period is 'not yet published' again (01 §5), not a historical observation."""
+    store = MemoryStore()
+    first = obs(value="1", sha=SHA_1, fetched_at=FETCH_1)
+    second = obs(value=None, sha=SHA_2, fetched_at=FETCH_2)
+    _write_rows(store, T1.target_id, FETCH_1, [first])
+    _write_rows(store, T1.target_id, FETCH_2, [second])
+    start = first.delivery_start_utc
+    counted = store.count_periods(
+        first.dataset_id,
+        start,
+        start + timedelta(minutes=15),
+        target_id=T1.target_id,
+        transport="soap",
+        metrics=("price_vwap",),
+    )
+    assert counted == 0
+    assert (
+        store.newest_delivery_start(first.dataset_id, target_id=T1.target_id, transport="soap")
+        is None
+    )
+
+
+def test_dc08_daily_settlement_rows_never_complete_the_monthly_target() -> None:
+    """DC-08 (ADR-037 amendment 1): the monthly target has a month partition of its own rows;
+    96 daily version-0 periods from another target leave it with nothing observed."""
+    store = MemoryStore()
+    now = datetime(2026, 9, 17, 12, tzinfo=UTC)
+    _write_rows(
+        store,
+        "ote_imbalance_settlement",
+        now,
+        [
+            obs(
+                "system_imbalance",
+                "1",
+                dataset_id="ote.imbalance_settlement",
+                source_version="0",
+                period=p,
+            )
+            for p in range(1, 97)
+        ],
+    )
+    monthly = load_manifest(Path("targets/ote_imbalance_settlement_monthly/manifest.yaml"))
+    rt = runtime(monthly, store=store, clock=Clock(now))
+    start, end, expected = partition_bounds(rt, now)
+    assert (start.astimezone(UTC).date(), end.astimezone(UTC).date()) == (
+        datetime(2026, 7, 31, tzinfo=UTC).date(),  # August 2026 in Prague starts 31 July 22:00Z
+        datetime(2026, 8, 31, tzinfo=UTC).date(),
+    )
+    assert expected == 31 * 96
+    fresh = compute_freshness(rt)
+    assert fresh.status != "complete" and fresh.observed_periods == 0
+    assert fresh.expected_periods == 31 * 96 and fresh.newest_delivery_start is None
+    assert (
+        fresh.expected_by.date() == datetime(2026, 10, 2, tzinfo=UTC).date()
+    )  # 1 Sep run + 31 days
+    assert not store.runs(monthly.target_id)
