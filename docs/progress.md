@@ -39,7 +39,12 @@ and does not touch the capture/process path.
   `local-secrets` and `DEMO_SECRET_KEYS` with the two new keys; dashboards `prices.json` and
   `freshness-sql.json` over the current views; on in `local` and all-flags; chart test.
 - **11.3** ADR-039, `07` §7.1, README, `05` C-70, roadmap, this entry.
-- **11.4** demo: see the closing note below.
+- **11.4** demo: the two keys added to the namespace Secret (patch, approved), `grafana.enabled` in
+  `values-demo.yaml`, deploy run green → Helm **revision 23** (17:49 UTC). Verified read-only:
+  `alembic_version` 0007, role `grafana` can log in, `has_table_privilege` SELECT true / INSERT false;
+  through a port-forward Grafana 12.2.0 reports healthy, lists both dashboards, and a datasource query
+  over `observations_current` returns 384 current `price_vwap` rows (newest 2026-09-24 23:45 Prague);
+  anonymous access answers 401; no LoadBalancer, NodePort or Ingress exists anywhere on the cluster.
 
 **Learned.** A `checksum/` annotation must hash the template's *inputs*, not the template that
 carries it (an `include` of itself recurses). A Helm action block that ends in `-}}` before a
