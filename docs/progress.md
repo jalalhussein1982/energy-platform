@@ -16,6 +16,71 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the strictly blind re-run (G10) run by the author and evaluated: PR #5 passes, F-3 closed; #5 merged, demo at revision 9, F-4 closed in full; the two repairs and the two letters prepared for the author |
 | 2026-09-24 | Source replies | OTE answered the reuse letter: internal use only, no redistribution, cadence expectations named; filed in `01` §10, `06` §1.4, the six OTE manifests and READMEs; ČEPS pending |
 | 2026-09-24 | Review 2 | Codex final review (17 findings, 8 P1) committed verbatim, every finding answered; two fail-open/false-green fixes and two editorial errors closed; README completion claim bounded; Phase 10 planned |
+| 2026-09-24 | Phase 10 | every review-2 finding closed: OTE cadence decided (ADR-033 am. 3); ownership, occurrences, generations, replay reclaim, create-only entries, invalidations (ADR-038), target-scoped freshness, RPO per domain, mode/FQDN/gate fixes, contributor path; three migrations with downgrades; 923 tests, 32 on PostgreSQL |
+
+---
+
+## 2026-09-24 — Phase 10: correctness and recovery (review 2) — every finding closed
+
+**Done** (`docs/plans/phase-10.md`, 11 commits fdc53ad … b8749d9 on `main`, `make check` green at
+each — 923 tests, `make db-test` 32 including the migration round trip 0001 → 0006 → base → 0006,
+`make helm-lint` green). The author asked for Phase 10 and the OTE cadence decision in one go.
+
+- **10.0 OTE cadence** (ADR-033 amendment 3): T1/T2 keep `*/15`; their D-1…D-3 corrections run
+  once a day (`7 3`, `9 3`); E1 reads four times after 13:05 (`15 13-16`) with a daily correction —
+  OTE's stated expectation (`06` §1.4). 5 day-ahead requests a day instead of 36.
+- **10.1 ownership** (ADR-023 am. 1, migration `0004_ownership`): `observations.owner_transport`
+  from the registry at commit, backfilled; the canonical view ranks the owner first; a per-transport
+  current view (`observations_current_by_transport`) keeps the copy selectable; `process` compares
+  with each other transport's own current rows. DC-03.
+- **10.2 occurrences** (ADR-023 am. 2, `0005_occurrences`): a version row once, an occurrence per
+  capture that reproduces it; the view orders by the newest occurrence; `CommitResult.occurrences`;
+  the drill replays consecutive payload changes. A → B → A ends at A. DC-04.
+- **10.3 generations** (ADR-024 am. 1): `mark_recaptured` bumps the fence and clears the lease;
+  `reconcile` advances a run to a later attempt with another payload, window + correction days; the
+  drill claims a chosen capture directly. DC-01, DC-02.
+- **10.4 replay reclaim** (ADR-024 am. 2): expired replay leases are pending again; the dead attempt
+  is `lost_lease`, a fresh one opened. DC-05.
+- **10.5 create-only entries** (ADR-024 am. 3): `CaptureLog.put_new` (lock / `O_EXCL` /
+  `If-None-Match: *` + read-back); `Bronze.capture` retries on the next attempt number; a colliding
+  fetch keeps its own entry. DC-06.
+- **10.6 invalidations** (ADR-038, `0006_invalidations`): a Bronze object per decision, mirrored by
+  `reconcile`; the views drop voided occurrences without deleting rows; `process`/replay refuse the
+  capture (`quarantined`, an `invalidated` event); the drill neither replays nor expects it;
+  `energyctl invalidate`. C-69. DC-07. Silver deletion retired as a repair (`07` §4.3).
+- **10.7 freshness** (ADR-037 am. 1): a target's own current rows with every mapped metric; a NULL
+  correction withdraws a period; month partitions for `month_start[k]` targets (August 2026 = 2 976
+  periods, expected by 2 October for the monthly target). DC-08.
+- **10.8 RPO per domain** (ADR-036 am. 2): the table in the ADR; demo replication `7,22,37,52`;
+  `EnergyPlatformReplicationStale` / `WalShipmentStale` / `BaseBackupStale` over
+  kube-state-metrics' last-success time; `02` pointer. DEP-01.
+- **10.9 modes, FQDN, gate** (ADR-036 am. 3, ADR-026 am. 3): cnpg/external refuse the drill at
+  render; the public-443 rule renders only without the FQDN layer, Cilium mode carries DNS; the gate
+  probes a host canary (node IP, port 9: refused = no policy, dropped = in force). DEP-02/03/05.
+- **10.10 contributor path**: the triage inventory is mapping-independent (largest sibling group /
+  object list) and admits `@attr`; `no_records` is drift; production `unknown_field` events count;
+  `docs/08` §9 primary route is plain Git, the bundle applies into a clean checkout; MCP
+  `admission_request` (nine tools, `02` pointer at ADR-007); `validate`, the MCP and the PR gate
+  refuse a `parser.py` until a loader exists. AE-01/02/04, scope limit 1.
+
+**Probes rerun** (`codex-review/2026-09-24/evidence/*.py.txt`): DC-01…DC-04 assert and fail (defects
+gone); DC-05/06/08 no longer run against the changed signatures and are covered by the new tests;
+DC-07 still asserts because it models the retired repair (a bare deletion) — the closure table in
+`docs/reviews/2026-09-24-codex-review-response.md` says so; AE-01 and AE-04 `reproduced: false`;
+AE-03 `true` by design (disclosure, not pytest in the sandbox).
+
+**Learned.** Three of the eight P1s were consequences of accepted decisions (ADR-023's retry rule,
+the drill's `live ⊆ rebuild`, ADR-037's dataset-wide count), which is why each fix is an amendment
+with the reviewer's script as its proof rather than a patch. `process()` reconciling before it
+claims meant the drill's "replay this older capture" was undone by the same call — the drill now
+claims directly. A Kubernetes `fieldRef` is not a credential; the gate test said "no valueFrom" and
+meant "no secret". `ON CONFLICT … DO UPDATE SET id = id` cannot touch a GENERATED ALWAYS column;
+`run_attempt_id = run_attempt_id` is the harmless no-op that yields `RETURNING id, xmax = 0`.
+
+**Open / carried.** Author: `energyctl invalidate` for the nine 22 September captures; the
+first-packet egress Jobs with the node block on; `TF_VAR_admin_cidr` at the next plan; the console
+check; teardown. ČEPS `value1` = `value2` (terms decided). CNPG/external backup chains when a
+cluster with the operator exists. The demo stays single-server by ADR-028.
 
 ---
 

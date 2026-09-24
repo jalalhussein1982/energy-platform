@@ -40,7 +40,7 @@ A contributor session — adding a target or requesting an admission — follows
 | 7 | Blind acceptance tests | 6 | 1 | agent PR + junior dry-run pass without core changes — **done 2026-09-23** (3/3 pass, `docs/09-acceptance-report.md`) |
 | 8 | Submission packaging | — | 1 | README reproducible by a stranger — **done 2026-09-23** (clean clone on a fresh VM: exit 0 in 199 s) |
 | 9 | Gap closure | — | 1 | every gap closed or listed in the README with a reason; final clean clone — **done 2026-09-23**; the strictly blind re-run (G10) run and passed 2026-09-24 (`docs/09` run 4) |
-| 10 | Correctness and recovery (review 2) | — | 3–4 | the eight P1 counterexamples of `codex-review/2026-09-24/` pass as negative tests on PostgreSQL; RPO stated per failure domain — **not started**; plan in `docs/plans/review-2.md` |
+| 10 | Correctness and recovery (review 2) | — | 3–4 | the eight P1 counterexamples of `codex-review/2026-09-24/` pass as negative tests on PostgreSQL; RPO stated per failure domain — **done 2026-09-24** (`docs/plans/phase-10.md`; 11 commits, 923 tests, 32 on PostgreSQL) |
 
 ---
 
@@ -242,17 +242,17 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 
 ---
 
-## Phase 10 — Correctness and recovery (review 2; after delivery)
+## Phase 10 — Correctness and recovery (review 2) — done 2026-09-24
 
 **Goal.** Make the platform's output correct through every correction, overlap and recovery it promises: the eight P1 and nine P2 findings of the final external review (`codex-review/2026-09-24/`, response in `docs/reviews/2026-09-24-codex-review-response.md`). Tasks 10.1–10.10, their ADR amendments and acceptance tests are in `docs/plans/review-2.md`. Done 2026-09-24 ahead of it: the review committed and answered, DEP-04 (fail-open external Postgres rule), AE-03 (bundle names what it did not run), the two editorial errors, the README completion statement bounded.
 
-- [ ] 10.1–10.2 owner-aware current view and occurrence lineage (ADR-023 amendment; DC-03, DC-04)
-- [ ] 10.3–10.5 capture generations, replay reclaim, collision-safe capture log (ADR-024 amendment; DC-01, DC-02, DC-05, DC-06)
-- [ ] 10.6 durable invalidation decisions applied by replay, restore and the drill (ADR-038; DC-07); the 22 September row recorded by the author
-- [ ] 10.7 target-scoped freshness (ADR-037 amendment; DC-08)
-- [ ] 10.8 RPO per failure domain, replication interval or amended bound, replica-age alert (ADR-036 amendment; DEP-01)
-- [ ] 10.9 deployment modes refuse what they do not implement; Cilium FQDN rule; policy-gate readiness (DEP-02, DEP-03, DEP-05)
-- [ ] 10.10 contributor path: triage inventory, plain-Git primary route, MCP admission request, custom parser refused until loadable (AE-01, AE-02, AE-04)
+- [x] 10.1–10.2 owner-aware current view and occurrence lineage (ADR-023 amendment; DC-03, DC-04)
+- [x] 10.3–10.5 capture generations, replay reclaim, collision-safe capture log (ADR-024 amendment; DC-01, DC-02, DC-05, DC-06)
+- [x] 10.6 durable invalidation decisions applied by replay, restore and the drill (ADR-038; DC-07); the 22 September row recorded by the author
+- [x] 10.7 target-scoped freshness (ADR-037 amendment; DC-08)
+- [x] 10.8 RPO per failure domain, replication interval or amended bound, replica-age alert (ADR-036 amendment; DEP-01)
+- [x] 10.9 deployment modes refuse what they do not implement; Cilium FQDN rule; policy-gate readiness (DEP-02, DEP-03, DEP-05)
+- [x] 10.10 contributor path: triage inventory, plain-Git primary route, MCP admission request, custom parser refused until loadable (AE-01, AE-02, AE-04)
 
 ---
 

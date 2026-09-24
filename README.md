@@ -11,14 +11,17 @@ cluster and on a laptop; five have produced data, the two monthly settlement tar
 seventh were added by blind agent runs through the contributor path ([`docs/09-acceptance-report.md`](docs/09-acceptance-report.md)).
 An external review on 2026-09-24 ([`codex-review/2026-09-24/`](codex-review/2026-09-24/README.md), answered in
 [`docs/reviews/2026-09-24-codex-review-response.md`](docs/reviews/2026-09-24-codex-review-response.md)) found **eight P1
-defects**, all reproduced and accepted: the current view can prefer the XLSX copy over the SOAP source of record, a correction
-captured during a database outage or overlapping an in-flight worker can be skipped, a provider's return to an earlier payload
-is not selected, two overlapping capture writers can share a log entry, a Bronze-only rebuild reinstates deliberately deleted
-rows, and hourly replication to the second provider does not meet the design's 15-minute cross-provider RPO. The demo runs one
-k3s server with one PostgreSQL on it, an accepted cost choice (ADR-028), so control-plane and database failover are **not**
-demonstrated. These are planned as Phase 10 ([`docs/plans/review-2.md`](docs/plans/review-2.md)); until then the system is
-an honest ingestion platform with a proven contributor path, not one whose output is guaranteed correct through every
-correction and recovery.
+defects**, all reproduced and accepted, and **all fixed the same day in Phase 10** ([`docs/plans/phase-10.md`](docs/plans/phase-10.md)),
+each with the reviewer's counterexample as a negative test on PostgreSQL: the canonical view now honours metric
+ownership (ADR-023 amendment 1), a returning payload is current again (amendment 2), a correction survives a ledger
+outage and an in-flight worker (ADR-024 amendment 1), an abandoned replay is reclaimed (amendment 2), capture-log
+entries are created and never overwritten (amendment 3), a known-wrong capture is recorded as a durable invalidation
+that no rebuild restores (ADR-038), freshness is a target's own rows (ADR-037 amendment 1), and the RPO is stated per
+failure domain with the demo replicating every 15 minutes (ADR-036 amendment 2). What the review counted against the
+brief and is **not** changed: the demo runs one k3s server with one PostgreSQL on it, an accepted cost choice (ADR-028),
+so control-plane and database failover are not demonstrated; the CNPG and external database modes refuse the restore
+drill until their backup chains exist. Left to the author: recording the nine wrong 22 September captures as
+invalidations and rerunning the first-packet egress test with the node block on ([`docs/07-operations.md`](docs/07-operations.md) §2.1, §4.3).
 
 ## Reproduce it
 

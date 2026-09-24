@@ -231,3 +231,28 @@ family, not an arbitrary new shape; sandbox verification is static. All four are
 - The live database and the demo cluster were not touched; the 22 September invalidation row is
   an author action once ADR-038 exists.
 - `codex-review/2026-09-24/` is verbatim.
+
+## Closure — Phase 10, 2026-09-24 (`docs/plans/phase-10.md`)
+
+Every finding was closed the same day, one commit each, with the review's counterexample as a
+negative test (on PostgreSQL where the store is involved). The reviewer's probe scripts were
+rerun afterwards, probe by probe:
+
+| Finding | Closed by | Probe now |
+|---|---|---|
+| DC-01, DC-02 | bba45dd — ADR-024 amendment 1: a recapture bumps the fence, reconcile advances generations, window + correction days | assertion fails (defect gone) |
+| DC-03 | 3bf5201 — ADR-023 amendment 1: owner first, per-transport current view, migration 0004 | assertion fails |
+| DC-04 | a39193b — ADR-023 amendment 2: occurrences, migration 0005 | assertion fails |
+| DC-05 | 7f39b06 — ADR-024 amendment 2: expired replay attempts reclaimed | no longer runs (`pending_runs` takes `now`); `tests/store/test_store.py::test_review2_dc05_…` |
+| DC-06 | 971e724 — ADR-024 amendment 3: create-only entries, retry on the next attempt | no longer runs (its barrier expects one listing per writer; the loser now lists again); `tests/bronze/test_bronze.py::test_review2_dc06_…` |
+| DC-07 | 07d4181 — ADR-038: durable invalidations, migration 0006, `energyctl invalidate` | **still asserts**: the probe models the retired repair (a bare Silver deletion with no recorded decision), which a rebuild can only undo; the supported repair is the invalidation, proved by `tests/runtime/test_review2.py::test_dc07_…` |
+| DC-08 | 04af64d — ADR-037 amendment 1: target-scoped freshness, month partitions | no longer runs (`count_periods` takes the target scope); `test_review2_dc08_…` on both stores and through the verb |
+| DEP-01 | 1c69fce — ADR-036 amendment 2: RPO per failure domain, 15-minute replication on the demo, staleness alerts | — |
+| DEP-02, DEP-03, DEP-05 | 10c3d60 — ADR-036 amendment 3, ADR-026 amendment 3: modes refuse the drill, FQDN mode replaces the coarse rule, host canary | — |
+| DEP-04, AE-03, editorial | 16605ae, 3482364, 9d57391 (before Phase 10) | — |
+| AE-01, AE-02, AE-04, scope limit 1 | b8749d9 — mapping-independent inventory, plain-Git route, `admission_request`, parser refusal | AE-01 and AE-04 `reproduced: false`; AE-03 stays `true` by design (the bundle discloses the checks it does not run instead of running pytest, which the sandbox lacks) |
+| Topology | not changed — the demo stays one server (ADR-028); the README says so | — |
+
+Left for the author (Level 3): record the nine wrong 22 September captures with `energyctl
+invalidate` (`docs/07` §4.3), rerun the three first-packet egress Jobs with the node block on
+(`docs/07` §2.1), and the CNPG/external backup chains when a cluster with the operator exists.

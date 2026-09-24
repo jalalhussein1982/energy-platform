@@ -40,6 +40,11 @@
 | 10.10 | Triage inventory; `docs/08` §9; MCP `admission_request`; parser refusal; ADR-007 pointer in `02` | ADR-007, ADR-022 | AE-01 renames → `drift`; AE-04 Route B completes with the tool surface; a supplied `parser.py` is refused by `validate` | `fix(triage,mcp,docs): …` |
 | 10.11 | Rerun both probe scripts (expect assertion failures = defects gone); `docs/09` note; progress; roadmap ticks; memory | — | probe scripts exit non-zero on their first defect assertion | `docs(progress): Phase 10 …` |
 
+## Result (2026-09-24)
+
+All eleven tasks done in eleven commits (fdc53ad … b8749d9): 923 tests, 32 on PostgreSQL,
+`helm-lint` green; probe outcomes in the closure table of `docs/reviews/2026-09-24-codex-review-response.md`.
+
 ## Stop conditions
 
 - A live mutation (the demo's invalidation records, the replication schedule takes effect on push — fine; the invalidation objects need the author).
