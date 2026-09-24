@@ -164,6 +164,34 @@ five hours, none of them alerted.
 day fetches the right file, its versions carry the newest `fetched_at` and win the current
 view (ADR-023 §3). The wrong versions stay in history, like every Silver version.
 
+## Amendment 3 (2026-09-24) — cadence aligned to the source's stated expectation
+
+**Context.** OTE's market desk answered the reuse letter on 2026-09-24 (`docs/06` §1.4):
+day-ahead results "once a day, whenever prices for that day are published, usually after
+1:05 p.m."; intraday results "once as a summary for the entire day, or continuously after the
+close of trading for a given 15-minute contract". §1's intervals were written before that
+answer: E1 polled hourly from 12:00 to 23:00 on D-1, and T1/T2 re-read D-1…D-3 every hour
+(`cadence.correction`). No rate limit was stated; nothing was objected to; the register (`01`
+§10) exists to respect what a source says.
+
+**Decision.**
+
+1. T1 and T2 keep `*/15 * * * *` — the second option OTE named.
+2. The T1/T2 correction re-poll of D-1…D-3 runs **once a day** (`7 3 * * *` and `9 3 * * *`,
+   Prague): the daily summary OTE named. The file of D-1 completes shortly after midnight
+   (`01` §5), so 03:xx sees it complete; a day that ended incomplete stays `late` in freshness
+   until that re-poll (ADR-037), which is the documented cost.
+3. E1 polls `15 13-16 * * *` on D-1: the first read after the usual publication, three more in
+   case the auction is late (`06` §5 saw D+1 complete at 14:24 CEST), and a once-daily correction
+   (`13 6 * * *`, 1 day). Requests per day: 5 instead of 36.
+4. `01` §5's "(initial)" intervals stay as written; the manifests carry the decided ones, and
+   this amendment is the record. A source that later states a different expectation changes
+   the manifests again, by the same route.
+
+Consequences: `render_target_values` and the chart follow the manifests; the process CronJob
+keeps its +3 min offset; `05` unchanged. `06` §1.4 and `01` §10 rows T1/E1 and T2 record the
+decision as closed.
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-19 · V-9 · CONFIRMED (egress reachable, no network rate limit;

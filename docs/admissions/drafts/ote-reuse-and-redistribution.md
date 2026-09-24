@@ -60,7 +60,8 @@ attribution wording exists. Answer 3 names the source's expectations: day-ahead 
 about 13:05 Prague; intraday either one daily summary or a fetch after each 15-minute contract
 closes — the 15-minute cadence of T1/T2 is the second option; the hourly correction re-reads of
 the previous three days (`cadence.correction`) and E1's hourly polling from 12:00 on D−1 go
-beyond what was described and are an open cadence decision for the maintainer (see `06` §1.4).
+beyond what was described; decided 2026-09-24 as ADR-033 amendment 3
+(corrections once a day, E1 four reads after 13:05).
 The message footer states that an OTE e-mail is not a contract and that OTE binds itself only in
 signed writing: the reply is the market desk's written answer to the Terms-of-Use question, not
 a licence. Evidence: the Gmail thread in the author's account (subject as above).

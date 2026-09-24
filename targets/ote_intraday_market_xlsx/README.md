@@ -44,11 +44,10 @@ and Bronze marks an unchanged payload (`tests/bronze/test_bronze.py`).
 
 - `ignore_fields: ["Time interval"]` (ADR-034): the label column is display only; the DST bridging
   labels are never parsed.
-- `cadence.correction {cron: "9 * * * *", days: 3}` declares the 01 §5 re-poll (runtime verb in
-  Phase 5, ADR-033).
+- `cadence.correction {cron: "9 3 * * *", days: 3}` declares the 01 §5 re-poll of D-1..D-3, once a
+  day (ADR-033 amendment 3).
 - Polling: OTE's reply of 2026-09-24 names a daily summary or a read after each 15-minute contract
-  closes; the 15-minute poll is the latter. The hourly correction re-reads go beyond what OTE
-  described — cadence decision open (06 §1.4).
+  closes; the 15-minute poll is the latter and the once-daily correction re-read is the former.
 
 ## Checks
 

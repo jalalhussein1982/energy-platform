@@ -13,8 +13,8 @@ modality: soap-xml
 cadence:
   cron: "*/15 * * * *"        # 01 §5: every 15 minutes during the delivery day
   timezone: Europe/Prague
-  correction:                 # 01 §5 "hourly for D-1..D-3" (ADR-033 §3; runtime verb in Phase 5)
-    cron: "7 * * * *"
+  correction:                 # 01 §5 re-poll of D-1..D-3, once a day since ADR-033 amendment 3 (OTE 2026-09-24: "once as a summary for the entire day")
+    cron: "7 3 * * *"
     days: 3
 history:
   max_age: P2Y                # period-based operation serves 2024-06-30 at PT60M (06 §2); depth beyond that [UNVERIFIED]

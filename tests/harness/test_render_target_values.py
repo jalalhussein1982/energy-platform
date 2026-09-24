@@ -28,10 +28,10 @@ def test_committed_targets_render_with_their_cadence_and_correction() -> None:
     assert {"ote_intraday_market", "ote_intraday_market_xlsx", "ceps_load", "ote_dam"} <= set(by_id)
     t1 = by_id["ote_intraday_market"]
     assert t1["cron"] == "*/15 * * * *" and t1["timezone"] == "Europe/Prague"
-    assert t1["correction"] == {"cron": "7 * * * *", "days": 3}
+    assert t1["correction"] == {"cron": "7 3 * * *", "days": 3}  # once a day, ADR-033 amendment 3
     assert t1["manifest"] == "ote_intraday_market/manifest.yaml"
     assert t1["hosts"] == ["www.ote-cr.cz"]
-    assert by_id["ote_dam"]["cron"] == "0 12-23 * * *"
+    assert by_id["ote_dam"]["cron"] == "15 13-16 * * *"  # after publication, ADR-033 amendment 3
 
 
 def test_restricted_license_is_refused_and_named(tmp_path: Path) -> None:
@@ -77,4 +77,4 @@ def test_targets_carry_a_process_cron() -> None:
     targets, _ = target_values(REPO / "targets", process_offset=3)
     by_id = {t["id"]: t for t in targets}
     assert by_id["ote_intraday_market"]["process_cron"] == "3-59/15 * * * *"
-    assert by_id["ote_dam"]["process_cron"] == "3 12-23 * * *"
+    assert by_id["ote_dam"]["process_cron"] == "18 13-16 * * *"

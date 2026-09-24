@@ -24,7 +24,7 @@ No 01 §4 candidate was read. No latency figure is quoted (§6).
 2. **Auth, headers**: none required; `Content-Type: text/xml; charset=UTF-8` in responses; no `ETag`/`Last-Modified` on SOAP responses (conditional requests do not apply to T1/E1), both present on the XLSX (T2, §2.3).
 3. **Rate limits**: none observed on ten requests within a minute; nothing in the WSDL or the terms states a limit. The platform's politeness (ADR-033 §2) stays the only limit.
 4. **Terms of Use** (`/en/documentation/term-of-use`, read 2026-09-20, evidence row 3): "The Operator has exclusive access to all data published on the Website. Users have no right to reproduce, copy or duplicate the content of the website in any way without the prior written consent of the Operator unless the Operator agrees otherwise with the Users." → the 01 §10 fixture policy (synthetic until written confirmation) is the right one; **V-1/V-3 open item unchanged**: written confirmation of reuse and attribution wording is still needed before any live capture is redistributed. `robots.txt` allows all agents (evidence row 5).
-   **Answered 2026-09-24** (letter `docs/admissions/drafts/ote-reuse-and-redistribution.md`, reply quoted there): (a) automated collection and storage **for internal use only**; (b) samples **must not be published to third parties** — so every OTE fixture in the repository is synthetic **permanently**, there is no attribution wording, and the V-1/V-3 question for OTE is closed with a *no*; (c) the source's cadence expectations: day-ahead once a day after about 13:05 Prague, intraday either one daily summary or a fetch after each 15-minute contract closes. T1/T2's 15-minute cadence is that second option; E1's hourly polling from 12:00 on D−1 and the hourly `cadence.correction` re-reads of the previous three days were described in the letter but not endorsed in the reply — an **open cadence decision** for the maintainer, recorded in 01 §10. The reply's footer says an OTE e-mail is not a contract; it is the market desk's written answer, not a licence.
+   **Answered 2026-09-24** (letter `docs/admissions/drafts/ote-reuse-and-redistribution.md`, reply quoted there): (a) automated collection and storage **for internal use only**; (b) samples **must not be published to third parties** — so every OTE fixture in the repository is synthetic **permanently**, there is no attribution wording, and the V-1/V-3 question for OTE is closed with a *no*; (c) the source's cadence expectations: day-ahead once a day after about 13:05 Prague, intraday either one daily summary or a fetch after each 15-minute contract closes. T1/T2's 15-minute cadence is that second option; E1's hourly polling from 12:00 on D−1 and the hourly `cadence.correction` re-reads of the previous three days were described in the letter but not endorsed in the reply — **decided 2026-09-24, ADR-033 amendment 3**: corrections once a day, E1 four reads after 13:05. The reply's footer says an OTE e-mail is not a contract; it is the market desk's written answer, not a licence.
 5. **Decimals**: a dot, always; `Price` with 2 decimals, `Volume` with 3 on every item of every day read (T1 2026-09-19: 96 of 96).
 6. **Negative and zero prices are real**: minimum average price −4.21 EUR/MWh on 2026-03-29 and −0.17 on 2026-09-20 (T2 files; the T1 items carry the same values). No zero-volume period and no item without `Price` was seen on the four days; the "no trade → absent `Price`" case of 01 §9 is therefore fixture-only, taken from the WSDL's `minOccurs="0"`.
 
@@ -40,7 +40,7 @@ No 01 §4 candidate was read. No latency figure is quoted (§6).
 | `Emerg` | not present on any of the five days; optional element, mapped as `ignore_fields` (ADR-034) because the registry has no metric for it | 8, 9, 17–19 |
 | Fill timing (single observation) | the last published period at 14:24 was the one whose delivery started at 14:15 → publication at or after gate closure, before delivery end; consistent with 01 §5 "around gate closure" | 9 |
 
-**Correction window.** Nothing was observed about corrections (one read per day). The manifest declares `cadence.correction {cron: "7 * * * *", days: 3}` per 01 §5; the runtime verb is Phase 5 (ADR-033).
+**Correction window.** Nothing was observed about corrections (one read per day). The manifest declares `cadence.correction {cron: "7 3 * * *", days: 3}` (once a day since ADR-033 amendment 3; 01 §5 said hourly); the runtime verb is Phase 5 (ADR-033).
 
 ## 3. T2 — daily XLSX
 
@@ -129,7 +129,7 @@ Consequence: the T3 manifest keeps `interval_label: start`, now with this sectio
 | Request | `PeriodResolution` is mandatory (WSDL); PT15M and PT60M both served | 1, 10, 11 |
 | PT15M day | 2026-09-21 requested on 2026-09-20 at 12:24:33Z: **96** items, `PeriodInterval` `00:00-00:15` …, `Price` per quarter-hour, `HourlyPrice` constant across the hour's four quarters (24 distinct values), `VolumeTotal` with 3 decimals, **no `EmergencyState` element** | 10 |
 | PT60M day | 2026-09-20: **24** items, `PeriodInterval` `00-01` …, `Price` = `HourlyPrice` | 11 |
-| Publication | D+1 results were complete at 14:24 CEST on D → 01 §5 "once after the day-ahead auction" holds for this day; the manifest polls hourly from 12:00 on D-1 with `{next_delivery_day}` (ADR-033 §4) | 10 |
+| Publication | D+1 results were complete at 14:24 CEST on D → 01 §5 "once after the day-ahead auction" holds for this day; the manifest polled hourly from 12:00 on D-1 with `{next_delivery_day}` (ADR-033 §4); four reads after 13:05 since ADR-033 amendment 3 | 10 |
 | Not seen | negative DAM prices (minimum 13.56 on 2026-09-21); `EmergencyState = 1` | 10 |
 
 `PeriodInterval` is display only → `ignore_fields`. `EmergencyState` maps to the registered `emergency_state` metric (unit `1`); absent → NULL ("no result").
@@ -162,7 +162,7 @@ Outside the server: `scripts/apply_pr_bundle.py` turned the bundle into the bran
 01 §5 requires one week of polls per target before any latency figure is quoted. Procedure, using only shipped verbs:
 
 ```text
-every 15 min (T1, T2, T3) / every hour from 12:00 (E1):
+every 15 min (T1, T2, T3) / every hour from 12:00 (E1; four reads after 13:05 since ADR-033 amendment 3):
   energyctl capture -m targets/<id>/manifest.yaml --bronze-dir <local bronze> --live
 afterwards:
   for each capture-log entry with content_changed = true: record (fetched_at, highest PeriodIndex

@@ -114,7 +114,7 @@ def test_one_cronjob_template_rendered_per_target(tmp_path: Path) -> None:
     assert "--live" in args and "--start-jitter-seconds" in args
     assert capture["spec"]["schedule"] == "*/15 * * * *"
     recapture = cronjobs["ep-energy-platform-recapture-ote-intraday-market"]
-    assert recapture["spec"]["schedule"] == "7 * * * *"
+    assert recapture["spec"]["schedule"] == "7 3 * * *"
     rargs = recapture["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0]["args"]
     assert rargs[:5] == [
         "recapture",

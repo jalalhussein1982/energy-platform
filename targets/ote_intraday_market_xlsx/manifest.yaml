@@ -14,8 +14,8 @@ modality: dated-file
 cadence:
   cron: "*/15 * * * *"        # 01 §5; the file carries ETag/Last-Modified, so a stale poll is a 304 (06 §3.3)
   timezone: Europe/Prague
-  correction:                 # 01 §5 "hourly for D-1..D-3" (ADR-033 §3; runtime verb in Phase 5)
-    cron: "9 * * * *"
+  correction:                 # 01 §5 re-poll of D-1..D-3, once a day since ADR-033 amendment 3 (OTE 2026-09-24: "once as a summary for the entire day"); the file of D-1 completes shortly after midnight
+    cron: "9 3 * * *"
     days: 3
 history:
   max_age: P1Y                # fallback URL served 2025-10-26 … 2026-09-20 (06 §3.1); depth beyond that [UNVERIFIED]

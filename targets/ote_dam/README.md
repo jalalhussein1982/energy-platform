@@ -15,7 +15,8 @@ live reads of 2026-09-20: `docs/06` §5, evidence rows 1, 10, 11). Four register
 ## Day-ahead timing
 
 Results for delivery day D are published on D-1 (complete by 14:24 CEST in the live read). The
-manifest polls hourly from 12:00 on D-1 and asks for `{next_delivery_day}` (ADR-033 §4); the
+manifest polls four times after the usual publication (13:15–16:15 on D-1, ADR-033 amendment 3)
+and asks for `{next_delivery_day}` (ADR-033 §4); the
 observations carry the document's own `Date`, so Silver and completeness see D.
 
 ## Fixtures (synthetic copies of the live shape — 01 §10)

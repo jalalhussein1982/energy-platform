@@ -39,9 +39,8 @@ Not fixtures, covered by platform tests: an unchanged payload is a stale fetch
 
 ## Manifest notes
 
-- `cadence.correction {cron: "7 * * * *", days: 3}` declares the 01 §5 re-poll of D-1..D-3; the
-  runtime verb arrives in Phase 5 (ADR-033). Until then a correction is picked up only by a manual
-  `energyctl capture --force`.
+- `cadence.correction {cron: "7 3 * * *", days: 3}` declares the 01 §5 re-poll of D-1..D-3, once a
+  day since ADR-033 amendment 3 (OTE's stated expectation); the runtime verb is `recapture`.
 - `history.max_age: P2Y` is an assumption beyond the one pre-2024-07 day read live.
 - `ignore_fields: [Emerg]`: the WSDL's optional flag has no registered metric; registering one is
   Route B, not a change here.
