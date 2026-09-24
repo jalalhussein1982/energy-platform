@@ -457,6 +457,38 @@ the restored-database phase 777 s (≈ 13 min); the Bronze-only rebuild into a f
 duration on warm infrastructure; none is a measured infrastructure-loss RTO (replacement
 nodes, identities and secrets, resumed schedules are not included — review 2 DEP-01/04-topology).
 
+### 7.1 Dashboards — Grafana, private (ADR-039, Phase 11, 2026-09-24)
+
+`grafana.enabled` renders one Deployment (`docker.io/grafana/grafana` by digest, uid 472,
+read-only root filesystem), a ClusterIP Service on 3000 and two NetworkPolicies: egress to
+Postgres and DNS, ingress from the namespace. There is **no Ingress and no public address**, on
+purpose: OTE's and ČEPS's data is for internal use only (`06` §1.4, §4.5). The datasource is
+the read-only login role `grafana` (a member of `energy_reader`, migration 0007) that the
+migrate hook creates from the Secret key `GRAFANA_DB_PASSWORD`; the admin password is
+`GRAFANA_ADMIN_PASSWORD`. Both keys are part of `DEMO_SECRET_KEYS` and of `make local-secrets`.
+
+Access, from a machine with the namespace kubeconfig:
+
+```bash
+kubectl -n energy-platform port-forward svc/energy-platform-grafana 3000:3000
+kubectl -n energy-platform get secret energy-platform -o jsonpath='{.data.GRAFANA_ADMIN_PASSWORD}' | base64 -d; echo
+# then http://localhost:3000 — user admin, that password
+```
+
+Two provisioned dashboards (`deployment/helm/energy-platform/dashboards/`, read-only in the
+UI; the data directory is an `emptyDir`, so nothing edited there survives a restart):
+
+| Dashboard | Panels |
+|---|---|
+| `energy-platform — prices and load` | intraday `price_vwap` per period with the SOAP record and the XLSX copy overlaid (a divergence is a `reconciliation_mismatch`), traded volume, day-ahead price (published for the next day), ČEPS load, imbalance settlement prices and system imbalance by version, the newest current row per dataset and transport |
+| `energy-platform — freshness and ledger health` | the `01` §5 state per target from `target_freshness` (ADR-037 amendment 1), ledger runs by state, capture attempts and quality events per hour, versions · occurrences · invalidations, the newest attempt per target |
+
+The queries read `observations_current` and `observations_current_by_transport`, so the screen
+shows what ADR-023 and ADR-038 say is current, nothing else. Enabling Grafana on a running
+deploy is a **Secret change first**: a missing key fails the atomic upgrade, which then changes
+nothing (`kubectl -n energy-platform patch secret energy-platform --type merge -p
+'{"stringData":{"GRAFANA_ADMIN_PASSWORD":"…","GRAFANA_DB_PASSWORD":"…"}}'`, Level 3).
+
 ## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
 
 `make rollback-drill` on kind, 2026-09-22 06:02–06:04 (`deployment/local/drills/rollback.sh`;

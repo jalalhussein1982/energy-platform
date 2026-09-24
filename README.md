@@ -53,6 +53,12 @@ offline path on fixtures), `make rollback-drill`, `make helm-lint terraform-vali
 | `ote_imbalance_settlement_monthly` | OTE SOAP `GetImbalanceSettlementPeriodE`, version 1 (monthly, previous month) | `ote.imbalance_settlement` | Phase 9, maintainer through the harness, PR #4 |
 | `ote_imbalance_settlement_final` | OTE SOAP `GetImbalanceSettlementPeriodE`, version 2 (final, four months back) | `ote.imbalance_settlement` | Phase 9, **by a strictly blind agent** (empty profile, no connectors), PR #5 |
 
+Behind a flag (`grafana.enabled`, on for the demo and the local profile) the chart also runs **Grafana**
+with two provisioned dashboards over the current views — prices and load, freshness and ledger
+health — reachable only through the cluster (`kubectl port-forward`), reading through a read-only
+database role, because the sources allow internal use only ([ADR-039](docs/adr/ADR-039-grafana-private-dashboards.md),
+[`docs/07-operations.md`](docs/07-operations.md) §7.1).
+
 Each target is a directory under [`targets/`](targets/): a manifest, Bronze fixtures, and golden
 values written by hand. The scope and the contracts are in
 [`docs/01-data-scope.md`](docs/01-data-scope.md) and [`docs/04-contracts.md`](docs/04-contracts.md).
@@ -150,7 +156,7 @@ One of them refused a source whose free API is for non-commercial use only
 
 | Not built | Why | Where decided |
 |---|---|---|
-| A read API or consumer MCP over Silver (D-9) | the brief is ingestion; SQL on Silver is the interface | `02` §4.2 D-9 |
+| A read API or consumer MCP over Silver (D-9) | the brief is ingestion; SQL on Silver is the interface — and, since 2026-09-24, a private Grafana over it (ADR-039), never a public endpoint | `02` §4.2 D-9 |
 | The OpenAI-compatible LLM client (triage runs on a deterministic stub) (G12) | "pipeline built, LLM step stubbed" (D-10). A real client needs an admitted host whose terms fit a commercial deliverable (the reference environment's inference is academic, ADR-028), and its egress must live in `fetch/` with the host registered. No such host is admitted | `02` D-10, ADR-009, plan P6-D4, `docs/plans/phase-9.md` |
 | A loader for a target's own `parser.py` (G13) — `ep validate` and the PR gate refuse a target that ships one (2026-09-24) | every committed target, including the settlement versions, is served by the generic parsers; dynamic import is banned outside `fetch/` and `scripts/` (ADR-027 §3), so a loader needs an ADR amending ADR-027 first | `05` §5 |
 | `bronze.tiering.mode=move` exercised on kind (G14) | the chart renders the tier CronJob and the unit tests cover the move, but no cluster has run it against a real cold store. The demo runs `mode: none` because its object storage has one class (V-12) | ADR-021, `07` §5 |

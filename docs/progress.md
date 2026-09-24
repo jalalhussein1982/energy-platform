@@ -16,7 +16,39 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the strictly blind re-run (G10) run by the author and evaluated: PR #5 passes, F-3 closed; #5 merged, demo at revision 9, F-4 closed in full; the two repairs and the two letters prepared for the author |
 | 2026-09-24 | Source replies | OTE answered the reuse letter: internal use only, no redistribution, cadence expectations named; filed in `01` §10, `06` §1.4, the six OTE manifests and READMEs; ČEPS pending |
 | 2026-09-24 | Review 2 | Codex final review (17 findings, 8 P1) committed verbatim, every finding answered; two fail-open/false-green fixes and two editorial errors closed; README completion claim bounded; Phase 10 planned |
+| 2026-09-24 | Phase 11 | private Grafana dashboards over Silver: read-only role (migration 0007), provisioned prices/load and freshness/ledger dashboards, port-forward only (ADR-039) |
 | 2026-09-24 | Phase 10 | every review-2 finding closed: OTE cadence decided (ADR-033 am. 3); ownership, occurrences, generations, replay reclaim, create-only entries, invalidations (ADR-038), target-scoped freshness, RPO per domain, mode/FQDN/gate fixes, contributor path; three migrations with downgrades; 923 tests, 32 on PostgreSQL |
+
+---
+
+## 2026-09-24 — Phase 11: Grafana dashboards over Silver, private
+
+**Done** (`docs/plans/phase-11.md`, 4 commits, `make check` 926 tests, `make db-test` 33,
+`make helm-lint` green). The author asked for a visualisation "as a cosmetic addition"; the
+answer was yes, provided it stays private — OTE's and ČEPS's terms allow internal use only —
+and does not touch the capture/process path.
+
+- **11.1** migration `0007_reader_role`: the `energy_reader` group with `SELECT` on the schema
+  and default privileges, tolerant of a user without `CREATEROLE`; `energyctl migrate
+  --reader-user grafana` creates or rotates the login role from `GRAFANA_DB_PASSWORD`. db-test:
+  the reader selects from the views and is refused an insert.
+- **11.2** chart: `grafana.*` values and schema, `templates/grafana.yaml` (provisioning and
+  dashboard ConfigMaps, ClusterIP, Deployment by digest at uid 472 with `emptyDir` data,
+  telemetry off, NetworkPolicies egress Postgres + DNS / ingress namespace), `grafana` as a
+  Postgres-egress role, the migrate hook's reader step behind the flag, `secretKeys`,
+  `local-secrets` and `DEMO_SECRET_KEYS` with the two new keys; dashboards `prices.json` and
+  `freshness-sql.json` over the current views; on in `local` and all-flags; chart test.
+- **11.3** ADR-039, `07` §7.1, README, `05` C-70, roadmap, this entry.
+- **11.4** demo: see the closing note below.
+
+**Learned.** A `checksum/` annotation must hash the template's *inputs*, not the template that
+carries it (an `include` of itself recurses). A Helm action block that ends in `-}}` before a
+YAML key swallows the newline the key needs. The ephemeral test server trusts its Unix socket,
+so a wrong password proves nothing there; role membership does.
+
+**Open / carried.** Unchanged from Phase 10: the author's `energyctl invalidate` for the nine
+22 September captures, the first-packet egress rerun, the Terraform address, the console check,
+teardown.
 
 ---
 

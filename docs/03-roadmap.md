@@ -41,6 +41,7 @@ A contributor session — adding a target or requesting an admission — follows
 | 8 | Submission packaging | — | 1 | README reproducible by a stranger — **done 2026-09-23** (clean clone on a fresh VM: exit 0 in 199 s) |
 | 9 | Gap closure | — | 1 | every gap closed or listed in the README with a reason; final clean clone — **done 2026-09-23**; the strictly blind re-run (G10) run and passed 2026-09-24 (`docs/09` run 4) |
 | 10 | Correctness and recovery (review 2) | — | 3–4 | the eight P1 counterexamples of `codex-review/2026-09-24/` pass as negative tests on PostgreSQL; RPO stated per failure domain — **done 2026-09-24** (`docs/plans/phase-10.md`; 11 commits, 923 tests, 32 on PostgreSQL) |
+| 11 | Grafana dashboards over Silver (private) | — | 1 | the two dashboards render on the demo through a port-forward, through the read-only role — **done 2026-09-24** (`docs/plans/phase-11.md`) |
 
 ---
 
@@ -253,6 +254,17 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 - [x] 10.8 RPO per failure domain, replication interval or amended bound, replica-age alert (ADR-036 amendment; DEP-01)
 - [x] 10.9 deployment modes refuse what they do not implement; Cilium FQDN rule; policy-gate readiness (DEP-02, DEP-03, DEP-05)
 - [x] 10.10 contributor path: triage inventory, plain-Git primary route, MCP admission request, custom parser refused until loadable (AE-01, AE-02, AE-04)
+
+---
+
+## Phase 11 — Grafana dashboards over Silver (private) — done 2026-09-24
+
+**Goal.** A window onto the collected data and the platform's health without a public endpoint (ADR-039): Grafana behind a chart flag, a read-only database role, two provisioned dashboards over the current views, access by port-forward. Plan: `docs/plans/phase-11.md`.
+
+- [x] 11.1 migration `0007_reader_role`, `energyctl migrate --reader-user` (db-test: SELECT yes, INSERT no)
+- [x] 11.2 chart component, network policies, hook step, dashboards, local and all-flags values (chart tests, helm-lint)
+- [x] 11.3 ADR-039, `07` §7.1, README, `05` C-70
+- [x] 11.4 demo: Secret keys, `grafana.enabled`, deploy, a port-forward render
 
 ---
 
