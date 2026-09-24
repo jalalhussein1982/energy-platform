@@ -210,6 +210,43 @@ def test_missing_digest_or_residency_is_refused(tmp_path: Path) -> None:
         assert result.returncode != 0
 
 
+def test_external_postgres_mode_refuses_an_empty_destination_list(tmp_path: Path) -> None:
+    """C-68 (review 2 DEP-04): an empty `to:` list is every destination, so the render must fail."""
+    base = [
+        "helm",
+        "template",
+        "ep",
+        str(CHART),
+        "-f",
+        str(TENANT),
+        "-f",
+        str(_targets_file(tmp_path)),
+        "--set",
+        f"image.digest={DIGEST}",
+        "--set",
+        "postgres.mode=external",
+    ]
+    refused = subprocess.run(base, capture_output=True, text=True)  # noqa: S603
+    assert refused.returncode != 0 and "egress.postgres.cidrs is required" in refused.stderr
+    allowed = subprocess.run(  # noqa: S603
+        [*base, "--set", "egress.postgres.cidrs[0]=10.9.8.0/24"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    docs = [d for d in yaml.safe_load_all(allowed.stdout) if isinstance(d, dict)]
+    rules = [
+        rule
+        for doc in docs
+        if doc.get("kind") == "NetworkPolicy"
+        for rule in (doc.get("spec", {}).get("egress") or [])
+        if any(p.get("port") == 5432 for p in rule.get("ports", []))
+    ]
+    cidrs = [t.get("ipBlock", {}).get("cidr") for rule in rules for t in (rule.get("to") or [])]
+    assert rules and all(rule.get("to") for rule in rules)
+    assert cidrs and set(cidrs) == {"10.9.8.0/24"}
+
+
 def test_dr_workloads_render_behind_their_flags(tmp_path: Path) -> None:
     """ADR-036: replication, backup shipping, tiering and the restore drill (Task 5.10)."""
     local = named(render(tmp_path, LOCAL), "CronJob")

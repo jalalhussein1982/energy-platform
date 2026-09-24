@@ -65,6 +65,9 @@ spec:
         values: {{ toJson $verbRoles }}
   policyTypes: [Egress]
   egress:
+{{- if and (eq .Values.postgres.mode "external") (not .Values.egress.postgres.cidrs) }}
+{{- fail "egress.postgres.cidrs is required when postgres.mode is external (ADR-026 layer 1: an empty destination list is every destination in the NetworkPolicy API, so TCP 5432 would open to the world; review 2 DEP-04)" }}
+{{- end }}
 {{- if eq .Values.postgres.mode "external" }}
     - to:
 {{- range .Values.egress.postgres.cidrs }}
