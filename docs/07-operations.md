@@ -566,3 +566,34 @@ checked against its SHA-256; `libpq5`). The run executed under `nohup` on the VM
 
 The VM was deleted after the run (`hcloud server list`: only the two demo nodes).
 
+
+
+### 8.3 The local profile can no longer pull its object stores (2026-09-24)
+
+Running `make local-down && make local-up` on this laptop after Phase 11 (Docker running again)
+failed twice: first on the 43-hour-old kind cluster from Phase 9, whose API server timed out
+under memory pressure during the upgrade and whose DNS was broken afterwards (the smoke pod could
+not resolve `energy-platform-postgres`), then on a **fresh** cluster, cleanly, at the image pull:
+
+```text
+Failed to pull image "quay.io/minio/minio@sha256:14cea493…": … unexpected status from HEAD request … 401 UNAUTHORIZED
+```
+
+From the host, `docker manifest inspect` says `no such manifest` for both pinned digests
+(`quay.io/minio/minio` RELEASE.2025-09-07, `quay.io/minio/mc`), `quay.io/minio/minio:latest` and
+`docker.io/minio/minio` answer 401 with an empty tag list, quay's public API for a control
+repository (`prometheus/node-exporter`) answers normally, and `github.com/minio/minio` is
+**archived** (last push 2026-04-24; the README now points to the commercial AIStor). Every other
+pinned image — Postgres, the exporter, rclone, Grafana — still resolves. The digest pins did their
+job (nothing else was pulled in their place); what they cannot do is keep a publisher from
+withdrawing an image. The kind node from 2026-09-23 had the images cached, which is why the last
+clean-clone run (§8.2) passed and why the problem surfaced only now.
+
+Consequences: `make local-up` fails on any machine without the cached images, so the README's
+reproduce block is annotated; the demo is unaffected (Hetzner Object Storage and OCI, ADR-036);
+Grafana's local-profile check (Phase 11) stays unrun — its chart tests, `helm-lint` and the demo
+deploy were the checks. Next platform change (an ADR-036 amendment, planned as Phase 12): replace
+the two MinIO StatefulSets and the `mc` init job with an S3-compatible server whose images are
+published and which implements Object Lock — candidates `ghcr.io/versity/versitygw` (v1.8.0,
+43 tags), `docker.io/rustfs/rustfs` (1.0.0), SeaweedFS — with the same `--with-lock` bucket
+semantics the local profile relies on (ADR-036 §1). The kind cluster was torn down afterwards.

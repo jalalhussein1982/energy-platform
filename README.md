@@ -35,7 +35,13 @@ make local-down     # and `docker rm -f kind-registry`
 
 Prerequisites: Docker with ≥ 4 GB, `kind`, `helm` ≥ 3, `kubectl`, `uv`, `make`, `openssl`, and the
 PostgreSQL client library **libpq** (`apt install libpq5`, `brew install libpq`). No credentials,
-no cloud account. Verified from a clean clone on a machine that had never seen the repository
+no cloud account. **Since 2026-09-24 the local profile cannot be brought up from a clean machine:** MinIO's
+community images (`quay.io/minio/minio`, `quay.io/minio/mc`, pinned by digest for the two local object stores)
+are no longer served by quay.io or Docker Hub — the MinIO repository was archived in April 2026 — so `make
+local-up` fails at the image pull (`ImagePullBackOff`, verified from this laptop and from a fresh kind node).
+The demo cluster is unaffected (Hetzner and OCI object storage). Replacing the local stores with an S3 server
+whose images exist and which supports Object Lock is the next platform change ([`docs/07-operations.md`](docs/07-operations.md) §8.3).
+Before that date it was verified from a clean clone on a machine that had never seen the repository
 (Ubuntu 24.04, 4 vCPU / 8 GB, GNU Make 4.3): see [`docs/07-operations.md`](docs/07-operations.md) §8.
 
 More: `make db-test` (store suite on an ephemeral PostgreSQL; needs `initdb`), `make demo` (the

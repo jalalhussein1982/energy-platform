@@ -51,9 +51,17 @@ carries it (an `include` of itself recurses). A Helm action block that ends in `
 YAML key swallows the newline the key needs. The ephemeral test server trusts its Unix socket,
 so a wrong password proves nothing there; role membership does.
 
-**Open / carried.** Unchanged from Phase 10: the author's `energyctl invalidate` for the nine
-22 September captures, the first-packet egress rerun, the Terraform address, the console check,
-teardown.
+**Live finding (Docker back, evening).** `make local-down && make local-up` fails on a fresh kind
+cluster at the image pull: **MinIO's community images are no longer served** by quay.io or Docker
+Hub (401, empty tag lists; the GitHub repository is archived since 2026-04-24), every other pinned
+image still resolves. The local profile is unreproducible from a clean machine until the two MinIO
+stores are replaced (`docs/07` §8.3; README annotated); the demo is unaffected. Grafana's local
+check stays unrun. Proposed as Phase 12: an ADR-036 amendment replacing MinIO with an S3 server
+that exists and implements Object Lock (versitygw, RustFS or SeaweedFS).
+
+**Open / carried.** Phase 12 (the local object stores). Unchanged from Phase 10: the author's
+`energyctl invalidate` for the nine 22 September captures, the first-packet egress rerun, the
+Terraform address, the console check, teardown.
 
 ---
 
