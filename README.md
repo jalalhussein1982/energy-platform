@@ -5,9 +5,20 @@ market (SOAP and daily XLSX), OTE day-ahead results and imbalance settlement, Č
 with a **constrained extension path**: a junior engineer or a coding agent adds a new data source
 by declaring it, and cannot change the platform while doing so.
 
-Status: **complete (2026-09-23); gaps closed in Phase 9** ([`docs/plans/phase-9.md`](docs/plans/phase-9.md)). Seven targets run as CronJobs from one Helm chart on a live demo
-cluster and on a laptop; the fifth and the seventh were added by blind agent runs through the contributor path
-([`docs/09-acceptance-report.md`](docs/09-acceptance-report.md)).
+Status: **delivered 2026-09-24, with known open defects.** Phases 0–9 are done
+([`docs/plans/phase-9.md`](docs/plans/phase-9.md)). Seven targets are configured as CronJobs from one Helm chart on a live demo
+cluster and on a laptop; five have produced data, the two monthly settlement targets first run on 2026-10-01. The fifth and the
+seventh were added by blind agent runs through the contributor path ([`docs/09-acceptance-report.md`](docs/09-acceptance-report.md)).
+An external review on 2026-09-24 ([`codex-review/2026-09-24/`](codex-review/2026-09-24/README.md), answered in
+[`docs/reviews/2026-09-24-codex-review-response.md`](docs/reviews/2026-09-24-codex-review-response.md)) found **eight P1
+defects**, all reproduced and accepted: the current view can prefer the XLSX copy over the SOAP source of record, a correction
+captured during a database outage or overlapping an in-flight worker can be skipped, a provider's return to an earlier payload
+is not selected, two overlapping capture writers can share a log entry, a Bronze-only rebuild reinstates deliberately deleted
+rows, and hourly replication to the second provider does not meet the design's 15-minute cross-provider RPO. The demo runs one
+k3s server with one PostgreSQL on it, an accepted cost choice (ADR-028), so control-plane and database failover are **not**
+demonstrated. These are planned as Phase 10 ([`docs/plans/review-2.md`](docs/plans/review-2.md)); until then the system is
+an honest ingestion platform with a proven contributor path, not one whose output is guaranteed correct through every
+correction and recovery.
 
 ## Reproduce it
 

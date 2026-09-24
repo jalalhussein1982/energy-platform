@@ -24,5 +24,5 @@ its evidence, in the order they were written; `00`–`02` are frozen and change 
 | [`evidence/`](evidence/README.md) | Index of the source reads behind `01` §3 (payloads stay outside the repository) |
 | [`plans/`](plans/) | One plan per phase, with the decisions taken while executing it |
 | [`progress.md`](progress.md) | The development log from Phase 5 on; earlier entries in [`archive/`](archive/) |
-| [`reviews/`](reviews/) | The response to the external pre-coding review |
+| [`reviews/`](reviews/) | Responses to the two external reviews: pre-coding (2026-09-19) and final against the brief (2026-09-24, 17 findings, Phase 10) |
 | [`overview/`](overview/) | A one-page illustrated explainer (HTML/PDF) |

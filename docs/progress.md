@@ -15,6 +15,47 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-23 | Phase 9 | gap closure: deploy identity, secret scope, body cap, `uv` checksum, drills and deploy-on-push, V-11, an 11-hour observation, settlement v1; three defects found and fixed, one a real incident on the demo |
 | 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the strictly blind re-run (G10) run by the author and evaluated: PR #5 passes, F-3 closed; #5 merged, demo at revision 9, F-4 closed in full; the two repairs and the two letters prepared for the author |
 | 2026-09-24 | Source replies | OTE answered the reuse letter: internal use only, no redistribution, cadence expectations named; filed in `01` §10, `06` §1.4, the six OTE manifests and READMEs; ČEPS pending |
+| 2026-09-24 | Review 2 | Codex final review (17 findings, 8 P1) committed verbatim, every finding answered; two fail-open/false-green fixes and two editorial errors closed; README completion claim bounded; Phase 10 planned |
+
+---
+
+## 2026-09-24 — Review 2: the Codex final review answered; four small fixes; the completion claim bounded
+
+**Done** (6 commits on `main`, `make check` green at each — 888 tests; `make helm-lint` green).
+The author found `codex-review/2026-09-24/` (untracked, written 16:28–16:37 local): a read-only
+audit of `1701ac7` with 17 findings (8 P1, 9 P2), two rerunnable probe scripts and 35 evidence
+files. Before answering, both scripts were rerun on this machine: **all eleven counterexamples
+reproduce** (DC-01 … DC-08, AE-01, AE-03, AE-04), and the two editorial discrepancies were
+confirmed by reading the lines. The contract readings behind DC-03 (`01` §3 rule 2, ADR-023
+decision 3), DC-04 (ADR-023 decision 2), DC-07 (`docs/07` §4.3/§5.3) and DEP-01 (ADR-002's RPO
+table against the hourly replica job) were checked and are correct.
+
+- **8a466d8** the review committed verbatim (`make check`, `secret-scan` green on it).
+- **6d468df** `docs/reviews/2026-09-24-codex-review-response.md`: a verdict per finding — all 17
+  accepted (none declined), three fixed today, the rest planned; `docs/plans/review-2.md` with
+  today's tasks and Phase 10 (10.1–10.10, the ADR each amends, the review's acceptance test as
+  the negative test on PostgreSQL).
+- **9d57391** README's incident line now records the 6 048-version deletion and the rebuild
+  caveat; `docs/07` §5.3 states 777 s, 1 216 s (≈ 20 min) and the whole Job (≈ 34 min)
+  separately and calls none of them an infrastructure-loss RTO.
+- **16605ae** DEP-04: `postgres.mode=external` with an empty `egress.postgres.cidrs` now fails
+  the render (an empty `to:` list is every destination); C-68; negative test.
+- **3482364** AE-03: `gate_report` and the bundle body name the checks the bundle does not run
+  (target pytest, ruff, mypy → CI); CLI, MCP `open_pr`, `docs/08` §9 and C-51 say the same; test.
+- **this commit** README status: "delivered 2026-09-24, with known open defects", the eight P1s
+  named in one paragraph with the review and response linked, the single-server demo stated as
+  not demonstrating failover; docs index row; roadmap phase map row 10 and a Phase 10 section.
+
+**Learned.** A 887-test green suite proved nothing about the interleavings the review probed:
+correction after a ledger outage, recapture during a claim, A→B→A, two writers on one log key,
+a deleted decision through a rebuild. Each is a two-actor or two-generation case; the tests were
+one-actor happy paths plus single-fault crashes. Phase 10's rule: every DC fix ships with the
+review's script as a PostgreSQL negative test. Also: a render that accepts an empty list where
+the API reads "empty = all" is a fail-open; the object-store rule already refused it, the
+Postgres rule did not.
+
+**Open / carried.** Phase 10 (not started; delivery first). ČEPS reply. The OTE cadence
+decision. `TF_VAR_admin_cidr` at the next plan, the Hetzner console check, the teardown.
 
 ---
 
