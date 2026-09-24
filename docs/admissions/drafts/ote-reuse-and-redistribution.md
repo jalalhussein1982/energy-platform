@@ -1,6 +1,6 @@
 # DRAFT — NOT SENT — OTE: reuse of public market data and redistribution of samples
 
-**To:** OTE, a.s. — _(address from www.ote-cr.cz contacts, filled in by the author)_
+**To:** market@ote-cr.cz (the market desk, www.ote-cr.cz/en/about-ote/contact, read 2026-09-24)
 **Subject:** Permission to reuse public market data (web service `PublicDataService`) and to publish small samples
 
 Dear Sir or Madam,
@@ -29,7 +29,7 @@ Until I have your answer, the repository contains only synthetic test data with 
 structure, and no OTE values.
 
 Kind regards,
-_(name, contact)_
+Jalal Hussein
 
 ---
 _Repository record: `docs/01-data-scope.md` §10 (T1, T2, E1, imbalance settlement: "written

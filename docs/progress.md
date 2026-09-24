@@ -13,13 +13,13 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-23 | Phase 7 | three blind runs pass; two documentation defects closed |
 | 2026-09-23 | Phase 8 | README, CI-porting note, docs index and ADR log; clean clone on a fresh VM: exit 0 in 199 s |
 | 2026-09-23 | Phase 9 | gap closure: deploy identity, secret scope, body cap, `uv` checksum, drills and deploy-on-push, V-11, an 11-hour observation, settlement v1; three defects found and fixed, one a real incident on the demo |
-| 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the strictly blind re-run (G10) run by the author and evaluated: PR #5 passes, F-3 closed; #5 merged, demo at revision 9, F-4 closed in full |
+| 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the strictly blind re-run (G10) run by the author and evaluated: PR #5 passes, F-3 closed; #5 merged, demo at revision 9, F-4 closed in full; the two repairs and the two letters prepared for the author |
 
 ---
 
 ## 2026-09-24 — PR #4 reviewed and merged; demo revision 8; the strictly blind re-run passes (PR #5)
 
-**Done** (3 docs commits on `main`, `make check` green at each; no platform code touched). The
+**Done** (4 commits on `main`, `make check` green at each; no platform code touched). The
 author asked for the six open decisions of the Phase 9 hand-over to be laid out with a recommendation each
 (merge #4 first; run G10 after it; delete the 672 wrong T2 rows of 22 September unless teardown is
 days away, because Silver is derived and Bronze keeps the evidence; block pod traffic to
@@ -84,9 +84,33 @@ Helm **revision 9**, the four `ote-imbalance-settlement-final` CronJobs on the c
 all), first run 2026-10-01 (June 2026's final settlement). All three settlement versions are
 target-only adapters on `main`: F-4 closed in full. Demo targets: 7.
 
-**Open / carried.** The 672 rows of 22 September (`docs/07` §4.3 SQL) — the
-author's decision. The node-level metadata block, the console check, the two letters, and the
-teardown — unchanged from the Phase 9 entry.
+**The remaining decisions, taken as recommended (fourth commit of the day).** The author said
+"continue according to your recommendations". What the agent could do itself, it did; what its
+classifier refused (production database reads and writes, SSH to the nodes, the Hetzner console
+domain in the browser) is prepared as one command each:
+
+- **22 September rows:** `deployment/own-cluster/repairs/2026-09-22-t2-wrong-day.sql` — one
+  transaction, aborts unless exactly 672 rows match, deletes them, prints what is left; run
+  command in the header; `docs/07` §4.3 carries the pointer and the replay caveat (a replay of
+  those runs would re-create the rows from the wrong captures). Even the read-only count was
+  refused ("production reads"), so the 672 is still the 2026-09-23 figure.
+- **Metadata block:** `deployment/own-cluster/node-metadata-block.sh` + `make demo-metadata-block`
+  (server, then agent by ProxyJump to `10.10.1.20`) + `make demo-metadata-verify` (a policy-less
+  pod in `default` must time out). Raw-table PREROUTING, not FORWARD, so flannel's ACCEPT cannot
+  shadow it; a systemd oneshot before k3s keeps it across reboots. `sh -n` and `make -n` clean;
+  not exercised on a node (SSH refused). `docs/threat-model.md` residual and the own-cluster
+  README updated.
+- **Letters:** recipient addresses read from the sources' contact pages (OTE market desk
+  `market@ote-cr.cz`; ČEPS general `ceps@ceps.cz`; personal addresses on OTE's page ignored). The
+  two ČEPS drafts merged into `ceps-web-service-and-load-series.md`. Both letters created as
+  **Gmail drafts** in the author's account, signed with the author's name, **not sent**; the
+  drafts index says so.
+- **Hetzner console check:** not done — the browser extension has no permission for the console
+  domain; the checklist in the own-cluster README stands.
+
+**Open / carried.** Run the two repairs (`make demo-metadata-block` + verify; the SQL). Send or
+discard the two Gmail drafts. The Hetzner console check. Teardown when the demo is done, then
+`gh workflow disable deploy-demo.yml`.
 
 ---
 

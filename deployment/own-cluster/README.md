@@ -105,3 +105,30 @@ GitHub-hosted runner prefixes cannot be allow-listed; anonymous authentication i
 only identities are the admin client certificate and namespace-scoped OIDC tokens. Set it to
 `false` for admin-only access (a self-hosted runner in the private network is the production
 hardening step).
+
+## Two author-run repairs prepared 2026-09-24
+
+Both were prepared by the maintainer agent and left unapplied on purpose: its permission
+classifier refuses production database access and SSH to the nodes, which matches the authority
+table in `CLAUDE.md`. Each is one command.
+
+**1. Node-level metadata block** (threat-model residual: k3s system pods carry no NetworkPolicy
+and `169.254.169.254` serves the node's `user_data`, join token included). From the checkout,
+with the admin SSH key and the `hcloud` state present:
+
+```bash
+make demo-metadata-block                    # server, then the agent through the server (ProxyJump)
+make demo-metadata-verify KUBECONFIG=~/.kube/energy-platform-demo.yaml   # PASS = the probe times out
+```
+
+What it installs is `node-metadata-block.sh`: a `raw` PREROUTING rule dropping `10.42.0.0/16 →
+169.254.169.254`, kept by a oneshot systemd unit ordered before k3s. Removal on a node:
+`systemctl disable --now energy-platform-metadata-block`. The agent's private address is
+`cidrhost(subnet, 20)` = `10.10.1.20` (`DEMO_AGENT_PRIVATE` if the subnet ever changes). A new
+node built from cloud-init does **not** get the rule automatically — re-run the target after any
+node replacement (cloud-init is first boot only, and this rule was deliberately kept out of the
+nodes module's templates until it has been exercised on a live node).
+
+**2. The 672 wrong T2 rows of 22 September** (`docs/07` §4.3): `repairs/2026-09-22-t2-wrong-day.sql`,
+one transaction, aborts unless exactly 672 rows match. Run command in the file header. Then never
+`replay` the 22 September runs of `ote_intraday_market_xlsx`.

@@ -28,7 +28,7 @@ IMAGE_DIGEST   ?=                        # sha256:… of a pushed image; deploy-
         harness-check pr-surface live-smoke image image-push image-digest target-values \
         local-cluster local-registry local-cni local-image local-secrets deploy-local local-egress-test terraform-plan-hcloud \
         deploy-tenant kubeconfig-oidc deploy-demo print-demo-secret-template rollback-drill ci-kind-tools ci-terraform \
-        demo-reconfigure helm-driver-migrate
+        demo-reconfigure demo-metadata-block demo-metadata-verify helm-driver-migrate
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-20s %s\n",$$1,$$2}'
@@ -285,6 +285,29 @@ demo-reconfigure: ## Author, admin SSH key: push the rendered authn.yaml + names
 	  && $(DEMO_SSH) "root@$$host" 'cp -a /etc/rancher/k3s/authn.yaml /etc/rancher/k3s/authn.yaml.prev && mv /etc/rancher/k3s/authn.yaml.new /etc/rancher/k3s/authn.yaml && systemctl restart k3s && for i in $$(seq 1 60); do k3s kubectl get --raw /readyz >/dev/null 2>&1 && exit 0; sleep 2; done; echo "k3s API not ready after 120 s" >&2; exit 1' \
 	  || { echo "demo-reconfigure: FAILED (the previous file is /etc/rancher/k3s/authn.yaml.prev on the server)"; exit 1; }; \
 	echo "demo-reconfigure: authn.yaml and the namespace RBAC pushed to $$host, k3s restarted, API ready"
+
+# Node-level drop of pod traffic to the cloud metadata service (threat-model residual, 2026-09-24).
+# The agent has no public address of its own in the outputs: it is cidrhost(subnet, 20) by the
+# nodes module and is reached through the server (ProxyJump).
+DEMO_AGENT_PRIVATE ?= 10.10.1.20
+DEMO_PROBE_IMAGE   ?= docker.io/curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+
+demo-metadata-block: ## Author, admin SSH key: install the node-level drop of pod traffic to 169.254.169.254 on the demo server and agent (deployment/own-cluster/node-metadata-block.sh)
+	@test -n "$(TF)" || { echo "demo-metadata-block: neither terraform nor tofu installed"; exit 1; }
+	@host="$$($(DEMO_TF_OUT) server_public_address)" || { echo "demo-metadata-block: no server_public_address in the hcloud state"; exit 1; }; \
+	$(DEMO_SSH) "root@$$host" 'sh -s' < deployment/own-cluster/node-metadata-block.sh \
+	  && $(DEMO_SSH) -J "root@$$host" "root@$(DEMO_AGENT_PRIVATE)" 'sh -s' < deployment/own-cluster/node-metadata-block.sh \
+	  || { echo "demo-metadata-block: FAILED (remove with: systemctl disable --now energy-platform-metadata-block on the node)"; exit 1; }
+	@echo "demo-metadata-block: installed on the server and the agent; verify with make demo-metadata-verify KUBECONFIG=<admin>"
+
+demo-metadata-verify: ## Admin kubeconfig: a policy-less pod in the default namespace must NOT reach 169.254.169.254 (exit 28 = timeout is the pass)
+	@$(KUBECTL) -n default delete pod energy-platform-metadata-probe --ignore-not-found --wait=true >/dev/null 2>&1; \
+	out="$$($(KUBECTL) -n default run energy-platform-metadata-probe --rm -i --restart=Never --image=$(DEMO_PROBE_IMAGE) --command -- \
+	  sh -c 'curl -sS -m 5 -o /dev/null -w "%{http_code}" http://169.254.169.254/hetzner/v1/metadata/hostname; echo " rc=$$?"' 2>/dev/null)"; \
+	case "$$out" in \
+	  *"rc=28"*|*"rc=7"*) echo "PASS metadata-verify: policy-less pod cannot reach the metadata service ($$out)";; \
+	  *) echo "FAIL metadata-verify: the metadata service answered a policy-less pod ($$out)"; exit 1;; \
+	esac
 
 helm-driver-migrate: ## Admin kubeconfig, once: copy $(RELEASE)'s Helm release records from Secrets to ConfigMaps (TENANT_HELM_DRIVER); DELETE_SECRETS=1 removes the Secrets after the history check
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) KUBECTL=$(KUBECTL) HELM=$(HELM) DELETE_SECRETS=$(DELETE_SECRETS) scripts/helm_release_to_configmaps.sh

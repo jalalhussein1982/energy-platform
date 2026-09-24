@@ -226,7 +226,14 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
   22 September (T2's own metrics) still carry 23 September's values.** T1, the system of record
   for `price_vwap` and `volume_total`, is correct. Removing the wrong versions is the author's
   decision (a production database change). They are exactly the T2 rows whose payload is mapped
-  to more than one date:
+  to more than one date (**2026-09-24:** the repair is
+  `deployment/own-cluster/repairs/2026-09-22-t2-wrong-day.sql` — one transaction that aborts
+  unless the set is exactly 672 rows, deletes them and prints what is left; run command in its
+  header. The agent could not run or even count it: its classifier refuses production reads and
+  writes. After the deletion, **do not `replay`** the 22 September runs of
+  `ote_intraday_market_xlsx`: a replay re-processes each run's recorded capture, and those
+  captures are the wrong blob (`energy_platform/runtime/replay.py`). Silver loses nothing that
+  Bronze and the fetch log do not keep):
 
   ```sql
   SELECT id FROM observations
