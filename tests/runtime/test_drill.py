@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import itertools
 from datetime import timedelta
+from typing import cast
 
 from energy_platform.bronze import Bronze, MemoryBlobStore, MemoryCaptureLog
 from energy_platform.runtime import capture, process, restore_drill, silver_digest
-from energy_platform.store import MemoryStore, UnavailableStore
+from energy_platform.store import MemoryStore, Store, UnavailableStore
 from tests.runtime.harness import DAY, SCHEDULED, T1, T3, Clock, runtime
 from tests.synthetic import ote_im_price_period_response
 
@@ -123,3 +124,37 @@ def test_rebuild_ahead_of_live_is_not_a_failure() -> None:
     assert report.ok and t1.ok and t1.extra_versions > 0 and t1.missing_versions == 0
     assert t1.scratch_processed == 4 and t1.live_processed == 3
     assert "ahead by" in t1.message
+
+
+def test_the_drill_streams_rows_and_never_materialises_a_dataset() -> None:
+    """2026-09-24: the first scheduled drill on the demo was OOM-killed at 512 MiB — it held
+    every Silver version of a dataset as Python objects, three times over. The comparison now
+    streams ``iter_rows`` and keeps one 16-byte fingerprint per version; ``all_rows`` must not
+    be touched by the drill on either store."""
+    live, replica, clock = live_system()
+    scratch = MemoryStore()
+    calls: list[str] = []
+
+    class Spy:
+        def __init__(self, inner: MemoryStore) -> None:
+            self._inner = inner
+
+        def all_rows(self, *args: object, **kwargs: object) -> object:
+            calls.append("all_rows")
+            raise AssertionError("the restore drill must stream rows, never materialise them")
+
+        def __getattr__(self, name: str) -> object:
+            return getattr(self._inner, name)
+
+    report = restore_drill(
+        (T1, T3),
+        scratch=cast(Store, Spy(scratch)),
+        replica=replica,
+        live=cast(Store, Spy(live)),
+        clock=clock,
+    )
+    assert report.ok and calls == []
+    t1 = report.targets[0]
+    assert t1.live is not None and t1.scratch is not None
+    assert t1.live.checksum == t1.scratch.checksum and t1.live.rows == t1.scratch.rows > 0
+    assert len(t1.live.checksum) == 64  # sha256 over the sorted fingerprints

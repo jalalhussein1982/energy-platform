@@ -6,7 +6,7 @@ nothing: the fence is checked first and nothing is mutated when it is stale.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import replace
 from datetime import datetime, timedelta
 
@@ -341,6 +341,17 @@ class MemoryStore:
             and (start is None or r.observation.delivery_start_utc >= start)
             and (end is None or r.observation.delivery_start_utc < end)
         )
+
+    def iter_rows(
+        self, dataset_id: str, *, transport: Transport | None = None
+    ) -> Iterator[StoredObservation]:
+        for rid in sorted(self._rows):
+            r = self._rows[rid]
+            o = r.observation
+            if o.dataset_id != dataset_id:
+                continue
+            if transport is None or o.source_transport == transport:
+                yield r
 
     def add_events(
         self,

@@ -19,7 +19,7 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 
 ## 2026-09-24 — PR #4 reviewed and merged; demo revision 8; the strictly blind re-run passes (PR #5)
 
-**Done** (5 commits on `main`, `make check` green at each; no platform code touched). The
+**Done** (6 commits on `main`, `make check` green at each; no platform code touched). The
 author asked for the six open decisions of the Phase 9 hand-over to be laid out with a recommendation each
 (merge #4 first; run G10 after it; delete the 672 wrong T2 rows of 22 September unless teardown is
 days away, because Silver is derived and Bronze keeps the evidence; block pod traffic to
@@ -130,8 +130,17 @@ the agent's classifier and then approved by hand by the author; nothing was work
   512 MiB in its comparison step, after the restored database shut down cleanly; the manual drill
   of 23 September had passed. Recorded in the own-cluster README as an open item.
 
+**The restore-drill memory (sixth commit, platform code).** Root cause, not a bigger limit: the
+drill loaded every Silver version of a dataset as Python objects — live, rebuild, and live again
+for the digest — and both transports of the shared dataset loaded the whole dataset each; at
+74 886 rows that passed 512 MiB and grew daily. `Store.iter_rows` (server-side cursor on
+PostgreSQL, generator in memory) streams versions; the drill keeps one 16-byte fingerprint per
+version per side and compares sets. Report fields and messages unchanged; two tests added (store,
+both backends; a spy that fails the drill if `all_rows` is touched); `make check` 885, `make
+db-test` 26 green. `docs/07` §5.3. Deployed by the push; the next scheduled drill is 01:30 UTC.
+
 **Open / carried.** `TF_VAR_admin_cidr` at the next plan (the firewall was changed outside
-Terraform). The restore-drill memory limit. **The two letters were sent by the author on
+Terraform). **The two letters were sent by the author on
 2026-09-24** (drafts index updated; answers go to `docs/06` §1.4 / §4.2 and `docs/01` §10). The Hetzner
 console check. Teardown when the demo is done, then `gh workflow disable deploy-demo.yml`.
 

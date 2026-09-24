@@ -71,29 +71,40 @@ def _never_fetch(manifest: Manifest) -> Fetcher:
     raise RuntimeError(f"{manifest.target_id}: the restore drill never fetches (ADR-004 replay)")
 
 
-VersionKey = tuple[Any, str, str]
+Fingerprint = bytes
+"""16 bytes per Silver version: blake2b over (observation identity, payload sha256, derivation
+id, value). The comparison keeps one fingerprint per version and never the rows themselves, so
+the drill's memory is a few dozen bytes per version whatever the dataset holds (2026-09-24: the
+first scheduled drill on the demo was OOM-killed at 512 MiB holding ~75 000 rows as objects,
+three times over)."""
 
 
-def silver_versions(store: Store, manifest: Manifest) -> dict[VersionKey, str]:
-    """Every stored Silver version this target's transport produced, keyed by
-    (observation identity, payload sha256, derivation id) → value. Versions are a pure function
-    of Bronze + derivation, so a rebuild from the replica must reproduce each of them; the
-    current view is not compared because which transport wins a shared identity may depend on
-    processing order (ADR-023 §3 tie-break), and live may lag the rebuild on pending captures."""
+def _fingerprint(o: Any) -> Fingerprint:
+    line = f"{observation_identity(o)!r}|{o.payload_sha256}|{o.derivation_id}|{o.value!s}"
+    return hashlib.blake2b(line.encode(), digest_size=16).digest()
+
+
+def silver_fingerprints(store: Store, manifest: Manifest) -> set[Fingerprint]:
+    """Every stored Silver version this target's transport produced, as fingerprints. Versions
+    are a pure function of Bronze + derivation, so a rebuild from the replica must reproduce
+    each of them; the current view is not compared because which transport wins a shared
+    identity may depend on processing order (ADR-023 §3 tie-break), and live may lag the
+    rebuild on pending captures. Rows are streamed (``Store.iter_rows``), never materialised."""
+    dataset_id = manifest.contract.dataset_id
     transport = manifest.contract.source_transport
-    versions: dict[VersionKey, str] = {}
-    for row in store.all_rows(manifest.contract.dataset_id):
-        o = row.observation
-        if o.source_transport != transport:
-            continue
-        versions[(observation_identity(o), o.payload_sha256, o.derivation_id)] = str(o.value)
-    return versions
+    rows = store.iter_rows(dataset_id, transport=transport)
+    return {_fingerprint(row.observation) for row in rows}
+
+
+def _digest(fingerprints: set[Fingerprint]) -> SilverDigest:
+    h = hashlib.sha256()
+    for fp in sorted(fingerprints):
+        h.update(fp)
+    return SilverDigest(len(fingerprints), h.hexdigest())
 
 
 def silver_digest(store: Store, manifest: Manifest) -> SilverDigest:
-    versions = silver_versions(store, manifest)
-    lines = sorted(f"{key!r}|{value}" for key, value in versions.items())
-    return SilverDigest(len(versions), hashlib.sha256("\n".join(lines).encode()).hexdigest())
+    return _digest(silver_fingerprints(store, manifest))
 
 
 def _processed(store: Store, target_id: str) -> int:
@@ -143,7 +154,8 @@ def _drill_target(
     except StoreUnavailable as exc:
         return TargetDrillReport(target, entries, 0, None, None, None, False, f"store: {exc}")
     failed = [r for r in reports if r.outcome not in {"ok", "noop"}]
-    scratch_digest = silver_digest(scratch, manifest)
+    scratch_fp = silver_fingerprints(scratch, manifest)
+    scratch_digest = _digest(scratch_fp)
     scratch_processed = _processed(scratch, target)
     if live is None:
         ok = not failed
@@ -158,12 +170,13 @@ def _drill_target(
             f"rebuilt {len(reconciled)} runs, {len(reports)} processed, {len(failed)} failed "
             f"(no live store to compare)",
         )
-    live_versions = silver_versions(live, manifest)
-    scratch_versions = silver_versions(scratch, manifest)
-    live_digest = silver_digest(live, manifest)
+    live_fp = silver_fingerprints(live, manifest)
+    live_digest = _digest(live_fp)
     live_processed = _processed(live, target)
-    missing = sum(1 for k, v in live_versions.items() if scratch_versions.get(k) != v)
-    extra = sum(1 for k in scratch_versions if k not in live_versions)
+    # a version live holds with a value the rebuild does not reproduce is missing (data loss);
+    # the fingerprint carries the value, so a diverging value is a missing version, not a match
+    missing = len(live_fp - scratch_fp)
+    extra = len(scratch_fp - live_fp)
     problems = []
     if failed:
         problems.append(f"{len(failed)} run(s) failed to process from the replica")
@@ -175,11 +188,11 @@ def _drill_target(
         message = "; ".join(problems)
     elif extra:
         message = (
-            f"live ⊆ rebuild: {len(live_versions)} versions reproduced; the rebuild is ahead by "
+            f"live ⊆ rebuild: {len(live_fp)} versions reproduced; the rebuild is ahead by "
             f"{extra} (live has captures it has not processed yet)"
         )
     else:
-        message = f"identical: {len(live_versions)} Silver versions"
+        message = f"identical: {len(live_fp)} Silver versions"
     return TargetDrillReport(
         target,
         entries,

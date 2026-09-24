@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from datetime import datetime, timedelta
 from typing import Any, cast
 
@@ -564,6 +564,28 @@ class PostgresStore:
         return tuple(
             StoredObservation(r["id"], r["run_attempt_id"], self._observation(r)) for r in rows
         )
+
+    def iter_rows(
+        self, dataset_id: str, *, transport: Transport | None = None
+    ) -> Iterator[StoredObservation]:
+        # a named (server-side) cursor: rows arrive in batches of itersize, never the whole
+        # dataset at once — the restore drill reads every version (ADR-002) and must not grow
+        # with the table (2026-09-24: the first scheduled drill on the demo was OOM-killed)
+        query = sql.SQL(
+            """
+            SELECT {cols} FROM observations
+            WHERE dataset_id = %s AND (%s::text IS NULL OR source_transport = %s)
+            ORDER BY id
+            """
+        ).format(cols=sql.SQL(_OBS_SELECT))
+        try:
+            with self._conn.cursor(name="energy_platform_iter_rows") as cur:
+                cur.itersize = 2000
+                cur.execute(query, (dataset_id, transport, transport))
+                for r in cur:
+                    yield StoredObservation(r["id"], r["run_attempt_id"], self._observation(r))
+        finally:
+            self._conn.rollback()
 
     def _insert_events(
         self,

@@ -147,5 +147,5 @@ all four.
 
 **Seen while checking, not fixed:** the first scheduled `restore-drill` (03:30 Prague, 01:30 UTC)
 ended **OOMKilled** at its 512 MiB limit after the restored database had shut down cleanly, i.e.
-in the comparison step; the manual drill of 2026-09-23 12:46 UTC had passed. Open item: measure
-the drill's peak and raise the limit in the chart values, or make the comparison stream.
+in the comparison step; the manual drill of 2026-09-23 12:46 UTC had passed. **Fixed the same day** (`docs/07` §5.3): the comparison now streams rows and keeps one
+16-byte fingerprint per version; the 512 MiB limit stays and no longer depends on the table size.

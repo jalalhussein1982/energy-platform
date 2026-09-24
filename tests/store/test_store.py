@@ -505,3 +505,32 @@ def test_freshness_row_is_upserted_and_period_helpers_agree(store: Store) -> Non
     rows = store.freshness_rows()
     assert len(rows) == 1 and rows[0].status == "late" and rows[0].computed_at == NOW + TTL
     assert rows[0].age == NOW + TTL - (day + timedelta(minutes=15))
+
+
+def test_iter_rows_streams_every_version_in_id_order_and_filters_by_transport(
+    store: Store,
+) -> None:
+    """``iter_rows`` is the restore drill's reader (ADR-002): every stored version, ``id`` order,
+    one transport when asked, and the same set ``all_rows`` returns — without materialising."""
+    run = captured_run(store)
+    store.commit(
+        claim(store, run),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[
+            obs(period=1),
+            obs(period=2),
+            obs("volume_total", "10.5", period=1, transport="xlsx"),
+        ],
+        now=NOW,
+    )
+    streamed = list(store.iter_rows("ote.idm_continuous"))
+    assert [r.id for r in streamed] == sorted(r.id for r in streamed)
+    assert {r.id for r in streamed} == {r.id for r in store.all_rows("ote.idm_continuous")}
+    assert len(streamed) == 3
+    xlsx_only = list(store.iter_rows("ote.idm_continuous", transport="xlsx"))
+    assert [r.observation.metric for r in xlsx_only] == ["volume_total"]
+    assert list(store.iter_rows("ceps.load")) == []
+    # a second full pass works (the cursor is not left open)
+    assert len(list(store.iter_rows("ote.idm_continuous"))) == 3

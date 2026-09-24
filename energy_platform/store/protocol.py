@@ -13,7 +13,7 @@ Rows are frozen dataclasses mirroring the tables created by the migrations:
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -279,6 +279,15 @@ class Store(Protocol):
     def all_rows(
         self, dataset_id: str, *, start: datetime | None = None, end: datetime | None = None
     ) -> tuple[StoredObservation, ...]: ...
+
+    def iter_rows(
+        self, dataset_id: str, *, transport: Transport | None = None
+    ) -> Iterator[StoredObservation]:
+        """Every stored version of ``dataset_id`` (optionally one transport's), **streamed** in
+        ``id`` order: the reader never holds the dataset in memory. For whole-dataset passes
+        such as the restore drill (ADR-002); ``all_rows`` materialises and is for bounded reads
+        and tests."""
+        ...
 
     def add_events(
         self,

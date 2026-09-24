@@ -349,6 +349,27 @@ on every target).
 Demo projection (not a measurement): one base a day plus about 12 closed segments an hour at
 16–150 KB each — tens of MB a day into A and B instead of ≈ 4.5 GiB of WAL plus 96 bases.
 
+### 5.3 The drill's memory does not grow with the table (2026-09-24)
+
+The first **scheduled** drill on the demo (01:30 UTC; the manual drill of 23 September had
+passed) ended `OOMKilled` at the Job limit of 512 MiB, after the restored database had shut down
+cleanly — in the comparison step. Cause: `restore-drill` compared Silver by loading every stored
+version of a dataset as Python objects (`Store.all_rows`, a tuple of `StoredObservation`), for
+live and for the rebuild, and once more for the live digest; the two targets that share
+`ote.idm_continuous` each loaded the whole dataset and filtered their transport in Python. At
+74 886 rows (57 MB on disk) that was already past the limit, and it grew with every capture.
+
+Fix (no chart change; the 512 MiB limit stays): `Store.iter_rows(dataset_id, transport=…)`
+streams versions in `id` order — a named server-side cursor on PostgreSQL (`itersize` 2 000),
+a generator on the memory store — and the drill keeps **one 16-byte fingerprint per version**
+(blake2b over identity, payload hash, derivation, value) in a set per side. Missing = live −
+rebuild, extra = rebuild − live, checksum = SHA-256 over the sorted fingerprints; the report
+fields, messages and every existing drill test are unchanged. Memory is now a few dozen bytes
+per version instead of a kilobyte per row three times over. Tests:
+`tests/store/test_store.py::test_iter_rows_streams_every_version_in_id_order_and_filters_by_transport`
+(memory and PostgreSQL) and `tests/runtime/test_drill.py::test_the_drill_streams_rows_and_never_materialises_a_dataset`
+(a store spy fails the drill if `all_rows` is touched).
+
 ## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
 
 `make rollback-drill` on kind, 2026-09-22 06:02–06:04 (`deployment/local/drills/rollback.sh`;
