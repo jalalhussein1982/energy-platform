@@ -79,8 +79,11 @@ decisions: [`docs/adr/README.md`](docs/adr/README.md).
   pod starts ([ADR-026](docs/adr/ADR-026-egress-boundary.md) amendment 2).
 - **Known data defect:** until 2026-09-23 18:15 UTC, backfills of the XLSX target stored the
   newest file under earlier days. That is fixed (ADR-033 amendment 2). 21 September is repaired.
-  For 22 September the source has no file (404), so 672 rows of that day still hold the next
-  day's XLSX values. Removing them is the owner's decision ([`docs/07-operations.md`](docs/07-operations.md) §4.3).
+  For 22 September the source has no file (404), so nothing could replace the next day's XLSX
+  values held under it. **Removed on 2026-09-24** (6 048 versions deleted from Silver by the
+  author; Bronze and the fetch log keep the wrong blobs as evidence). Do not `replay` those runs, and note
+  that a Bronze-only rebuild brings the deleted versions back — the durable invalidation record that
+  would stop that is Phase 10 work ([`docs/07-operations.md`](docs/07-operations.md) §4.3; review 2 DC-07).
 - **Storage:** Bronze store A is Hetzner Object Storage (COMPLIANCE Object Lock). Store B is OCI
   Object Storage in Frankfurt (a retention rule): another provider, another country.
 - **Checked live on 2026-09-23:** the backup chain (WAL shipping, base backup, replication) and a

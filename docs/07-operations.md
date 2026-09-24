@@ -422,9 +422,12 @@ and the two monthly targets identical, `ote_intraday_market_xlsx` live ⊆ rebui
 **57 120** live versions reproduced and the rebuild ahead by 11 424 (the nine deleted versions
 of §4.3 among them; 3 lagging). Phase 2, the Bronze-only rebuild into a fresh schema: **OK in
 1 216 s**. Peak memory seen during phase 2: 77 MiB for the drill container, 156 MiB for the
-scratch PostgreSQL; the platform's captures and processing ran normally throughout. RTO figure
-for the demo at this size (≈ 75 000 Silver versions, seven targets): a full rebuild from store B
-in about 13 minutes.
+scratch PostgreSQL; the platform's captures and processing ran normally throughout. Recovery
+figures for the demo at this size (≈ 75 000 Silver versions, seven targets), stated separately:
+the restored-database phase 777 s (≈ 13 min); the Bronze-only rebuild into a fresh schema
+1 216 s (≈ 20 min); the whole two-phase Job 02:52–03:26 UTC (≈ 34 min). Each is a replay
+duration on warm infrastructure; none is a measured infrastructure-loss RTO (replacement
+nodes, identities and secrets, resumed schedules are not included — review 2 DEP-01/04-topology).
 
 ## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
 
