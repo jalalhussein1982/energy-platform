@@ -8,6 +8,7 @@ numbers come from listing that prefix. No database is involved.
 from __future__ import annotations
 
 import json
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol
@@ -76,7 +77,16 @@ class CaptureEntry(BaseModel):
 
 
 class CaptureLog(Protocol):
-    def put(self, entry: CaptureEntry) -> None: ...
+    def put(self, entry: CaptureEntry) -> None:
+        """Write (or overwrite) an entry: fixtures and ingest. The capture path never uses
+        it (ADR-024 amendment 3)."""
+        ...
+
+    def put_new(self, entry: CaptureEntry) -> bool:
+        """Create the entry only if its key does not exist yet; ``False`` when another
+        writer got there first (ADR-024 amendment 3, review 2 DC-06). The capture path retries
+        with the next attempt number, so no acknowledged entry is ever overwritten."""
+        ...
 
     def get(self, capture_id: str) -> CaptureEntry | None: ...
 
@@ -108,9 +118,17 @@ def _in_window(e: CaptureEntry, since: datetime | None, until: datetime | None) 
 class MemoryCaptureLog:
     def __init__(self) -> None:
         self._entries: dict[str, CaptureEntry] = {}
+        self._lock = threading.Lock()
 
     def put(self, entry: CaptureEntry) -> None:
         self._entries[entry.key] = entry
+
+    def put_new(self, entry: CaptureEntry) -> bool:
+        with self._lock:
+            if entry.key in self._entries:
+                return False
+            self.put(entry)
+            return True
 
     def get(self, capture_id: str) -> CaptureEntry | None:
         return next((e for e in self._entries.values() if e.capture_id == capture_id), None)
@@ -153,6 +171,16 @@ class FileCaptureLog:
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(entry.to_json(), encoding="utf-8")
         tmp.replace(path)
+
+    def put_new(self, entry: CaptureEntry) -> bool:
+        path = self._root / entry.key
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with path.open("x", encoding="utf-8") as f:  # O_EXCL: create or fail, atomically
+                f.write(entry.to_json())
+        except FileExistsError:
+            return False
+        return True
 
     def _all(self, target_id: str) -> list[CaptureEntry]:
         prefix = self._root / "captures" / target_id

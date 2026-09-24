@@ -77,6 +77,26 @@ class S3CaptureLog:
     def put(self, entry: CaptureEntry) -> None:
         self._store.put(entry.key, entry.to_json().encode(), content_type=ENTRY_CONTENT_TYPE)
 
+    def put_new(self, entry: CaptureEntry) -> bool:
+        """``PUT`` with ``If-None-Match: *`` (412 → another writer won), then a read-back of
+        the key: a gateway that ignores the header keeps the last writer, so an entry that
+        reads back as someone else's was lost and the caller retries with the next attempt.
+        ADR-024 amendment 3 records the residual: a store that ignores the header *and* is
+        overwritten between this PUT and this GET keeps the other writer's entry."""
+        if not self._store.put_new(
+            entry.key, entry.to_json().encode(), content_type=ENTRY_CONTENT_TYPE
+        ):
+            return False
+        stored = self._read(entry.key)
+        return (
+            stored is not None
+            and stored.capture_id == entry.capture_id
+            and (
+                stored.payload_sha256 == entry.payload_sha256
+                and stored.fetched_at == entry.fetched_at
+            )
+        )
+
     def get(self, capture_id: str) -> CaptureEntry | None:
         try:
             target_id, stamp, attempt = capture_id.rsplit(":", 2)

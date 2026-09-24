@@ -145,6 +145,33 @@ new fence. The lease model (§4) is unchanged: the dead holder, if it ever commi
 **Proof:** `tests/store/test_store.py::test_review2_dc05_…` (both stores);
 `tests/runtime/test_review2.py::test_dc05_…` through `replay_range`, `claim` and `process`.
 
+## Amendment 3 (2026-09-24) — capture-log entries are created, never overwritten
+
+**Context.** Review 2 (DC-06): §1's attempt number was `len(existing) + 1` from a listing
+and the entry write an unconditional PUT, so two writers that listed before either wrote
+(a manual Job beside the CronJob, a backfill and a correction of the same run) produced two
+blobs and **one** entry with the same capture id: the earlier writer's provenance was
+replaced and its blob orphaned, and `concurrencyPolicy: Forbid` covers only the scheduled case.
+
+**Decision.**
+
+1. `CaptureLog.put_new(entry) -> bool` creates the entry only if its key does not exist:
+   memory under a lock, file with `O_EXCL`, S3 with `If-None-Match: *` (412 = another writer
+   won) followed by a read-back of the key — a gateway that ignores the header keeps the last
+   writer, and an entry that reads back as someone else's is reported as not created.
+2. `Bronze.capture` lists, takes `max(attempt) + 1`, writes the blob once (content-addressed)
+   and retries the entry with the next attempt number up to five times; every acknowledged
+   capture keeps its own entry and id. `put` (overwrite) remains for fixtures and `ingest`.
+3. **Residual, recorded:** a gateway that ignores `If-None-Match` *and* is overwritten between
+   the PUT and the read-back keeps the other writer's entry. Hetzner's Ceph RGW and MinIO honour
+   the header; the demo's store A is the former. Bucket versioning on A retains the overwritten
+   version, which an operator can recover by hand; the reader does not enumerate versions.
+
+**Proof:** `tests/bronze/test_bronze.py::test_review2_dc06_…` (two barrier-synchronised
+writers keep two entries with distinct ids; the file backend refuses an existing key; repeated
+collisions fail loudly); `tests/bronze/test_s3.py` (412 on the fake gateway; read-back on a
+gateway that ignores the header).
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-19 · V-6 · CONFIRMED (object store listing and object lock, on which

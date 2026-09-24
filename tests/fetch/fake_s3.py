@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from urllib.parse import unquote
 
@@ -59,6 +60,11 @@ class FakeS3:
     storage_classes: frozenset[str] = frozenset({"STANDARD"})
     """Classes the gateway implements. Any other ``x-amz-storage-class`` on a PUT answers
     ``400 InvalidArgument`` with an **empty** ``<Message>``, as Ceph RGW does (V-6, V-12)."""
+    honours_if_none_match: bool = True
+    """``If-None-Match: *`` on a PUT answers 412 when the key exists (MinIO, Ceph RGW); a
+    gateway that ignores the header keeps the last writer (review 2 DC-06 residual)."""
+    after_put: Callable[[str], None] | None = None
+    """Test hook run after a successful PUT (a concurrent writer overwriting the key)."""
 
     def transport(self) -> Transport:
         return mock_transport(self.handle)
@@ -123,6 +129,16 @@ class FakeS3:
         storage_class = request.headers.get("x-amz-storage-class")
         if storage_class is not None and storage_class not in self.storage_classes:
             return _error(400, "InvalidArgument", "")
+        if (
+            self.honours_if_none_match
+            and request.headers.get("if-none-match") == "*"
+            and key in self.objects
+        ):
+            return _error(
+                412,
+                "PreconditionFailed",
+                "At least one of the pre-conditions you specified did not hold",
+            )
         obj = StoredObject(
             body=bytes(request.content),
             content_type=request.headers.get("content-type", "binary/octet-stream"),
@@ -131,6 +147,8 @@ class FakeS3:
             storage_class=storage_class,
         )
         self.objects[key] = obj
+        if self.after_put is not None:
+            self.after_put(key)
         return response(200, b"", {"etag": obj.etag})
 
     def _get(self, key: str) -> Response:

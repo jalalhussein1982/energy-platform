@@ -15,6 +15,9 @@ from energy_platform.bronze.store import BlobStore, blob_key, sha256_hex
 from energy_platform.contracts.registry import Transport
 from energy_platform.fetch.client import FetchResult
 
+MAX_ENTRY_COLLISIONS = 5
+"""Retries of the attempt number when another writer created the same entry key."""
+
 
 class BronzeError(Exception):
     pass
@@ -71,49 +74,64 @@ class Bronze:
         last HTTP 200 entry (``runtime.capture.capture_baseline``); by default it is this run's
         own previous attempt. Never the target's newest run, which fetched another resource.
         """
-        existing = self._log.entries_for(target_id, scheduled_for)
-        if existing and not force:
-            return CaptureOutcome(existing[-1], created=False)
-        attempt = len(existing) + 1
-        previous = (
-            (existing[-1] if existing else None) if isinstance(baseline, _Default) else baseline
-        )
+        # ADR-024 amendment 3 (review 2 DC-06): the entry is *created*, never overwritten. Two
+        # writers that both listed the same attempts collide on the key; the loser lists again
+        # and takes the next attempt number, so every acknowledged capture keeps its entry.
+        blob: tuple[str, str, int] | None = None
+        collided = False
+        for _ in range(MAX_ENTRY_COLLISIONS):
+            existing = self._log.entries_for(target_id, scheduled_for)
+            if existing and not force and not collided:
+                return CaptureOutcome(existing[-1], created=False)
+            # after a collision this fetch is recorded as the next attempt: its payload was
+            # obtained and must keep its own entry (the other writer's may differ)
+            attempt = max((e.attempt for e in existing), default=0) + 1
+            previous = (
+                (existing[-1] if existing else None) if isinstance(baseline, _Default) else baseline
+            )
 
-        if result.not_modified:
-            if previous is None:
-                raise BronzeError("304 Not Modified without a previous capture to point at")
-            if previous.source_url != result.url:
-                raise BronzeError(
-                    f"304 Not Modified for a different resource than the baseline "
-                    f"({result.url} vs {previous.source_url}): refusing to attach its payload"
-                )
-            sha, raw_ref, size = previous.payload_sha256, previous.raw_ref, previous.size
-        else:
-            sha = self._hot.put(result.body)  # 1. blob, content-addressed
-            raw_ref, size = blob_key(sha), len(result.body)
+            if result.not_modified:
+                if previous is None:
+                    raise BronzeError("304 Not Modified without a previous capture to point at")
+                if previous.source_url != result.url:
+                    raise BronzeError(
+                        f"304 Not Modified for a different resource than the baseline "
+                        f"({result.url} vs {previous.source_url}): refusing to attach its payload"
+                    )
+                sha, raw_ref, size = previous.payload_sha256, previous.raw_ref, previous.size
+            else:
+                if blob is None:
+                    sha = self._hot.put(result.body)  # 1. blob, content-addressed, once
+                    blob = (sha, blob_key(sha), len(result.body))
+                sha, raw_ref, size = blob
 
-        entry = CaptureEntry(  # 2. entry; the ledger row comes later and elsewhere
-            capture_id=capture_id(target_id, scheduled_for, attempt),
-            target_id=target_id,
-            scheduled_for=scheduled_for,
-            attempt=attempt,
-            fetched_at=result.fetched_at,
-            source_url=result.url,
-            http_status=result.status,
-            content_type=result.content_type,
-            payload_sha256=sha,
-            raw_ref=raw_ref,
-            size=size,
-            content_changed=previous is None or previous.payload_sha256 != sha,
-            source_transport=transport,
-            etag=result.etag if not result.not_modified else previous_etag(previous),
-            last_modified=(
-                result.last_modified if not result.not_modified else previous_lm(previous)
-            ),
-            hops=result.hops,
+            entry = CaptureEntry(  # 2. entry; the ledger row comes later and elsewhere
+                capture_id=capture_id(target_id, scheduled_for, attempt),
+                target_id=target_id,
+                scheduled_for=scheduled_for,
+                attempt=attempt,
+                fetched_at=result.fetched_at,
+                source_url=result.url,
+                http_status=result.status,
+                content_type=result.content_type,
+                payload_sha256=sha,
+                raw_ref=raw_ref,
+                size=size,
+                content_changed=previous is None or previous.payload_sha256 != sha,
+                source_transport=transport,
+                etag=result.etag if not result.not_modified else previous_etag(previous),
+                last_modified=(
+                    result.last_modified if not result.not_modified else previous_lm(previous)
+                ),
+                hops=result.hops,
+            )
+            if self._log.put_new(entry):
+                return CaptureOutcome(entry, created=True)
+            collided = True
+        raise BronzeError(
+            f"{target_id} {scheduled_for:%Y-%m-%dT%H:%MZ}: capture-log entry collided "
+            f"{MAX_ENTRY_COLLISIONS} times; another writer keeps taking the next attempt"
         )
-        self._log.put(entry)
-        return CaptureOutcome(entry, created=True)
 
     def ingest(self, entry: CaptureEntry, payload: bytes) -> None:
         """Store an already-described capture (a fixture): blob first, then entry."""

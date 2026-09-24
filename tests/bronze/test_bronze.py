@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Barrier, Lock
 
 import pytest
 
@@ -11,6 +13,7 @@ from energy_platform.bronze import (
     Bronze,
     BronzeError,
     CaptureEntry,
+    CaptureOutcome,
     FileBlobStore,
     FileCaptureLog,
     MemoryBlobStore,
@@ -242,3 +245,66 @@ def test_entry_json_round_trip_keeps_aware_utc_datetimes() -> None:
     ).entry
     again = CaptureEntry.from_json(entry.to_json())
     assert again == entry and again.scheduled_for.tzinfo is not None
+
+
+def test_review2_dc06_two_concurrent_writers_keep_two_entries() -> None:
+    """Review 2 DC-06 (ADR-024 amendment 3): both writers list the same attempts before either
+    writes; the loser's create fails on the key and it takes the next attempt number — two
+    blobs, two entries, two capture ids, nothing overwritten."""
+    barrier = Barrier(2)
+
+    class Racing(MemoryCaptureLog):
+        """Both writers' *first* listing waits for the other, so both compute attempt 1."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self._first_listings = 2
+            self._gate = Lock()
+
+        def entries_for(self, target_id: str, scheduled_for: datetime) -> tuple[CaptureEntry, ...]:
+            snapshot = super().entries_for(target_id, scheduled_for)
+            with self._gate:
+                synchronise = self._first_listings > 0
+                self._first_listings -= 1
+            if synchronise:
+                barrier.wait(timeout=5)
+            return snapshot
+
+    blobs, log = MemoryBlobStore(), Racing()
+    b = Bronze(blobs, log)
+
+    def one(body: bytes) -> CaptureOutcome:
+        return b.capture(target_id="t", scheduled_for=T0, result=result(body), transport="soap")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(one, (b"first observation", b"second observation")))
+    assert all(o.created for o in outcomes)
+    assert {o.entry.capture_id for o in outcomes} == {
+        "t:2026-09-17T220000Z:1",
+        "t:2026-09-17T220000Z:2",
+    }
+    assert len(log.list("t")) == 2 and len(blobs) == 2
+    assert {e.payload_sha256 for e in log.list("t")} == {o.entry.payload_sha256 for o in outcomes}
+
+
+def test_review2_dc06_file_log_create_is_exclusive(tmp_path: Path) -> None:
+    log = FileCaptureLog(tmp_path)
+    b = Bronze(FileBlobStore(tmp_path), log)
+    first = b.capture(target_id="t", scheduled_for=T0, result=result(b"a"), transport="soap")
+    assert first.created and log.put_new(first.entry) is False  # the key exists: refused
+    stored = log.get(first.entry.capture_id)
+    assert stored is not None and stored.payload_sha256 == first.entry.payload_sha256
+    again = b.capture(
+        target_id="t", scheduled_for=T0, result=result(b"b"), transport="soap", force=True
+    )
+    assert again.entry.attempt == 2 and len(log.entries_for("t", T0)) == 2
+
+
+def test_capture_gives_up_after_repeated_collisions() -> None:
+    class Taken(MemoryCaptureLog):
+        def put_new(self, entry: CaptureEntry) -> bool:
+            return False  # someone else always wins
+
+    b = Bronze(MemoryBlobStore(), Taken())
+    with pytest.raises(BronzeError, match="collided"):
+        b.capture(target_id="t", scheduled_for=T0, result=result(b"x"), transport="soap")

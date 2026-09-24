@@ -227,3 +227,42 @@ def test_fixture_ingest_on_s3() -> None:
     e = entry("t", T0, 1)
     b.ingest(e, b"x")
     assert b.log.get(e.capture_id) == e and b.read(e.raw_ref).payload == b"x"
+
+
+# ------------------------------------------------------------------ create-only entries (DC-06)
+
+
+def test_entry_create_is_conditional_and_a_412_means_another_writer_won() -> None:
+    fake = FakeS3()
+    log = S3CaptureLog(store(fake))
+    e = entry("t", T0, 1)
+    assert log.put_new(e) is True
+    put = next(r for r in fake.requests if r.method == "PUT")
+    assert put.headers.get("if-none-match") == "*"
+    assert log.put_new(entry("t", T0, 1, payload_sha256=sha256_hex(b"other"))) is False
+    stored = log.get(e.capture_id)
+    assert stored is not None and stored.payload_sha256 == e.payload_sha256  # untouched
+    assert [m for m, _ in fake.calls()] == [
+        "PUT",
+        "GET",
+        "PUT",
+        "GET",
+    ]  # create, read-back, 412, get
+
+
+def test_entry_create_on_a_gateway_that_ignores_the_header_is_verified_by_read_back() -> None:
+    """A store that ignores If-None-Match keeps the last writer: the read-back shows another
+    writer's entry, the create reports False and the caller takes the next attempt."""
+    fake = FakeS3(honours_if_none_match=False)
+    log = S3CaptureLog(store(fake))
+    mine = entry("t", T0, 1)
+    theirs = entry("t", T0, 1, payload_sha256=sha256_hex(b"theirs"))
+
+    def overwrite(key: str) -> None:  # the other writer lands between our PUT and our GET
+        fake.after_put = None
+        log.put(theirs)
+
+    fake.after_put = overwrite
+    assert log.put_new(mine) is False
+    stored = log.get(mine.capture_id)
+    assert stored is not None and stored.payload_sha256 == theirs.payload_sha256

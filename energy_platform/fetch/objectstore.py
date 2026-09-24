@@ -313,6 +313,29 @@ class ObjectStore:
         self._raise_unless(response, {200}, key)
         return str(response.headers.get("etag", ""))
 
+    def put_new(
+        self, key: str, data: bytes, *, content_type: str = "application/octet-stream"
+    ) -> bool:
+        """Create-only ``PUT`` (``If-None-Match: *``): ``False`` on 412 Precondition Failed,
+        the object already existed (ADR-024 amendment 3). Object-lock headers as ``put``."""
+        headers = {
+            "content-type": content_type,
+            "content-md5": base64.b64encode(
+                hashlib.md5(data, usedforsecurity=False).digest()
+            ).decode(),
+            "if-none-match": "*",
+        }
+        retention = self._config.retention
+        if retention is not None:
+            until = self._clock().astimezone(UTC) + timedelta(days=retention.days)
+            headers["x-amz-object-lock-mode"] = retention.mode
+            headers["x-amz-object-lock-retain-until-date"] = until.strftime(_RETAIN_UNTIL)
+        response = self._request("PUT", self._object_url(key), headers=headers, body=data)
+        if response.status_code == 412:
+            return False
+        self._raise_unless(response, {200}, key)
+        return True
+
     def get(self, key: str) -> bytes | None:
         """The object's bytes, or ``None`` when it does not exist (404)."""
         response = self._request("GET", self._object_url(key))
