@@ -4,7 +4,7 @@ ADR-026 layer 1, standard NetworkPolicy API (no CRD):
   2. DNS to kube-dns for every pod;
   3. Postgres: platform verb pods -> the chart's Postgres pod (statefulset/cnpg) or the external
      CIDRs; ingress on the Postgres pod only from platform pods;
-  4. object store: platform pods -> the local MinIO pods (port 9000) or the off-cluster CIDRs;
+  4. object store: platform pods -> the local object-store pods (port 9000) or the off-cluster CIDRs;
   5. TCP 443 to the public internet, minus private/metadata/cluster ranges, for the pods that
      fetch and nothing else: capture, recapture, backfill. process, gaps, hooks, drills, the
      exporter have no internet egress. Layer 2 (host allowlist, redirects, private-range

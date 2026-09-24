@@ -1,0 +1,27 @@
+{{- /*
+Bucket bootstrap for the local object stores (ADR-036 §1, amendment 4): bucket A created with
+Object Lock and versioning (the store-A control), bucket B plain (the copy target). Runs the
+platform image (`energyctl bucket-init`, the same signed S3 client the platform trusts — no `mc`,
+one fewer third-party image) as a post-install/post-upgrade hook at weight -20, before migrate
+(-10), the storage probe (-5) and the smoke (0); idempotent (an existing bucket is fine).
+*/ -}}
+{{- if .Values.objectstore.local.enabled }}
+{{- $fullname := include "energy-platform.fullname" . }}
+{{- $replicaEnv := include "energy-platform.s3Env" (dict "root" . "prefix" "ENERGY_PLATFORM_S3_REPLICA" "secret" "BRONZE_REPLICA" "store" .Values.bronze.replica) | fromYamlArray -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fullname }}-bucket-init
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: hook
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  template:
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "hook" "container" (include "energy-platform.container" (dict "root" . "name" "bucket-init" "args" (list "bucket-init" "--replica") "extraEnv" $replicaEnv))) | indent 4 }}
+{{- end }}

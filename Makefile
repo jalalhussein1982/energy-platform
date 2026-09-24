@@ -210,14 +210,14 @@ local-image: ## Push $(IMAGE) to the kind-attached registry; the deploy referenc
 	$(DOCKER) push $(LOCAL_IMAGE_REPO):$(IMAGE_TAG)
 	@echo "local-image: $$(make -s image-digest FROM_LOCAL_REGISTRY=1)"
 
-local-secrets: ## Generate the local Secret (random Postgres password and MinIO keys); never asks for credentials (P5-D10)
+local-secrets: ## Generate the local Secret (random Postgres password and object-store keys); never asks for credentials (P5-D10)
 	@$(KUBE) get namespace $(NAMESPACE) >/dev/null 2>&1 || $(KUBE) create namespace $(NAMESPACE) >/dev/null
 	@$(KUBE) -n $(NAMESPACE) get secret $(RELEASE) >/dev/null 2>&1 && echo "local-secrets: $(RELEASE) exists" || \
 	$(KUBE) -n $(NAMESPACE) create secret generic $(RELEASE) \
 	  --from-literal=POSTGRES_PASSWORD=$$(openssl rand -hex 16) \
-	  --from-literal=BRONZE_ACCESS_KEY_ID=minioa$$(openssl rand -hex 6) \
+	  --from-literal=BRONZE_ACCESS_KEY_ID=storea$$(openssl rand -hex 6) \
 	  --from-literal=BRONZE_SECRET_ACCESS_KEY=$$(openssl rand -hex 20) \
-	  --from-literal=BRONZE_REPLICA_ACCESS_KEY_ID=miniob$$(openssl rand -hex 6) \
+	  --from-literal=BRONZE_REPLICA_ACCESS_KEY_ID=storeb$$(openssl rand -hex 6) \
 	  --from-literal=BRONZE_REPLICA_SECRET_ACCESS_KEY=$$(openssl rand -hex 20) \
 	  --from-literal=GRAFANA_ADMIN_PASSWORD=$$(openssl rand -hex 12) \
 	  --from-literal=GRAFANA_DB_PASSWORD=$$(openssl rand -hex 20)

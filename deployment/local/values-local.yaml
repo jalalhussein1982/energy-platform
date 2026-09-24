@@ -1,5 +1,5 @@
-# `local` profile (ADR-010): kind + Cilium on a laptop. Two MinIOs in the chart (A with Object
-# Lock, B plain), Postgres as a StatefulSet, generated credentials in one Secret created by
+# `local` profile (ADR-010): kind + Cilium on a laptop. Two RustFS object stores in the chart (A
+# with Object Lock, B plain; ADR-036 amendment 4), Postgres as a StatefulSet, generated credentials in one Secret created by
 # `make local-secrets` (no credentials required to run, P5-D10). The image digest is set by
 # `make deploy-local` from the kind node after `kind load docker-image`.
 residency: local
@@ -53,6 +53,6 @@ resources:
   postgres:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {cpu: 500m, memory: 512Mi}
-  minio:
+  objectstore:
     requests: {cpu: 25m, memory: 96Mi}
     limits: {cpu: 500m, memory: 384Mi}

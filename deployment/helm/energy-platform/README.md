@@ -10,7 +10,7 @@ anything cluster-level sits behind a values flag that is off by default.
 | gap detector + freshness row | `templates/cronjob-gaps.yaml` (`energyctl gaps --all --with-freshness`) | ADR-031, ADR-037 |
 | hook chain `migrate` (−10, `post-install,pre-upgrade`) → `storage-probe` (−5, only `tiering.mode=lifecycle`) → `smoke` (0, `post-install,post-upgrade,test`) | `templates/hook-*.yaml` | ADR-025 |
 | Postgres per `postgres.mode` = `statefulset` \| `cnpg` \| `external` | `templates/postgres-*.yaml` | D-2, ADR-030, ADR-036 §4 |
-| two MinIOs for the local profile (A `--with-lock`, B plain) | `templates/minio*.yaml` (`objectstore.local.enabled`) | ADR-036 §1 |
+| two RustFS object stores for the local profile (A with Object Lock + versioning, B plain) and the `bucket-init` hook (`energyctl bucket-init` on the platform image, no `mc`) | `templates/objectstore.yaml`, `templates/hook-bucket-init.yaml` (`objectstore.local.enabled`) | ADR-036 §1, amendment 4 |
 | NetworkPolicies: default deny; DNS; Postgres; object store; TCP 443 to public ranges for capture / recapture / backfill only | `templates/networkpolicy.yaml` | ADR-026 layer 1 |
 | optional `CiliumNetworkPolicy` with `toFQDNs` from the targets' hosts | `egress.fqdnPolicy=cilium` | ADR-026 layer 3 |
 | `Secret` by name, or an `ExternalSecret` behind `secrets.eso.enabled` | `templates/externalsecret.yaml` | D-7 |
@@ -43,7 +43,7 @@ helm test energy-platform -n energy-platform --logs   # re-run the smoke on dema
 | `BRONZE_REPLICA_ACCESS_KEY_ID`, `BRONZE_REPLICA_SECRET_ACCESS_KEY` | `bronze.replica.enabled` (store B) |
 | `BRONZE_COLD_ACCESS_KEY_ID`, `BRONZE_COLD_SECRET_ACCESS_KEY` | `bronze.tiering.mode=move` |
 
-The local profile generates all of them (`make local-secrets`); MinIO's root credentials are
+The local profile generates all of them (`make local-secrets`); the object stores' root credentials are
 the same keys, so nothing else has to agree. With `secrets.eso.enabled` the chart renders an
 `ExternalSecret` that produces the same Secret from `secrets.eso.remoteKeys`.
 

@@ -180,7 +180,7 @@ def test_flags_render_their_crd_kinds_only_when_on(tmp_path: Path) -> None:
     assert on["Cluster"] == 1 and on["ExternalSecret"] == 1 and on["CiliumNetworkPolicy"] == 1
     assert on["StatefulSet"] == 0  # cnpg replaces the chart's own Postgres
     local = kinds(render(tmp_path, LOCAL))
-    assert local["StatefulSet"] == 3  # postgres + minio a + minio b
+    assert local["StatefulSet"] == 3  # postgres + object store a + object store b (RustFS)
     assert "Cluster" not in local
 
 
@@ -476,7 +476,7 @@ def test_policy_gate_runs_first_in_every_payload_pod_behind_its_flag(tmp_path: P
     )
     for values, extra in ((LOCAL, ()), (DEMO, ("--set", demo_endpoint))):
         specs = [(r, s) for r, s in _pod_specs(render(tmp_path, TENANT, values, extra=extra))]
-        gated = [  # the platform image's pods (minio-init, a local hook, runs mc)
+        gated = [  # the platform image's pods (every hook is the platform image since Phase 12)
             (r, s) for r, s in specs if r in payload_roles and DIGEST in s["containers"][0]["image"]
         ]
         assert {r for r, _ in gated} >= {
@@ -627,3 +627,36 @@ def test_grafana_is_off_by_default_and_private_behind_its_flag(tmp_path: Path) -
         yaml.safe_load(flagged["data"]["datasource.yaml"])["datasources"][0]["jsonData"]["sslmode"]
         == "require"
     )
+
+
+def test_local_object_stores_are_rustfs_with_the_bucket_init_hook_on_the_platform_image(
+    tmp_path: Path,
+) -> None:
+    """ADR-036 amendment 4: two RustFS StatefulSets (A locked, B plain) and a bucket-init hook
+    that runs the platform's own client — no `mc`, no MinIO image anywhere in the render."""
+    docs = render(tmp_path, TENANT, LOCAL)
+    text = json.dumps(docs)
+    assert "minio/minio" not in text and "minio/mc" not in text
+    stores = {n: d for n, d in named(docs, "StatefulSet").items() if "minio-" in n}
+    assert set(stores) == {"ep-energy-platform-minio-a", "ep-energy-platform-minio-b"}
+    for name, sts in stores.items():
+        spec = sts["spec"]["template"]["spec"]
+        container = spec["containers"][0]
+        assert container["image"].startswith("docker.io/rustfs/rustfs@sha256:")
+        env = {e["name"]: e for e in container["env"]}
+        secret = "BRONZE" if name.endswith("-a") else "BRONZE_REPLICA"
+        assert (
+            env["RUSTFS_ACCESS_KEY"]["valueFrom"]["secretKeyRef"]["key"]
+            == f"{secret}_ACCESS_KEY_ID"
+        )
+        assert env["RUSTFS_CONSOLE_ENABLE"]["value"] == "false"
+        assert container["readinessProbe"]["httpGet"]["path"] == "/health/ready"
+        assert spec["securityContext"]["runAsUser"] == 10001
+    hook = named(docs, "Job")["ep-energy-platform-bucket-init"]
+    pod = hook["spec"]["template"]["spec"]
+    assert DIGEST in pod["containers"][0]["image"]
+    assert pod["containers"][0]["args"] == ["bucket-init", "--replica"]
+    hook_env = {e["name"] for e in pod["containers"][0]["env"]}
+    assert {"ENERGY_PLATFORM_S3_ENDPOINT", "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT"} <= hook_env
+    assert hook["metadata"]["annotations"]["helm.sh/hook-weight"] == "-20"
+    assert "ep-energy-platform-minio-init" not in named(docs, "Job")
