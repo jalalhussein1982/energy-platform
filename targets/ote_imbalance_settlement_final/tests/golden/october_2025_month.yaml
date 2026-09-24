@@ -1,0 +1,26 @@
+fixture: october_2025_month
+checked_by: "Claude (contributor session), 2026-09-24: values read from fixtures/october_2025_month/blob with ElementTree; UTC instants computed with zoneinfo from local midnight, not from platform output; 2025-10-26 has 100 periods (02:00 occurs twice: indices 9 and 13 are an hour apart in UTC); 5 October periods 45-56 have negative prices; 12 October period 60 has no SettlImbalancePrice (NULL)"
+expect:
+  row_count: 8940
+  rows:
+    - {delivery_start_utc: 2025-09-30T22:00:00Z, resolution: PT15M, period_index: 1, source_version: "2", metric: system_imbalance, value: "1.00100"}
+    - {delivery_start_utc: 2025-09-30T22:00:00Z, resolution: PT15M, period_index: 1, source_version: "2", metric: imbalance_price, value: "3010.001"}
+    - {delivery_start_utc: 2025-09-30T22:00:00Z, resolution: PT15M, period_index: 1, source_version: "2", metric: counter_imbalance_price, value: "4010.001"}
+    - {delivery_start_utc: 2025-10-05T09:00:00Z, resolution: PT15M, period_index: 45, source_version: "2", metric: system_imbalance, value: "5.04500"}
+    - {delivery_start_utc: 2025-10-05T09:00:00Z, resolution: PT15M, period_index: 45, source_version: "2", metric: imbalance_price, value: "-505.045"}
+    - {delivery_start_utc: 2025-10-05T09:00:00Z, resolution: PT15M, period_index: 45, source_version: "2", metric: counter_imbalance_price, value: "-605.045"}
+    - {delivery_start_utc: 2025-10-12T12:45:00Z, resolution: PT15M, period_index: 60, source_version: "2", metric: system_imbalance, value: "-12.06000"}
+    - {delivery_start_utc: 2025-10-12T12:45:00Z, resolution: PT15M, period_index: 60, source_version: "2", metric: imbalance_price, value: null}
+    - {delivery_start_utc: 2025-10-12T12:45:00Z, resolution: PT15M, period_index: 60, source_version: "2", metric: counter_imbalance_price, value: "4120.060"}
+    - {delivery_start_utc: 2025-10-26T00:00:00Z, resolution: PT15M, period_index: 9, source_version: "2", metric: system_imbalance, value: "26.00900"}
+    - {delivery_start_utc: 2025-10-26T00:00:00Z, resolution: PT15M, period_index: 9, source_version: "2", metric: imbalance_price, value: "3260.009"}
+    - {delivery_start_utc: 2025-10-26T00:00:00Z, resolution: PT15M, period_index: 9, source_version: "2", metric: counter_imbalance_price, value: "4260.009"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, period_index: 13, source_version: "2", metric: system_imbalance, value: "26.01300"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, period_index: 13, source_version: "2", metric: imbalance_price, value: "3260.013"}
+    - {delivery_start_utc: 2025-10-26T01:00:00Z, resolution: PT15M, period_index: 13, source_version: "2", metric: counter_imbalance_price, value: "4260.013"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, period_index: 100, source_version: "2", metric: system_imbalance, value: "-26.10000"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, period_index: 100, source_version: "2", metric: imbalance_price, value: "3260.100"}
+    - {delivery_start_utc: 2025-10-26T22:45:00Z, resolution: PT15M, period_index: 100, source_version: "2", metric: counter_imbalance_price, value: "4260.100"}
+    - {delivery_start_utc: 2025-10-31T22:45:00Z, resolution: PT15M, period_index: 96, source_version: "2", metric: system_imbalance, value: "-31.09600"}
+    - {delivery_start_utc: 2025-10-31T22:45:00Z, resolution: PT15M, period_index: 96, source_version: "2", metric: imbalance_price, value: "3310.096"}
+    - {delivery_start_utc: 2025-10-31T22:45:00Z, resolution: PT15M, period_index: 96, source_version: "2", metric: counter_imbalance_price, value: "4310.096"}
