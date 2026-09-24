@@ -138,9 +138,19 @@ PostgreSQL, generator in memory) streams versions; the drill keeps one 16-byte f
 version per side and compares sets. Report fields and messages unchanged; two tests added (store,
 both backends; a spy that fails the drill if `all_rows` is touched); `make check` 885, `make
 db-test` 26 green. `docs/07` §5.3. Deployed by the push; the next scheduled drill is 01:30 UTC.
+**Proved on the demo and a new finding:** a manual drill after the deploy (revision 12) completed
+the comparison in 406 s inside 512 MiB (65 856 rebuilt vs 57 120 live versions on the xlsx target),
+so the OOM is fixed — and the drill **failed on its own rule**: versions produced by superseded
+captures of a run (a correction with changed content is a new capture; the rebuild replays one
+capture per run) read as "missing", and a run processed after the last replication reads as
+"processed runs 63 < live 64". The nine deleted versions of 22 September come back in the rebuild
+as "extra", as documented. Open, `docs/07` §5.3: replay every capture-log entry of a run, and
+bound the processed-runs comparison by the replica's last replication.
 
-**Open / carried.** `TF_VAR_admin_cidr` at the next plan (the firewall was changed outside
-Terraform). **The two letters were sent by the author on
+
+**Open / carried.** The drill's comparison rule (`07` §5.3: superseded captures, replica lag) —
+the nightly drill fails on it until fixed. `TF_VAR_admin_cidr` at the next plan (the firewall was
+changed outside Terraform). **The two letters were sent by the author on
 2026-09-24** (drafts index updated; answers go to `docs/06` §1.4 / §4.2 and `docs/01` §10). The Hetzner
 console check. Teardown when the demo is done, then `gh workflow disable deploy-demo.yml`.
 

@@ -370,6 +370,37 @@ per version instead of a kilobyte per row three times over. Tests:
 (memory and PostgreSQL) and `tests/runtime/test_drill.py::test_the_drill_streams_rows_and_never_materialises_a_dataset`
 (a store spy fails the drill if `all_rows` is touched).
 
+**Proof and a new finding (manual drill `restore-drill-manual-2`, 02:05–02:12 UTC, revision 12).**
+The comparison **completed**: 406 s wall clock, all seven targets compared, `65 856` rebuilt
+versions against `57 120` live for the xlsx target alone, inside the same 512 MiB — the OOM is
+gone. The drill then **failed on its own criterion**, which the OOM (and the early manual run of
+23 September) had hidden:
+
+| Target | Rebuild vs live | Verdict |
+|---|---|---|
+| `ote_dam`, `…settlement_final`, `…settlement_monthly` | identical | ok |
+| `ote_imbalance_settlement` | processed runs 63 < live 64 | fail |
+| `ceps_load` | 84 versions live holds are missing from the rebuild | fail |
+| `ote_intraday_market` | 64 missing | fail |
+| `ote_intraday_market_xlsx` | 1 344 missing, 10 080 extra | fail |
+
+Two causes, both in the drill's rule, not in the backups: **(a) superseded captures.** A
+correction that finds changed content is a new capture of the same run; live keeps the version
+each capture produced, but the run's `capture_id` moves to the newest, and the rebuild
+(`reconcile` + `process`) replays one capture per run — so every version an earlier capture of
+a run produced is "missing" although its blob is in the replica. The counts are multiples of a
+day's rows (84 = ČEPS QH rows of a partial day, 1 344 = 2 × 672). **(b) replica lag.** A run
+processed in live after the last replication has no capture in store B yet, so the rebuild
+holds one processed run fewer. The rule tolerates the rebuild being ahead, not behind. The
+10 080 "extra" xlsx versions include the nine wrong versions of 22 September deleted in §4.3:
+their blobs are in the replica, so a rebuild recreates them — the documented cost of that
+deletion, informational here.
+
+**Status: open, recorded 2026-09-24.** The fix is in the drill, not the chart: replay **every**
+capture-log entry of a run in order (versions are a function of each capture, not of the last
+one), and compare processed runs only up to the replica's last replication instant. Until then
+the nightly drill reports these two effects as failures.
+
 ## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
 
 `make rollback-drill` on kind, 2026-09-22 06:02–06:04 (`deployment/local/drills/rollback.sh`;
