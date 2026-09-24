@@ -77,6 +77,14 @@ claims directly. A Kubernetes `fieldRef` is not a credential; the gate test said
 meant "no secret". `ON CONFLICT … DO UPDATE SET id = id` cannot touch a GENERATED ALWAYS column;
 `run_attempt_id = run_attempt_id` is the harmless no-op that yields `RETURNING id, xmax = 0`.
 
+**Live finding after the push (16:50 UTC).** The deploy of the last four commits failed atomically:
+the migrate hook's gate saw the new *host canary* (node IP, port 9) **answered** with every policy in
+force — on kube-router pod-to-node traffic is not policed — so every gated pod would have failed
+closed; Helm rolled revision 18 back to 17 and captures continued. Fixed in the next commit: the
+policy canary is the cluster DNS service's metrics port 9153 (pod-to-pod, policed; DNS rule 53 only;
+CoreDNS answers without the policy), derived from the pod's `resolv.conf`; the host canary is
+withdrawn in ADR-026 amendment 3 with the observation. The migrate hook's gate is the live check.
+
 **Open / carried.** Author: `energyctl invalidate` for the nine 22 September captures; the
 first-packet egress Jobs with the node block on; `TF_VAR_admin_cidr` at the next plan; the console
 check; teardown. ČEPS `value1` = `value2` (terms decided). CNPG/external backup chains when a

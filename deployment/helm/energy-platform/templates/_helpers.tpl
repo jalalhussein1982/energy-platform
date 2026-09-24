@@ -211,19 +211,13 @@ spec:
         - wait-egress-policy
         - --timeout
         - {{ .root.Values.egress.policyGate.timeoutSeconds | quote }}
-{{- if gt (int .root.Values.egress.policyGate.hostCanaryPort) 0 }}
-        - --host-canary
-        - "$(POLICY_GATE_HOST_IP):{{ .root.Values.egress.policyGate.hostCanaryPort }}"
+{{- if gt (int .root.Values.egress.policyGate.dnsMetricsCanaryPort) 0 }}
+        - --dns-metrics-canary-port
+        - {{ .root.Values.egress.policyGate.dnsMetricsCanaryPort | quote }}
 {{- end }}
       env:
         - name: TMPDIR
           value: /tmp
-{{- if gt (int .root.Values.egress.policyGate.hostCanaryPort) 0 }}
-        - name: POLICY_GATE_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-{{- end }}
       securityContext:
 {{ include "energy-platform.containerSecurity" . | indent 8 }}
       resources:

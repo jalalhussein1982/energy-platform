@@ -149,9 +149,10 @@ egress:                                  # ADR-026 layer 1
   policyGate:
     enabled: false
     timeoutSeconds: 60
-    # ADR-026 amendment 3: a second canary only the pod's own policy can drop — the node's IP
-    # (downward API) on a closed port: refused = no policy yet, dropped = policy in force. 0 = off.
-    hostCanaryPort: 9
+    # ADR-026 amendment 3: a second canary that answers without this pod's egress policy and
+    # that the policy drops — the cluster DNS service (resolv.conf's nameserver) on its metrics
+    # port: pod-to-pod, policed by every CNI; the DNS rule allows 53 only. 0 = off.
+    dnsMetricsCanaryPort: 9153
 
 smoke:                                   # ADR-025 hook: one fixture capture+process
   manifest: ote_intraday_market/manifest.yaml

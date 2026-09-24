@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from energy_platform.fetch.policy_gate import (
     CANARY,
     Connect,
     PolicyNotEnforced,
+    dns_metrics_canary,
     wait_for_egress_policy,
 )
 
@@ -66,7 +69,7 @@ def test_already_enforced_opens_at_once() -> None:
     assert result.attempts == 2
 
 
-HOST = ("10.0.0.5", 9)
+DNS = ("10.43.0.10", 9153)
 
 
 def two_canaries(metadata: list[bool], host: list[str]) -> Connect:
@@ -87,29 +90,41 @@ def two_canaries(metadata: list[bool], host: list[str]) -> Connect:
     return connect
 
 
-def test_host_canary_refused_means_no_policy_even_when_metadata_is_blocked_by_the_node() -> None:
+def test_policy_canary_answered_means_no_policy_even_when_the_node_blocks_metadata() -> None:
     """ADR-026 amendment 3 (review 2 DEP-05): after the node-level metadata block the metadata
-    canary is unreachable from the first attempt; only a *dropped* host canary proves the pod's
-    own policy. Refused twice, then dropped twice → opens on the fourth attempt."""
+    canary is unreachable from the first attempt; only a *dropped* policy canary (CoreDNS's
+    metrics port, answered without the policy) proves the pod's own policy. Answered twice, then
+    dropped twice → opens on the fourth attempt."""
     clock = Clock()
-    connect = two_canaries([False] * 8, ["refused", "refused", "dropped", "dropped"])
+    connect = two_canaries([False] * 8, ["open", "refused", "dropped", "dropped"])
     result = wait_for_egress_policy(
-        host_canary=HOST, connect=connect, clock=clock, sleep=clock.sleep
+        policy_canary=DNS, connect=connect, clock=clock, sleep=clock.sleep
     )
-    assert result.attempts == 4 and result.host_canary_dropped is True
+    assert result.attempts == 4 and result.policy_canary_dropped is True
 
 
-def test_host_canary_that_keeps_answering_fails_closed() -> None:
+def test_policy_canary_that_keeps_answering_fails_closed() -> None:
     clock = Clock()
     connect = two_canaries([False] * 100, ["open"] * 100)
-    with pytest.raises(PolicyNotEnforced, match="host canary"):
+    with pytest.raises(PolicyNotEnforced, match="policy canary"):
         wait_for_egress_policy(
-            host_canary=HOST, timeout=5.0, connect=connect, clock=clock, sleep=clock.sleep
+            policy_canary=DNS, timeout=5.0, connect=connect, clock=clock, sleep=clock.sleep
         )
 
 
-def test_without_a_host_canary_the_metadata_rule_stands_alone() -> None:
+def test_without_a_policy_canary_the_metadata_rule_stands_alone() -> None:
     clock = Clock()
     connect, _ = connector([False, False])
     result = wait_for_egress_policy(connect=connect, clock=clock, sleep=clock.sleep)
-    assert result.host_canary_dropped is None
+    assert result.policy_canary_dropped is None
+
+
+def test_dns_metrics_canary_comes_from_resolv_conf(tmp_path: Path) -> None:
+    resolv = tmp_path / "resolv.conf"
+    resolv.write_text(
+        "search energy-platform.svc.cluster.local\nnameserver 10.43.0.10\noptions ndots:5\n"
+    )
+    assert dns_metrics_canary(9153, str(resolv)) == ("10.43.0.10", 9153)
+    resolv.write_text("options ndots:5\n")
+    assert dns_metrics_canary(9153, str(resolv)) is None
+    assert dns_metrics_canary(9153, str(tmp_path / "missing")) is None

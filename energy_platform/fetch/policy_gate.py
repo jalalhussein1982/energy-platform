@@ -12,17 +12,22 @@ Two canaries, two different signals (ADR-026 amendment 3, review 2 DEP-05):
   twice in a row — the fail-closed check: a cluster that keeps answering it fails the pod after
   ``timeout``. Once the node itself blocks that address, this canary is unreachable whether or
   not the pod's policy exists, so it can no longer prove the policy;
-* the **host canary** (the node's own address on a closed port, given by the chart from the
-  downward API) tells the two apart: with no policy the node answers the SYN with a reset
-  (``ConnectionRefusedError``); with the pod's egress policy in force the packet is dropped and
-  the connect *times out*. The gate opens only when the host canary has been dropped twice in
-  a row as well. A connect that succeeds or is refused means the policy is not there yet.
+* the **policy canary** tells the two apart: a destination that *answers* when no egress
+  policy stands on the pod and that the pod's own policy *drops*. The chart uses the cluster
+  DNS service's metrics port (the ``nameserver`` of ``/etc/resolv.conf``, port 9153): it is
+  pod-to-pod traffic, which every CNI polices, the DNS rule allows port 53 only, and CoreDNS
+  answers on 9153 without the policy. A connect that succeeds or is refused means the policy
+  is not there yet; a timeout means it is. The gate opens only when the policy canary has been
+  dropped twice in a row as well. (The node's own address was tried first and withdrawn the
+  same day: on the demo's kube-router pod-to-node traffic is not policed, so it answered with
+  the policies in force — ADR-026 amendment 3.)
 
 The main container, the one that handles source payloads, then starts under an enforced policy.
 """
 
 from __future__ import annotations
 
+import pathlib
 import socket
 import time
 from collections.abc import Callable
@@ -35,22 +40,39 @@ Connect = Callable[[tuple[str, int], float], object]
 
 
 class PolicyNotEnforced(RuntimeError):
-    """A canary stayed reachable (or the host canary kept answering) until the timeout; the pod
-    must not start its work."""
+    """A canary stayed reachable (or the policy canary kept answering) until the timeout; the
+    pod must not start its work."""
 
 
 @dataclass(frozen=True, slots=True)
 class GateResult:
     waited_seconds: float
     attempts: int
-    host_canary_dropped: bool | None = None
-    """``True`` when the host canary timed out (dropped by the pod's policy); ``None`` when no
-    host canary was given."""
+    policy_canary_dropped: bool | None = None
+    """``True`` when the policy canary timed out (dropped by the pod's policy); ``None`` when no
+    policy canary was given."""
 
 
 def _tcp_connect(address: tuple[str, int], timeout: float) -> object:
     with socket.create_connection(address, timeout=timeout):
         return None
+
+
+def dns_metrics_canary(
+    port: int = 9153, resolv_conf: str = "/etc/resolv.conf"
+) -> tuple[str, int] | None:
+    """The cluster DNS service on its metrics port, from the pod's own resolver configuration
+    (``ClusterFirst`` pods name the ``kube-dns`` ClusterIP); ``None`` when no nameserver is
+    listed. Port 9153 is what k3s's and kind's CoreDNS expose."""
+    try:
+        text = pathlib.Path(resolv_conf).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == "nameserver":
+            return (parts[1], port)
+    return None
 
 
 def _dropped(connect: Connect, address: tuple[str, int], timeout: float) -> bool:
@@ -68,7 +90,7 @@ def _dropped(connect: Connect, address: tuple[str, int], timeout: float) -> bool
 def wait_for_egress_policy(
     *,
     canary: tuple[str, int] = CANARY,
-    host_canary: tuple[str, int] | None = None,
+    policy_canary: tuple[str, int] | None = None,
     timeout: float = 60.0,
     blocked_in_a_row: int = 2,
     attempt_timeout: float = 0.5,
@@ -78,7 +100,7 @@ def wait_for_egress_policy(
     sleep: Callable[[float], None] = time.sleep,
 ) -> GateResult:
     """Return once ``blocked_in_a_row`` consecutive rounds found the metadata canary unreachable
-    and (when given) the host canary dropped; raise :class:`PolicyNotEnforced` after
+    and (when given) the policy canary dropped; raise :class:`PolicyNotEnforced` after
     ``timeout`` seconds otherwise."""
     start = clock()
     attempts = 0
@@ -92,24 +114,24 @@ def wait_for_egress_policy(
             metadata_blocked = True
         else:
             metadata_blocked = False
-        host_dropped = (
-            True if host_canary is None else _dropped(connect, host_canary, attempt_timeout)
+        policy_dropped = (
+            True if policy_canary is None else _dropped(connect, policy_canary, attempt_timeout)
         )
-        if metadata_blocked and host_dropped:
+        if metadata_blocked and policy_dropped:
             blocked += 1
             if blocked >= blocked_in_a_row:
                 return GateResult(
                     waited_seconds=clock() - start,
                     attempts=attempts,
-                    host_canary_dropped=None if host_canary is None else True,
+                    policy_canary_dropped=None if policy_canary is None else True,
                 )
         else:
             blocked = 0
             last_reason = (
                 "the metadata canary still answers"
                 if not metadata_blocked
-                else "the host canary is answered or refused, not dropped: no egress policy "
-                "stands between this pod and its node"
+                else "the policy canary is answered or refused, not dropped: this pod's egress "
+                "policy is not in force"
             )
         if clock() - start >= timeout:
             raise PolicyNotEnforced(

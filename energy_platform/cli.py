@@ -44,7 +44,11 @@ from energy_platform.contracts.manifest import (
     validate_manifest,
 )
 from energy_platform.fetch import EnvSecretResolver, Fetcher, ObjectStoreError
-from energy_platform.fetch.policy_gate import PolicyNotEnforced, wait_for_egress_policy
+from energy_platform.fetch.policy_gate import (
+    PolicyNotEnforced,
+    dns_metrics_canary,
+    wait_for_egress_policy,
+)
 from energy_platform.harness.admission import write_request
 from energy_platform.harness.fixtures import FixtureError, record_from_file, record_live
 from energy_platform.harness.pr import BundleRefused, prepare_bundle
@@ -488,34 +492,50 @@ def wait_egress_policy_cmd(
     timeout: Annotated[
         float, typer.Option("--timeout", help="seconds before the pod fails closed")
     ] = 60.0,
-    host_canary: Annotated[
+    policy_canary: Annotated[
         str | None,
         typer.Option(
-            "--host-canary",
-            help="HOST:PORT the pod's own policy must drop (the node on a closed port); "
-            "refused = no policy yet (ADR-026 amendment 3)",
+            "--policy-canary",
+            help="HOST:PORT that answers without this pod's egress policy and that the policy "
+            "drops (ADR-026 amendment 3); answered or refused = no policy yet",
         ),
     ] = None,
+    dns_metrics_canary_port: Annotated[
+        int,
+        typer.Option(
+            "--dns-metrics-canary-port",
+            min=0,
+            help="derive the policy canary from /etc/resolv.conf's nameserver on this port "
+            "(the cluster DNS service's metrics port, 9153 on k3s and kind); 0 = off",
+        ),
+    ] = 0,
 ) -> None:
     """05 C-65: an init container's gate. Exit 0 once the metadata canary is unreachable twice
-    in a row and, when given, the host canary is dropped twice in a row (the pod's NetworkPolicy
-    is in force); exit 1 if either still answers after --timeout."""
-    host: tuple[str, int] | None = None
-    if host_canary:
-        name, _, port = host_canary.rpartition(":")
+    in a row and, when given, the policy canary is dropped twice in a row (the pod's
+    NetworkPolicy is in force); exit 1 if either still answers after --timeout."""
+    canary: tuple[str, int] | None = None
+    if policy_canary:
+        name, _, port = policy_canary.rpartition(":")
         if not name or not port.isdigit():
             typer.echo(
-                f"wait-egress-policy: --host-canary must be HOST:PORT, got {host_canary!r}",
+                f"wait-egress-policy: --policy-canary must be HOST:PORT, got {policy_canary!r}",
                 err=True,
             )
             raise typer.Exit(code=1)
-        host = (name, int(port))
+        canary = (name, int(port))
+    elif dns_metrics_canary_port:
+        canary = dns_metrics_canary(dns_metrics_canary_port)
+        if canary is None:
+            typer.echo(
+                "wait-egress-policy: no nameserver in /etc/resolv.conf for the canary", err=True
+            )
+            raise typer.Exit(code=1)
     try:
-        result = wait_for_egress_policy(timeout=timeout, host_canary=host)
+        result = wait_for_egress_policy(timeout=timeout, policy_canary=canary)
     except PolicyNotEnforced as exc:
         typer.echo(f"wait-egress-policy: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    dropped = "" if result.host_canary_dropped is None else "; host canary dropped"
+    dropped = "" if result.policy_canary_dropped is None else "; policy canary dropped"
     typer.echo(
         f"wait-egress-policy: enforced after {result.waited_seconds:.2f} s "
         f"({result.attempts} attempts{dropped})"

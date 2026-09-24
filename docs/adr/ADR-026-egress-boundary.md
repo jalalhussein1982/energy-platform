@@ -139,21 +139,31 @@ the pod's rules exist, so the gate's evidence no longer depended on the pod's po
    CiliumNetworkPolicy carries the DNS rule (`toEndpoints` kube-dns, port 53, `rules.dns
    matchPattern "*"`) that `toFQDNs` needs and the FQDN allowlist on 443; DNS, Postgres and
    object-store rules stay as they are. The option is now a restriction.
-2. The gate gets a **host canary**: the node's own address (downward API `status.hostIP`) on a
-   closed port (`egress.policyGate.hostCanaryPort`, default 9). Without the pod's policy the
-   node answers the SYN with a reset (`ConnectionRefusedError`); with the pod's egress policy in
-   force the packet is dropped and the connect times out. The gate opens only when the metadata
-   canary is unreachable **and** the host canary is dropped, twice in a row; a host canary that
-   keeps answering or being refused fails the pod closed. The metadata canary stays the
-   fail-closed floor. The gate still carries no credential (a `fieldRef` is not one).
-3. Residual: a node firewall that drops pod-to-node traffic regardless of the pod's policy makes
-   the host canary vacuous too; the runbook's first-packet egress test (`docs/07` §2.1) is the
-   check that catches that, and it is to be rerun with the node block on.
+2. The gate gets a **policy canary**: a destination that answers when no egress policy stands
+   on the pod and that the pod's own policy drops — the cluster DNS service (the `nameserver`
+   of the pod's `/etc/resolv.conf`) on its **metrics port 9153**
+   (`egress.policyGate.dnsMetricsCanaryPort`, 0 = off). It is pod-to-pod traffic, which every
+   CNI polices; the chart's DNS rule allows port 53 only; CoreDNS answers on 9153 without the
+   policy (k3s and kind both expose it). A connect that succeeds or is refused means the policy
+   is not there yet; a timeout means it is. The gate opens only when the metadata canary is
+   unreachable **and** the policy canary is dropped, twice in a row; a canary that keeps
+   answering fails the pod closed. The metadata canary stays the fail-closed floor. The gate
+   still carries no credential.
+   *First attempt, withdrawn the same day:* the node's own address (downward API `status.hostIP`)
+   on a closed port. On the demo's kube-router **pod-to-node traffic is not policed**: with
+   every policy in force the node still answered the migrate hook's gate with a reset (release
+   revision 18, 16:50 UTC, rolled back atomically to 17). A reset from the node therefore does
+   not mean "no policy"; the canary has to be another pod.
+3. Residual: a CNI that does not police pod-to-pod traffic to the DNS service, or a CoreDNS
+   without its metrics port, makes the gate fail closed (every pod times out at start) rather
+   than open blindly; the runbook's first-packet egress test (`docs/07` §2.1) stays the check of
+   the policies themselves, and it is to be rerun with the node block on.
 
-**Proof:** `tests/fetch/test_policy_gate.py` (refused-then-dropped opens on the fourth attempt;
-answering host canary fails closed; no host canary keeps amendment 2's rule),
-`tests/harness/test_chart.py::test_cilium_fqdn_mode_…`, the gate test asserts the host-canary
-argument and the downward-API env.
+**Proof:** `tests/fetch/test_policy_gate.py` (answered-then-dropped opens on the fourth attempt;
+an answering policy canary fails closed; no policy canary keeps amendment 2's rule; the canary
+comes from `resolv.conf`), `tests/harness/test_chart.py::test_cilium_fqdn_mode_…`, the gate test
+asserts the `--dns-metrics-canary-port 9153` argument; on the demo the migrate hook's gate is
+the live check (revision 19 → the next deploy).
 
 ## Verification refs
 

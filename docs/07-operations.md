@@ -90,10 +90,15 @@ closed if it keeps answering.
 
 **2026-09-24 (ADR-026 amendment 3, review 2 DEP-05).** With the node-level metadata block in
 place the metadata canary is refused from the first attempt whatever the pod's policy, so the
-gate now also probes a **host canary**: the node's own IP on port 9. A reset means no policy
-stands between the pod and its node yet; a dropped connect means the pod's egress rules are in
-force. The three egress Jobs are to be rerun with the node block on to confirm the first-packet
-behaviour under the new gate (author's action; the previous 9 of 9 predate the node block).
+gate now also probes a **policy canary**: the cluster DNS service (resolv.conf's nameserver,
+`10.43.0.10` on the demo) on its metrics port 9153 — pod-to-pod, so kube-router polices it; the
+DNS rule allows 53 only; CoreDNS answers on 9153 without the policy. An answered connect means
+the pod's egress rules are not in force yet; a dropped one means they are. The node's own IP was
+tried first the same day and **withdrawn**: kube-router does not police pod-to-node traffic, the
+node answered the migrate hook's gate with every policy in force, and Helm rolled revision 18
+back to 17 (the platform kept running throughout). The three egress Jobs are to be rerun with
+the node block on to confirm the first-packet behaviour under the new gate (author's action; the
+previous 9 of 9 predate the node block).
 
 ## 3. Terraform (`own-cluster`)
 
