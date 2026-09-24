@@ -316,7 +316,13 @@ class MemoryStore:
                 continue
             if end is not None and o.delivery_start_utc >= end:
                 continue
-            key = observation_identity(o)
+            # amendment 1: with a transport given, the current row *of that transport* (the
+            # reconciliation copy stays selectable); otherwise the canonical row, owner first
+            key: tuple[object, ...] = observation_identity(o)
+            if transport is not None:
+                if o.source_transport != transport:
+                    continue
+                key = (*key, o.source_transport)
             current = best.get(key)
             if current is None or rank(o, self._registered_at(o.derivation_id)) > rank(
                 current.observation, self._registered_at(current.observation.derivation_id)

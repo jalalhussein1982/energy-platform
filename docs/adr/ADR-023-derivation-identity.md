@@ -93,6 +93,35 @@ after newer must not become current" true under replay.
   release followed by a full replay doubles Silver row count. Accepted: replay is opt-in per
   derivation, and a release without a replay leaves existing rows current.
 
+## Amendment 1 (2026-09-24) — the owning transport ranks first; a per-transport current view
+
+**Context.** Review 2 (DC-03, `codex-review/2026-09-24/03-data-correctness.md`) reproduced
+on PostgreSQL what decision 3 permits: `01` §3 rule 2 names T1 (SOAP) the system of record for
+`price_vwap` and `volume_total`, the registry carries `owner_transport`, and the current view
+ranked only by ordering instant — so the XLSX copy, fetched a minute later, became canonical,
+and a `transport="soap"` filter on the canonical view returned nothing. The live demo showed
+288 current XLSX rows against 96 SOAP rows for each owned metric.
+
+**Decision.**
+
+1. Decision 3 gains rule 0: per observation identity, among the rows whose metric has an
+   `owner_transport` in the registry, the owning transport's rows rank first; the rest of the
+   order (ordering basis, contract semver, derivation registration, derivation id) applies
+   within. A metric without an owner is unchanged.
+2. The row records its owner: `observations.owner_transport` is written by the store at commit
+   from the registry (never by a mapping); migration `0004_ownership` adds the column,
+   backfills it from the registry and rebuilds the view. The SQL view and the memory store
+   share `store.ordering.rank`.
+3. **Per-transport current.** `Store.current_rows(transport=X)` returns X's own current row per
+   identity (`observations_current_by_transport`), not the canonical row filtered by transport,
+   so the reconciliation copy of an owned metric stays selectable. `process` compares a
+   document with each other transport's own current rows (`01` §3 rule 2), not with the
+   canonical view, where the copy would never appear.
+
+**Proof (both stores, `make db-test`):** `tests/store/test_store.py::test_review2_dc03_…`
+(both arrival orders), proof 4 rewritten with differing values;
+`tests/runtime/test_review2.py::test_dc03_…` through capture and process.
+
 ## Verification refs
 
 none — design decision.

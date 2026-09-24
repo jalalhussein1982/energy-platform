@@ -30,7 +30,7 @@ from [`ADR-template.md`](ADR-template.md). Open items `D-1 … D-13` are in `02`
 | [ADR-020](ADR-020-test-strategy.md) | Test strategy: fixtures are Bronze objects, goldens by hand | file | — |
 | [ADR-021](ADR-021-bronze-tiering.md) | Bronze cold tier as a platform tiering job | file | [ADR-025](ADR-025-upgrade-hooks-and-install-ordering.md): storage probe as a hook |
 | [ADR-022](ADR-022-source-admission-vs-adapter-addition.md) | Source admission (Route B) versus adapter addition (Route A) | file | — |
-| [ADR-023](ADR-023-derivation-identity.md) | Derivation identity and current-view selection | file | — |
+| [ADR-023](ADR-023-derivation-identity.md) | Derivation identity and current-view selection | file | amendment 1 (2026-09-24): the owning transport ranks first in the current view; per-transport current rows (review 2 DC-03) |
 | [ADR-024](ADR-024-capture-recovery-invariants.md) | Capture durability, orphan reconciliation, backfill versus replay, lease fencing | file | — |
 | [ADR-025](ADR-025-upgrade-hooks-and-install-ordering.md) | Upgrade verification hooks and first-install ordering | file | — |
 | [ADR-026](ADR-026-egress-boundary.md) | Egress boundary: coarse NetworkPolicy plus host enforcement in the fetch layer | file | amendment 1 (2026-09-23): response-body cap (64 MiB, streamed); amendment 2: policy gate where a CNI enforces asynchronously |

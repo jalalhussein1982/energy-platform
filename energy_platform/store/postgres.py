@@ -23,6 +23,7 @@ from energy_platform.contracts.intervals import DeliveryInterval
 from energy_platform.contracts.observation import EnergyObservation
 from energy_platform.contracts.registry import Transport
 from energy_platform.mapping.quality import QualityEvent
+from energy_platform.store.ordering import owner_transport_of
 from energy_platform.store.protocol import (
     AttemptKind,
     AttemptOutcome,
@@ -55,12 +56,12 @@ _OBS_COLUMNS = (
     "source_id, dataset_id, source_transport, contract_version, derivation_id, raw_ref, "
     "payload_sha256, fetched_at, source_published_at, source_version, processed_at, "
     "delivery_interval, resolution, local_date, period_index, kind, dimensions, metric, value, "
-    "unit, sign_convention, run_attempt_id"
+    "unit, sign_convention, run_attempt_id, owner_transport"
 )
 _INSERT_OBSERVATION = sql.SQL(
     "INSERT INTO observations ({cols}) VALUES ("
     "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, tstzrange(%s, %s, '[)'), "
-    "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
+    "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING"
 ).format(cols=sql.SQL(_OBS_COLUMNS))
 _OBS_SELECT = (
     "id, run_attempt_id, source_id, dataset_id, source_transport, contract_version, "
@@ -376,6 +377,7 @@ class PostgresStore:
                         o.unit,
                         o.sign_convention,
                         claim.attempt.id,
+                        owner_transport_of(o),  # ADR-023 amendment 1: from the registry
                     ),
                 )
                 inserted += cur.rowcount
@@ -526,10 +528,13 @@ class PostgresStore:
         metric: str | None = None,
         transport: Transport | None = None,
     ) -> tuple[CurrentRow, ...]:
+        # ADR-023 amendment 1: no transport → the canonical view (owner first); a transport →
+        # that transport's own current row (the reconciliation copy stays selectable)
+        view = "observations_current" if transport is None else "observations_current_by_transport"
         rows = self._all(
             sql.SQL(
                 """
-            SELECT {cols}, ordering_basis FROM observations_current
+            SELECT {cols}, ordering_basis FROM {view}
             WHERE dataset_id = %s
               AND (%s::timestamptz IS NULL OR lower(delivery_interval) >= %s)
               AND (%s::timestamptz IS NULL OR lower(delivery_interval) < %s)
@@ -537,7 +542,7 @@ class PostgresStore:
               AND (%s::text IS NULL OR source_transport = %s)
             ORDER BY lower(delivery_interval), metric
             """
-            ).format(cols=sql.SQL(_OBS_SELECT)),
+            ).format(cols=sql.SQL(_OBS_SELECT), view=sql.Identifier(view)),
             (dataset_id, start, start, end, end, metric, metric, transport, transport),
         )
         self._conn.rollback()

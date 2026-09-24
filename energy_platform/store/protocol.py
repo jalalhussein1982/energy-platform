@@ -274,7 +274,12 @@ class Store(Protocol):
         end: datetime | None = None,
         metric: str | None = None,
         transport: Transport | None = None,
-    ) -> tuple[CurrentRow, ...]: ...
+    ) -> tuple[CurrentRow, ...]:
+        """The current view (ADR-023 §3, amendment 1). Without ``transport``: one row per
+        observation identity, the owning transport's when it has one (01 §3 rule 2). With
+        ``transport``: that transport's own current row per identity, so the reconciliation
+        copy of an owned metric stays selectable (review 2 DC-03)."""
+        ...
 
     def all_rows(
         self, dataset_id: str, *, start: datetime | None = None, end: datetime | None = None

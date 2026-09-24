@@ -12,12 +12,13 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from typing import get_args
 
 from energy_platform.bronze import BronzeError
 from energy_platform.contracts.manifest import Manifest
 from energy_platform.contracts.observation import EnergyObservation
 from energy_platform.contracts.parser import DecodedDocument, SourceRecord
-from energy_platform.contracts.registry import dataset
+from energy_platform.contracts.registry import Transport, dataset
 from energy_platform.mapping import (
     MappingContext,
     MappingResult,
@@ -181,7 +182,9 @@ def completeness_events(
 def _other_transport_rows(
     rt: Runtime, observations: tuple[EnergyObservation, ...]
 ) -> dict[CompareKey, tuple[str, Decimal | None]]:
-    """Current rows of the same dataset delivered by another transport (01 §3 rule 2)."""
+    """Each other transport's own current rows of the same dataset (01 §3 rule 2). Per
+    transport, not the canonical view: the canonical row of an owned metric is the owner's
+    (ADR-023 amendment 1), so the copy would never be seen there."""
     if not observations:
         return {}
     contract = dataset(rt.manifest.contract.dataset_id)
@@ -191,7 +194,11 @@ def _other_transport_rows(
     start = min(o.delivery_start_utc for o in observations)
     end = max(o.delivery_end_utc for o in observations)
     out: dict[CompareKey, tuple[str, Decimal | None]] = {}
-    for row in rt.store.current_rows(contract.dataset_id, start=start, end=end):
-        if row.observation.source_transport != mine:
-            out[compare_key(row.observation)] = (row.observation.source_transport, row.value)
+    for other in get_args(Transport):
+        if other == mine:
+            continue
+        for row in rt.store.current_rows(
+            contract.dataset_id, start=start, end=end, transport=other
+        ):
+            out[compare_key(row.observation)] = (other, row.value)
     return out

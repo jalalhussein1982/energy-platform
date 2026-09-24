@@ -139,9 +139,10 @@ def test_proof_4_t1_t2_ownership_holds_across_retry_and_new_derivation(store: St
     t1 = captured_run(store, "ote_idm_soap")
     t2 = captured_run(store, "ote_idm_xlsx")
     soap = [obs("price_vwap", "170.13"), obs("volume_total", "125.275")]
+    # the copy differs and is fetched later: without ownership it would win (review 2 DC-03)
     xlsx = [
-        obs("price_vwap", "170.13", transport="xlsx", sha=SHA_2),
-        obs("price_min", "165.00", transport="xlsx", sha=SHA_2),
+        obs("price_vwap", "171.00", transport="xlsx", sha=SHA_2, fetched_at=FETCH_2),
+        obs("price_min", "165.00", transport="xlsx", sha=SHA_2, fetched_at=FETCH_2),
     ]
     store.commit(
         claim(store, t1),
@@ -161,13 +162,11 @@ def test_proof_4_t1_t2_ownership_holds_across_retry_and_new_derivation(store: St
     )
     # both copies of price_vwap are stored: rows are metric-long, identity has no transport
     assert len(store.all_rows("ote.idm_continuous")) == 4
-    by_transport = {
-        r.observation.source_transport
-        for r in store.current_rows("ote.idm_continuous", metric="price_vwap")
-    }
-    assert (
-        by_transport
-    )  # a current row exists; which copy wins is decided by fetched_at, not by transport
+    current = store.current_rows("ote.idm_continuous", metric="price_vwap")
+    assert len(current) == 1 and current[0].observation.source_transport == "soap"
+    assert current[0].value == Decimal("170.13")  # the owner, although the copy is newer
+    copy = store.current_rows("ote.idm_continuous", metric="price_vwap", transport="xlsx")
+    assert len(copy) == 1 and copy[0].value == Decimal("171.00")  # the copy stays selectable
     assert store.current_rows("ote.idm_continuous", metric="price_vwap", transport="soap")
     assert store.current_rows("ote.idm_continuous", metric="price_min", transport="soap") == ()
     # exact retry of both and a re-derivation of T1 leave T2-only metrics untouched
@@ -189,6 +188,56 @@ def test_proof_4_t1_t2_ownership_holds_across_retry_and_new_derivation(store: St
     )
     assert len(store.all_rows("ote.idm_continuous")) == 6
     assert values(store, "price_min")[1] == Decimal("165.00")
+    assert values(store, "price_vwap")[1] == Decimal("170.13")  # still the owner's
+
+
+def test_review2_dc03_the_owner_wins_in_both_arrival_orders(store: Store) -> None:
+    """Review 2 DC-03: SOAP is the system of record for price_vwap (01 §3 rule 2); the XLSX
+    copy never becomes canonical, whether it arrives before or after, and never hides the
+    owner's row behind a transport filter."""
+    t1 = captured_run(store, "ote_idm_soap")
+    t2 = captured_run(store, "ote_idm_xlsx", T0 + timedelta(minutes=15))
+    # period 1: SOAP first, XLSX a minute later; period 2: XLSX first, SOAP a minute later
+    soap = [
+        obs("price_vwap", "999.00", period=1, fetched_at=FETCH_1),
+        obs("price_vwap", "999.00", period=2, fetched_at=FETCH_2),
+    ]
+    xlsx = [
+        obs("price_vwap", "170.13", period=1, transport="xlsx", sha=SHA_2, fetched_at=FETCH_2),
+        obs("price_vwap", "170.13", period=2, transport="xlsx", sha=SHA_2, fetched_at=FETCH_1),
+    ]
+    store.commit(
+        claim(store, t2),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=xlsx,
+        now=NOW,
+    )
+    store.commit(
+        claim(store, t1),
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=soap,
+        now=NOW,
+    )
+    canonical = store.current_rows("ote.idm_continuous", metric="price_vwap")
+    assert [
+        (r.observation.period_index, str(r.value), r.observation.source_transport)
+        for r in canonical
+    ] == [
+        (1, "999.00", "soap"),
+        (2, "999.00", "soap"),
+    ]
+    assert [
+        str(r.value)
+        for r in store.current_rows("ote.idm_continuous", metric="price_vwap", transport="soap")
+    ] == ["999.00", "999.00"]
+    assert [
+        str(r.value)
+        for r in store.current_rows("ote.idm_continuous", metric="price_vwap", transport="xlsx")
+    ] == ["170.13", "170.13"]
 
 
 def test_proof_5_null_source_version_retry_is_a_no_op(store: Store) -> None:
