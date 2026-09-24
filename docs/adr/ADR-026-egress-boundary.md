@@ -143,17 +143,21 @@ the pod's rules exist, so the gate's evidence no longer depended on the pod's po
    on the pod and that the pod's own policy drops — the cluster DNS service (the `nameserver`
    of the pod's `/etc/resolv.conf`) on its **metrics port 9153**
    (`egress.policyGate.dnsMetricsCanaryPort`, 0 = off). It is pod-to-pod traffic, which every
-   CNI polices; the chart's DNS rule allows port 53 only; CoreDNS answers on 9153 without the
-   policy (k3s and kind both expose it). A connect that succeeds or is refused means the policy
-   is not there yet; a timeout means it is. The gate opens only when the metadata canary is
-   unreachable **and** the policy canary is dropped, twice in a row; a canary that keeps
-   answering fails the pod closed. The metadata canary stays the fail-closed floor. The gate
-   still carries no credential.
-   *First attempt, withdrawn the same day:* the node's own address (downward API `status.hostIP`)
-   on a closed port. On the demo's kube-router **pod-to-node traffic is not policed**: with
-   every policy in force the node still answered the migrate hook's gate with a reset (release
-   revision 18, 16:50 UTC, rolled back atomically to 17). A reset from the node therefore does
-   not mean "no policy"; the canary has to be another pod.
+   CNI polices; the chart's DNS rule allows port 53 only; CoreDNS **accepts connections** on
+   9153 without the policy (k3s and kind both expose it). A connect that succeeds means the
+   policy is not there yet; one that fails means it is — **refused or dropped alike**, because
+   kube-router rejects denied traffic with an ICMP error (the runbook's curl exit 7) while
+   Cilium and a node firewall drop it (exit 28). Port 53 on the same address is the control: it
+   must connect, or the DNS service is unreachable and the gate stays closed rather than open
+   blindly. The gate opens only when the metadata canary is unreachable **and** the policy
+   canary is denied with its control answering, twice in a row. The metadata canary stays the
+   fail-closed floor. The gate carries no credential.
+   *Two attempts withdrawn the same day, both on the demo's migrate hook:* (a) the node's own
+   address on a closed port (revision 18 rolled back to 17, 16:55 UTC) — a closed port is
+   refused with or without a policy, and pod-to-node traffic is not the pod-to-pod case anyway;
+   (b) the metrics port read as "dropped means policy" (revision 20 rolled back to 19,
+   17:06 UTC) — kube-router **rejects**, it does not drop, so the denial arrived as a refusal.
+   The signal that holds on both CNIs is "accepts a connection" versus "does not".
 3. Residual: a CNI that does not police pod-to-pod traffic to the DNS service, or a CoreDNS
    without its metrics port, makes the gate fail closed (every pod times out at start) rather
    than open blindly; the runbook's first-packet egress test (`docs/07` §2.1) stays the check of

@@ -496,8 +496,8 @@ def wait_egress_policy_cmd(
         str | None,
         typer.Option(
             "--policy-canary",
-            help="HOST:PORT that answers without this pod's egress policy and that the policy "
-            "drops (ADR-026 amendment 3); answered or refused = no policy yet",
+            help="HOST:PORT that accepts connections without this pod's egress policy and that "
+            "the policy denies (ADR-026 amendment 3); port 53 on HOST is the control",
         ),
     ] = None,
     dns_metrics_canary_port: Annotated[
@@ -535,7 +535,7 @@ def wait_egress_policy_cmd(
     except PolicyNotEnforced as exc:
         typer.echo(f"wait-egress-policy: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    dropped = "" if result.policy_canary_dropped is None else "; policy canary dropped"
+    dropped = "" if result.policy_canary_denied is None else "; policy canary denied"
     typer.echo(
         f"wait-egress-policy: enforced after {result.waited_seconds:.2f} s "
         f"({result.attempts} attempts{dropped})"

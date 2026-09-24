@@ -92,11 +92,14 @@ closed if it keeps answering.
 place the metadata canary is refused from the first attempt whatever the pod's policy, so the
 gate now also probes a **policy canary**: the cluster DNS service (resolv.conf's nameserver,
 `10.43.0.10` on the demo) on its metrics port 9153 — pod-to-pod, so kube-router polices it; the
-DNS rule allows 53 only; CoreDNS answers on 9153 without the policy. An answered connect means
-the pod's egress rules are not in force yet; a dropped one means they are. The node's own IP was
-tried first the same day and **withdrawn**: kube-router does not police pod-to-node traffic, the
-node answered the migrate hook's gate with every policy in force, and Helm rolled revision 18
-back to 17 (the platform kept running throughout). The three egress Jobs are to be rerun with
+DNS rule allows 53 only; CoreDNS accepts connections on 9153 without the policy. An accepted
+connect means the pod's egress rules are not in force yet; a refused *or* dropped one means they
+are (kube-router rejects — the curl exit 7 above — Cilium drops); port 53 on the same address
+must answer, or the gate stays closed. Two earlier readings were tried on the migrate hook the
+same day and **withdrawn** by their own failures: the node's IP on a closed port (revision 18
+rolled back to 17, 16:55 UTC — refused with or without a policy) and "dropped = policy"
+(revision 20 rolled back to 19, 17:06 UTC — kube-router's denial is a refusal). The platform
+kept running throughout: an atomic upgrade that fails its hook changes nothing. The three egress Jobs are to be rerun with
 the node block on to confirm the first-packet behaviour under the new gate (author's action; the
 previous 9 of 9 predate the node block).
 

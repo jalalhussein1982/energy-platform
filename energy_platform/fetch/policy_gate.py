@@ -12,15 +12,18 @@ Two canaries, two different signals (ADR-026 amendment 3, review 2 DEP-05):
   twice in a row — the fail-closed check: a cluster that keeps answering it fails the pod after
   ``timeout``. Once the node itself blocks that address, this canary is unreachable whether or
   not the pod's policy exists, so it can no longer prove the policy;
-* the **policy canary** tells the two apart: a destination that *answers* when no egress
-  policy stands on the pod and that the pod's own policy *drops*. The chart uses the cluster
-  DNS service's metrics port (the ``nameserver`` of ``/etc/resolv.conf``, port 9153): it is
-  pod-to-pod traffic, which every CNI polices, the DNS rule allows port 53 only, and CoreDNS
-  answers on 9153 without the policy. A connect that succeeds or is refused means the policy
-  is not there yet; a timeout means it is. The gate opens only when the policy canary has been
-  dropped twice in a row as well. (The node's own address was tried first and withdrawn the
-  same day: on the demo's kube-router pod-to-node traffic is not policed, so it answered with
-  the policies in force — ADR-026 amendment 3.)
+* the **policy canary** tells the two apart: a destination that *accepts a connection* when no
+  egress policy stands on the pod and that the pod's own policy denies. The chart uses the
+  cluster DNS service's metrics port (the ``nameserver`` of ``/etc/resolv.conf``, port 9153):
+  it is pod-to-pod traffic, which every CNI polices, the DNS rule allows port 53 only, and
+  CoreDNS accepts on 9153 without the policy. A connect that succeeds means the policy is not
+  there yet; one that fails — **refused or dropped**, because kube-router rejects denied traffic
+  with an ICMP error while Cilium drops it — means it is. Port 53 on the same address is the
+  control: it must connect (the policy allows it), or the DNS service is unreachable and the
+  gate cannot tell anything, so it stays closed. The gate opens only when the policy canary has
+  been denied, with the control answering, twice in a row as well. (The node's own address on a
+  closed port was tried first and withdrawn the same day: a closed port is refused with or
+  without a policy, and kube-router's rejection looks the same — ADR-026 amendment 3.)
 
 The main container, the one that handles source payloads, then starts under an enforced policy.
 """
@@ -48,9 +51,9 @@ class PolicyNotEnforced(RuntimeError):
 class GateResult:
     waited_seconds: float
     attempts: int
-    policy_canary_dropped: bool | None = None
-    """``True`` when the policy canary timed out (dropped by the pod's policy); ``None`` when no
-    policy canary was given."""
+    policy_canary_denied: bool | None = None
+    """``True`` when the policy canary was denied (refused or dropped by the pod's policy) while
+    its control port answered; ``None`` when no policy canary was given."""
 
 
 def _tcp_connect(address: tuple[str, int], timeout: float) -> object:
@@ -75,22 +78,22 @@ def dns_metrics_canary(
     return None
 
 
-def _dropped(connect: Connect, address: tuple[str, int], timeout: float) -> bool:
-    """Whether a connect to ``address`` was **dropped** (timed out or unreachable) rather than
-    answered (connected) or refused (a reset: the node is there and no policy stands between)."""
+def _connects(connect: Connect, address: tuple[str, int], timeout: float) -> bool:
+    """Whether a TCP connect to ``address`` succeeds. A failure of any kind — refused (an RST or
+    an ICMP error: kube-router's rejection), timed out (a drop: Cilium, a node firewall) — is a
+    denial; only an accepted connection proves that nothing stood in the way."""
     try:
         connect(address, timeout)
-    except ConnectionRefusedError:
-        return False
     except OSError:
-        return True
-    return False
+        return False
+    return True
 
 
 def wait_for_egress_policy(
     *,
     canary: tuple[str, int] = CANARY,
     policy_canary: tuple[str, int] | None = None,
+    control_port: int = 53,
     timeout: float = 60.0,
     blocked_in_a_row: int = 2,
     attempt_timeout: float = 0.5,
@@ -100,8 +103,8 @@ def wait_for_egress_policy(
     sleep: Callable[[float], None] = time.sleep,
 ) -> GateResult:
     """Return once ``blocked_in_a_row`` consecutive rounds found the metadata canary unreachable
-    and (when given) the policy canary dropped; raise :class:`PolicyNotEnforced` after
-    ``timeout`` seconds otherwise."""
+    and (when given) the policy canary denied while ``control_port`` on the same address
+    answered; raise :class:`PolicyNotEnforced` after ``timeout`` seconds otherwise."""
     start = clock()
     attempts = 0
     blocked = 0
@@ -114,25 +117,34 @@ def wait_for_egress_policy(
             metadata_blocked = True
         else:
             metadata_blocked = False
-        policy_dropped = (
-            True if policy_canary is None else _dropped(connect, policy_canary, attempt_timeout)
-        )
-        if metadata_blocked and policy_dropped:
+        control_ok = True
+        policy_denied = True
+        if policy_canary is not None:
+            control = (policy_canary[0], control_port)
+            control_ok = _connects(connect, control, attempt_timeout)
+            policy_denied = not _connects(connect, policy_canary, attempt_timeout)
+        if metadata_blocked and control_ok and policy_denied:
             blocked += 1
             if blocked >= blocked_in_a_row:
                 return GateResult(
                     waited_seconds=clock() - start,
                     attempts=attempts,
-                    policy_canary_dropped=None if policy_canary is None else True,
+                    policy_canary_denied=None if policy_canary is None else True,
                 )
         else:
             blocked = 0
-            last_reason = (
-                "the metadata canary still answers"
-                if not metadata_blocked
-                else "the policy canary is answered or refused, not dropped: this pod's egress "
-                "policy is not in force"
-            )
+            if not metadata_blocked:
+                last_reason = "the metadata canary still answers"
+            elif not control_ok:
+                last_reason = (
+                    f"the control port {control_port} of the policy canary does not answer: "
+                    "the DNS service is unreachable, nothing can be told about the policy"
+                )
+            else:
+                last_reason = (
+                    "the policy canary accepts connections: this pod's egress policy is not in "
+                    "force"
+                )
         if clock() - start >= timeout:
             raise PolicyNotEnforced(
                 f"after {timeout:.0f} s ({attempts} attempts) {last_reason}: the egress "

@@ -72,19 +72,27 @@ def test_already_enforced_opens_at_once() -> None:
 DNS = ("10.43.0.10", 9153)
 
 
-def two_canaries(metadata: list[bool], host: list[str]) -> Connect:
-    """``metadata``: True = answers; ``host``: "refused" | "dropped" | "open" per attempt."""
+CONTROL = ("10.43.0.10", 53)
+
+
+def two_canaries(metadata: list[bool], policy: list[str], control_up: bool = True) -> Connect:
+    """``metadata``: True = answers; ``policy``: "refused" | "dropped" | "open" per attempt on
+    the metrics port; the control port 53 answers unless ``control_up`` is False."""
 
     def connect(address: tuple[str, int], timeout: float) -> object:
         if address == CANARY:
             if metadata.pop(0) if metadata else False:
                 return None
             raise ConnectionRefusedError("refused")
-        outcome = host.pop(0) if host else "dropped"
+        if address == CONTROL:
+            if control_up:
+                return None
+            raise TimeoutError("DNS service unreachable")
+        outcome = policy.pop(0) if policy else "dropped"
         if outcome == "refused":
-            raise ConnectionRefusedError("reset by the node: no policy in between")
+            raise ConnectionRefusedError("kube-router rejects denied traffic with an ICMP error")
         if outcome == "dropped":
-            raise TimeoutError("timed out: dropped by the pod's policy")
+            raise TimeoutError("timed out: dropped by the pod's policy (Cilium, a firewall)")
         return None
 
     return connect
@@ -92,15 +100,16 @@ def two_canaries(metadata: list[bool], host: list[str]) -> Connect:
 
 def test_policy_canary_answered_means_no_policy_even_when_the_node_blocks_metadata() -> None:
     """ADR-026 amendment 3 (review 2 DEP-05): after the node-level metadata block the metadata
-    canary is unreachable from the first attempt; only a *dropped* policy canary (CoreDNS's
-    metrics port, answered without the policy) proves the pod's own policy. Answered twice, then
-    dropped twice → opens on the fourth attempt."""
+    canary is unreachable from the first attempt; only a *denied* policy canary (CoreDNS's
+    metrics port, which accepts without the policy) proves the pod's own policy — refused on
+    kube-router, dropped on Cilium, both count. Open twice, then denied twice → opens on the
+    fourth attempt."""
     clock = Clock()
-    connect = two_canaries([False] * 8, ["open", "refused", "dropped", "dropped"])
+    connect = two_canaries([False] * 8, ["open", "open", "refused", "dropped"])
     result = wait_for_egress_policy(
         policy_canary=DNS, connect=connect, clock=clock, sleep=clock.sleep
     )
-    assert result.attempts == 4 and result.policy_canary_dropped is True
+    assert result.attempts == 4 and result.policy_canary_denied is True
 
 
 def test_policy_canary_that_keeps_answering_fails_closed() -> None:
@@ -112,11 +121,22 @@ def test_policy_canary_that_keeps_answering_fails_closed() -> None:
         )
 
 
+def test_an_unreachable_dns_service_keeps_the_gate_closed() -> None:
+    """A denied canary proves nothing when its control port does not answer either: the DNS
+    service may be down or unrouted; the gate fails closed instead of opening blindly."""
+    clock = Clock()
+    connect = two_canaries([False] * 100, ["refused"] * 100, control_up=False)
+    with pytest.raises(PolicyNotEnforced, match="control port 53"):
+        wait_for_egress_policy(
+            policy_canary=DNS, timeout=5.0, connect=connect, clock=clock, sleep=clock.sleep
+        )
+
+
 def test_without_a_policy_canary_the_metadata_rule_stands_alone() -> None:
     clock = Clock()
     connect, _ = connector([False, False])
     result = wait_for_egress_policy(connect=connect, clock=clock, sleep=clock.sleep)
-    assert result.policy_canary_dropped is None
+    assert result.policy_canary_denied is None
 
 
 def test_dns_metrics_canary_comes_from_resolv_conf(tmp_path: Path) -> None:
