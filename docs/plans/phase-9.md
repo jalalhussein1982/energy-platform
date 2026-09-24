@@ -37,7 +37,7 @@
 - [x] 9.9 **G7** — V-11 probe (P9-D7). *Accept:* raw output in `00` §5, nothing left in `hussein-ns`.
 - [x] 9.10 **G8** — N-hour publication observation (P9-D8).
 - [x] 9.11 **G9b** — `ote_imbalance_settlement_monthly` through the harness, as a PR (P9-D9). *Accept:* target-only PR, CI green, goldens re-derived from the fixture bytes; the merge command handed to the author.
-- [ ] 9.12 **G10** — blind re-run: instructions to the author; evaluation into `docs/09` once the run exists (P9-D10). *Instructions given (`docs/09`); the run has not happened at hand-over.*
+- [ ] 9.12 **G10** — blind re-run: instructions to the author; evaluation into `docs/09` once the run exists (P9-D10). *Instructions given (`docs/09`); the run has not happened at hand-over. 2026-09-24: folder and clone prepared at d14388c (after PR #4's merge); login and start are the author's — `docs/09` "Prepared 2026-09-24".*
 - [x] 9.13 **G11** — `docs/reviews/2026-09-19-codex-review-response.md`: F09 and F12 closed with references.
 - [x] 9.14 **P3** in P9-D11 order: G17 local branches, G18 email drafts (not sent), G16 Hetzner budget instructions, G15 sandbox image test, then G14, G12, G13 as time allows.
 - [x] 9.15 Finish: README "Deliberately not built", threat-model residuals reduced to what remains, the final clean clone (P9-D12), roadmap ticks, progress entry, memory, hand-over.
