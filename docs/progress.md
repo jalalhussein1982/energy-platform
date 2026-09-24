@@ -13,14 +13,14 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-23 | Phase 7 | three blind runs pass; two documentation defects closed |
 | 2026-09-23 | Phase 8 | README, CI-porting note, docs index and ADR log; clean clone on a fresh VM: exit 0 in 199 s |
 | 2026-09-23 | Phase 9 | gap closure: deploy identity, secret scope, body cap, `uv` checksum, drills and deploy-on-push, V-11, an 11-hour observation, settlement v1; three defects found and fixed, one a real incident on the demo |
-| 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the blind re-run (G10) prepared, its login and start left to the author |
+| 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the strictly blind re-run (G10) run by the author and evaluated: PR #5 passes, F-3 closed |
 
 ---
 
-## 2026-09-24 — PR #4 reviewed and merged; demo revision 8; the blind re-run prepared
+## 2026-09-24 — PR #4 reviewed and merged; demo revision 8; the strictly blind re-run passes (PR #5)
 
-**Done** (1 docs commit on `main`, `make check` green; no platform code touched). The author asked
-for the six open decisions of the Phase 9 hand-over to be laid out with a recommendation each
+**Done** (2 docs commits on `main`, `make check` green at each; no platform code touched). The
+author asked for the six open decisions of the Phase 9 hand-over to be laid out with a recommendation each
 (merge #4 first; run G10 after it; delete the 672 wrong T2 rows of 22 September unless teardown is
 days away, because Silver is derived and Bronze keeps the evidence; block pod traffic to
 `169.254.169.254` if the demo lives on; the Hetzner console check; send the OTE letter and one
@@ -63,8 +63,24 @@ GitHub has computed it; a second call a minute later gave `MERGEABLE`. A golden 
 `delivery_start_utc` is parsed by PyYAML as a `datetime`, not a string — an independent checker
 has to accept both.
 
-**Open / carried.** G10 itself (login, `/memory` `/mcp` `/plugin` empty, paste the prompt; then
-tell the maintainer the PR number). The 672 rows of 22 September (`docs/07` §4.3 SQL) — the
+**G10 run and evaluated (second commit of the day).** The author logged in to the empty profile,
+checked `/plugin` and `/mcp` (both empty, in the transcript), pasted the protocol prompt once and
+answered nothing. Claude Code 2.1.281, `claude-opus-5-5` (the profile default), 00:47:23 →
+00:52:18 UTC: **PR #5** `targets/ote_imbalance_settlement_final/`, 14 files, one commit, CI 12/12,
+**no network call** (fixtures generated in the session scratchpad and recorded with `--from-file`).
+Maintainer checks as for PR #4 (worktree of the branch, removed afterwards): surface OK; manifest
+= admission and `diff` against the version 1 target is only `Version 2`, the cadence and
+`month_start[4]`/`month_end[4]` — a month that is actually settled (`docs/06` §9.1: version 2 of
+May out, June not, on 23 September); three synthetic fixtures with blob hashes = `entry.json`;
+**42/42 golden rows and all three row counts re-derived from the bytes**; `validate` and
+`run-target-tests` green on the branch. Written up as **run 4** in `docs/09` (summary row, F-3
+closed, maintainer action 4); the transcript and both re-derivation scripts are kept under
+`~/.config/energy-platform/evidence/2026-09-24/`. Roadmap Phase 9 line and plan 9.12 ticked.
+Observations (not defects): the run stayed offline because a sibling target gave it the shape; the
+cadence is the manifest's correction bound, not a measured publication day (F-5).
+
+**Open / carried.** The merge of PR #5 (the author's; the push deploys it and closes F-4 in full).
+The 672 rows of 22 September (`docs/07` §4.3 SQL) — the
 author's decision. The node-level metadata block, the console check, the two letters, and the
 teardown — unchanged from the Phase 9 entry.
 
