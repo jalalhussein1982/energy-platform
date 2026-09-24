@@ -150,4 +150,5 @@ ended **OOMKilled** at its 512 MiB limit after the restored database had shut do
 in the comparison step; the manual drill of 2026-09-23 12:46 UTC had passed. **Fixed the same day** (`docs/07` §5.3): the comparison now streams rows and keeps one
 16-byte fingerprint per version; the 512 MiB limit stays and no longer depends on the table size. A manual drill after the deploy (revision 12)
 completed the comparison in 406 s — and failed on the drill's rule instead: superseded captures
-and replica lag read as "missing"; open, `docs/07` §5.3.
+and replica lag read as "missing" — the rule was fixed the same night (`docs/07` §5.3): every
+distinct capture of a run is replayed, and the comparison is bounded by the replica's newest capture.

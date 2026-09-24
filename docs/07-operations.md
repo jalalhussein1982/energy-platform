@@ -396,10 +396,23 @@ holds one processed run fewer. The rule tolerates the rebuild being ahead, not b
 their blobs are in the replica, so a rebuild recreates them — the documented cost of that
 deletion, informational here.
 
-**Status: open, recorded 2026-09-24.** The fix is in the drill, not the chart: replay **every**
-capture-log entry of a run in order (versions are a function of each capture, not of the last
-one), and compare processed runs only up to the replica's last replication instant. Until then
-the nightly drill reports these two effects as failures.
+**Fixed the same night (rule change in `energy_platform/runtime/drill.py`).** (a) The rebuild
+now replays **every distinct payload** of a run from the replica log, oldest first and the
+newest last, so the rebuild holds the version each capture produced and the run ends on its
+newest capture as live does; `content_changed` is not used for this (it is a flag against the
+target's newest entry, §4.3), payload hashes are. (b) The comparison is bounded by the
+**replica's newest capture instant** for the target: a live version or processed run whose
+capture is in the replica, or was fetched before that instant, is compared (its absence is
+loss); one whose capture is newer and not replicated yet is lag, counted in a new report field
+`lagging_runs` and named in the message ("N live run(s) newer than the replica's last capture
+not compared"), never a failure. With no replica entry for a target at all, everything live
+holds is compared and is missing — the replica never received it. Tests:
+`test_a_replica_missing_a_capture_fails_the_drill` now removes a *middle* capture (loss),
+`test_a_replica_lagging_behind_live_is_not_a_failure` removes the newest (lag),
+`test_superseded_captures_are_replayed_so_every_live_version_is_rebuilt` forces a second
+capture of a run. The test harness now stamps `fetched_at` from its clock, so capture instants
+and ledger instants share one time line. The nine deleted versions of §4.3 still come back as
+"extra", by design.
 
 ## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
 

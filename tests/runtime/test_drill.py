@@ -53,16 +53,56 @@ def test_rebuild_from_the_replica_matches_live() -> None:
 
 
 def test_a_replica_missing_a_capture_fails_the_drill() -> None:
+    """A capture older than the replica's newest one is absent from the replica: loss."""
     live, replica, clock = live_system()
     partial = Bronze(MemoryBlobStore(), MemoryCaptureLog())
-    for entry in replica.log.list("ote_idm_soap")[:-1] + replica.log.list("ceps_load_soap"):
+    t1_entries = replica.log.list("ote_idm_soap")
+    for entry in (t1_entries[0], t1_entries[2], *replica.log.list("ceps_load_soap")):
         partial.ingest(entry, replica.read(entry.raw_ref).payload)
     report = restore_drill((T1, T3), scratch=MemoryStore(), replica=partial, live=live, clock=clock)
     assert not report.ok
     t1, t3 = report.targets
     assert not t1.ok and "processed runs 2 < live 3" in t1.message
     assert t1.missing_versions > 0 and "missing from the rebuild" in t1.message
+    assert t1.lagging_runs == 0
     assert t3.ok and t3.message.startswith("identical")
+
+
+def test_a_replica_lagging_behind_live_is_not_a_failure() -> None:
+    """The newest live capture is not in the replica yet (replication has its own cadence):
+    its run and its versions are not compared, reported as lagging; nothing is 'missing'."""
+    live, replica, clock = live_system()
+    lagging = Bronze(MemoryBlobStore(), MemoryCaptureLog())
+    for entry in replica.log.list("ote_idm_soap")[:-1] + replica.log.list("ceps_load_soap"):
+        lagging.ingest(entry, replica.read(entry.raw_ref).payload)
+    report = restore_drill((T1, T3), scratch=MemoryStore(), replica=lagging, live=live, clock=clock)
+    assert report.ok, [t.message for t in report.targets]
+    t1, t3 = report.targets
+    assert t1.ok and t1.lagging_runs == 1 and t1.missing_versions == 0
+    assert t1.scratch_processed == 2 and t1.live_processed == 2
+    assert "1 live run(s) newer than the replica's last capture not compared" in t1.message
+    assert t3.lagging_runs == 0 and t3.message.startswith("identical")
+
+
+def test_superseded_captures_are_replayed_so_every_live_version_is_rebuilt() -> None:
+    """A correction that found changed content is a new capture of the same run (ADR-033 §3);
+    live keeps the version each capture produced. The rebuild replays every distinct capture of
+    the run, oldest first, so those versions are reproduced and the run ends on its newest
+    capture — the 2026-09-24 demo drill read them as 'missing'."""
+    live, replica, clock = live_system()
+    rt = runtime(T1, store=live, bronze=replica, clock=clock, payload=distinct_t1_payload)
+    clock.now = SCHEDULED + timedelta(minutes=50)
+    forced = capture(rt, SCHEDULED, force=True)  # a new payload for the first run
+    assert forced.outcome == "ok" and forced.entry is not None and forced.entry.attempt == 2
+    process(rt)
+    versions_before = silver_digest(live, T1).rows
+    report = restore_drill((T1,), scratch=MemoryStore(), replica=replica, live=live, clock=clock)
+    t1 = report.targets[0]
+    assert report.ok and t1.ok, t1.message
+    assert t1.missing_versions == 0 and t1.extra_versions == 0 and t1.lagging_runs == 0
+    assert t1.replica_entries == 4 and t1.scratch_processed == t1.live_processed == 3
+    assert t1.scratch is not None and t1.scratch.rows == versions_before
+    assert t1.message.startswith("identical")
 
 
 def test_a_diverging_value_in_live_is_detected_by_the_checksum() -> None:

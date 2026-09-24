@@ -43,7 +43,13 @@ def payload_for(manifest: Manifest, day: date = DAY) -> bytes:
     return ceps_load_response(day)
 
 
-def fixture_factory(payload: bytes | Callable[[], bytes]) -> Callable[[Manifest], Fetcher]:
+def fixture_factory(
+    payload: bytes | Callable[[], bytes], clock: Callable[[], datetime] | None = None
+) -> Callable[[Manifest], Fetcher]:
+    """``clock`` stamps ``fetched_at`` from the harness clock, so a capture entry's instant and
+    the ledger's attempt instants live in the same time line (the drill's replica bound
+    compares them)."""
+
     def factory(manifest: Manifest) -> Fetcher:
         body = payload() if callable(payload) else payload
         return Fetcher(
@@ -52,6 +58,7 @@ def fixture_factory(payload: bytes | Callable[[], bytes]) -> Callable[[Manifest]
             transport=FixtureTransport(body),
             offline=True,
             sleep=lambda s: None,
+            clock=clock or (lambda: datetime.now(UTC)),
         )
 
     return factory
@@ -66,12 +73,15 @@ def runtime(
     clock: Clock | None = None,
     owner: str = "w1",
 ) -> Runtime:
+    clock = clock or Clock(SCHEDULED + timedelta(minutes=1))
     return Runtime(
         manifest=manifest,
         bronze=bronze or Bronze(MemoryBlobStore(), MemoryCaptureLog()),
         store=store or MemoryStore(),
-        fetcher_factory=fixture_factory(payload if payload is not None else payload_for(manifest)),
-        clock=clock or Clock(SCHEDULED + timedelta(minutes=1)),
+        fetcher_factory=fixture_factory(
+            payload if payload is not None else payload_for(manifest), clock
+        ),
+        clock=clock,
         owner=owner,
         lease_ttl=timedelta(minutes=5),
     )

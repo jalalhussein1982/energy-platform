@@ -19,7 +19,7 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 
 ## 2026-09-24 — PR #4 reviewed and merged; demo revision 8; the strictly blind re-run passes (PR #5)
 
-**Done** (6 commits on `main`, `make check` green at each; no platform code touched). The
+**Done** (7 commits on `main`, `make check` green at each; no platform code touched). The
 author asked for the six open decisions of the Phase 9 hand-over to be laid out with a recommendation each
 (merge #4 first; run G10 after it; delete the 672 wrong T2 rows of 22 September unless teardown is
 days away, because Silver is derived and Bronze keeps the evidence; block pod traffic to
@@ -144,12 +144,15 @@ so the OOM is fixed — and the drill **failed on its own rule**: versions produ
 captures of a run (a correction with changed content is a new capture; the rebuild replays one
 capture per run) read as "missing", and a run processed after the last replication reads as
 "processed runs 63 < live 64". The nine deleted versions of 22 September come back in the rebuild
-as "extra", as documented. Open, `docs/07` §5.3: replay every capture-log entry of a run, and
-bound the processed-runs comparison by the replica's last replication.
+as "extra", as documented. Fixed in the same session (seventh commit, `docs/07` §5.3): the rebuild replays every distinct payload
+of a run from the replica log, oldest first, newest last; the comparison is bounded by the
+replica's newest capture instant, and lag is a counted, named, non-failing condition
+(`lagging_runs`). Three drill tests (loss = a middle capture missing; lag = the newest missing;
+superseded captures replayed); the harness now stamps `fetched_at` from its clock. `make check`
+887 green.
 
 
-**Open / carried.** The drill's comparison rule (`07` §5.3: superseded captures, replica lag) —
-the nightly drill fails on it until fixed. `TF_VAR_admin_cidr` at the next plan (the firewall was
+**Open / carried.** `TF_VAR_admin_cidr` at the next plan (the firewall was
 changed outside Terraform). **The two letters were sent by the author on
 2026-09-24** (drafts index updated; answers go to `docs/06` §1.4 / §4.2 and `docs/01` §10). The Hetzner
 console check. Teardown when the demo is done, then `gh workflow disable deploy-demo.yml`.
