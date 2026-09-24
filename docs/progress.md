@@ -54,8 +54,10 @@ review's script as a PostgreSQL negative test. Also: a render that accepts an em
 the API reads "empty = all" is a fail-open; the object-store rule already refused it, the
 Postgres rule did not.
 
-**Open / carried.** Phase 10 (not started; delivery first). ČEPS reply. The OTE cadence
-decision. `TF_VAR_admin_cidr` at the next plan, the Hetzner console check, the teardown.
+**Open / carried.** Phase 10 (not started; delivery first). The OTE cadence decision.
+**ČEPS terms decided later the same day** (next commit): internal use only, no redistribution,
+the documented service only — recorded in `06` §4.5, `01` §10 T3, the manifest, the target README,
+the letters index; questions 5–6 (`value1` = `value2`) stay open for ČEPS. `TF_VAR_admin_cidr` at the next plan, the Hetzner console check, the teardown.
 
 ---
 

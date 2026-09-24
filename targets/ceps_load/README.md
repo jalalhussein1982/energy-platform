@@ -40,8 +40,8 @@ deterministic formulas; any golden row can be checked with `grep '<item date="�
 | `decimal_comma` | `@value1 = "5951,667"` | quarantine `not a decimal under the dot rule` |
 | `soap_fault` | SOAP Fault over HTTP 200 | quarantine `SOAP Fault` |
 
-Live payloads are not committed: ČEPS's web-service terms and redistribution are still open items
-of the 01 §10 register (06 §4.5). Observed but not fixture-worthy: on 2026-09-19 `@value1` equalled
+Live payloads are never committed: ČEPS's terms were decided by the maintainer on 2026-09-24 without
+a reply — internal use only, no redistribution (06 §4.5, 01 §10). Observed but not fixture-worthy: on 2026-09-19 `@value1` equalled
 `@value2` on every QH and HR item while the DY item differed — a question for ČEPS (06 §4.2).
 
 ## Manifest notes

@@ -119,6 +119,9 @@ Consequence: the T3 manifest keeps `interval_label: start`, now with this sectio
 
 `robots.txt` (row 4): `User-agent: * / Disallow: /`. The web-services page and the interface description document present the service for "structured data delivery" with a test client and a test endpoint (`wwwtest.ceps.cz`); neither states a rate limit nor redistribution terms. The 01 §10 open items for ČEPS (terms of the service, confirmation that the robots rule does not cover the service, rate expectations) **remain open**; the committed fixtures stay synthetic.
 
+**Terms decided by the maintainer, 2026-09-24, without a reply** (the letter of `docs/admissions/drafts/ceps-web-service-and-load-series.md` was sent the same morning; no answer at the time of the decision). The decision is the conservative reading and is the same posture OTE's answer imposed on the OTE targets: (a) automated collection of `Load` through the documented structured-data web service, at the committed 15-minute cadence, **for internal use only**; (b) **no real response is ever published** — the committed fixtures stay synthetic permanently, no attribution wording is claimed; (c) the `robots.txt` rule is read as applying to the website, not to the web service ČEPS documents for structured data delivery with a test client, and only that service is called — the website is never fetched; (d) no rate limit was stated or observed; the cadence stays as committed. A reply from ČEPS is filed here when it arrives and can only loosen this decision. The `value1` = `value2` question (§4.2) is **not** part of the decision: it is a data-semantics question only ČEPS can answer and stays open, both series stored as published.
+
+
 ## 5. E1 — `GetDamPricePeriodE`
 
 | Fact | Observation | Row |
@@ -216,7 +219,7 @@ looked at, and nothing from this run was kept (temporary Bronze).
 
 ## 8. What was not verified
 
-- Redistribution rights: **OTE answered 2026-09-24 — internal use only, no redistribution** (§1.4); ČEPS (01 §10, V-1/V-3) still unanswered, human action.
+- Redistribution rights: **OTE answered 2026-09-24 — internal use only, no redistribution** (§1.4); ČEPS (01 §10, V-1/V-3) decided by the maintainer 2026-09-24 without a reply — internal use only, no redistribution (§4.5); the `value1` = `value2` question stays open (§4.2).
 - ČEPS `function` values other than AVG, `version` values other than RT, and history depth.
 - OTE history depth beyond the four days read (2024-06-30 works; 01's P2Y is still an assumption).
 - Corrections after a delivery day (no second read of any day).

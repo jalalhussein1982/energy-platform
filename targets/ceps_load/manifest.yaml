@@ -5,7 +5,7 @@
 schema_version: 1
 target_id: ceps_load
 description: ČEPS system load, quarter-hour averages (QH, AVG), real data (RT), Load and Load including pumping
-license: "ČEPS web-service terms not published beyond the interface description v3.2 (docs/06 §4.5); robots.txt disallows crawling and only the documented service is used; fixtures synthetic (01 §10)"
+license: "ČEPS web-service terms not published beyond the interface description v3.2; maintainer decision 2026-09-24 without a reply (docs/06 §4.5): internal use only, no redistribution, the documented service only; robots.txt read as the website; fixtures synthetic permanently (01 §10)"
 terms_url: https://www.ceps.cz/en/web-services
 allowed_hosts:
   - www.ceps.cz
