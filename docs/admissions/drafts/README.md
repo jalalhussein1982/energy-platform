@@ -1,14 +1,16 @@
-# Email drafts to the sources — NOT SENT
+# Email drafts to the sources — SENT 2026-09-24
 
-Drafts for the author (Phase 9, G18). **None of these has been sent**; the agent has no
-authority to send email. Each draft names the repository document that records the open
+Drafts for the author (Phase 9, G18). **Both letters were sent by the author on 2026-09-24** from
+the Gmail drafts below; the files here are the record of what was asked. Answers are filed in the
+documents each row names. Until an answer arrives, every fixture in the repository stays
+synthetic. Each draft names the repository document that records the open
 question, so the answer can be filed there.
 
 **2026-09-24:** the recipient addresses were read from the sources' own contact pages
 (OTE: `market@ote-cr.cz`, the market desk on www.ote-cr.cz/en/about-ote/contact; ČEPS:
 `ceps@ceps.cz`, the general contact on www.ceps.cz/en/contact). The two ČEPS drafts were merged
-into one letter. Both letters are in the author's Gmail as **drafts** (created by the agent, not
-sent) and here as the record; the author sends them or discards them.
+into one letter. Both letters were created by the agent as Gmail drafts and **sent by the author the same
+day**.
 
 | Draft | To | Closes |
 |---|---|---|

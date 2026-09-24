@@ -131,7 +131,8 @@ the agent's classifier and then approved by hand by the author; nothing was work
   of 23 September had passed. Recorded in the own-cluster README as an open item.
 
 **Open / carried.** `TF_VAR_admin_cidr` at the next plan (the firewall was changed outside
-Terraform). The restore-drill memory limit. Send or discard the two Gmail drafts. The Hetzner
+Terraform). The restore-drill memory limit. **The two letters were sent by the author on
+2026-09-24** (drafts index updated; answers go to `docs/06` §1.4 / §4.2 and `docs/01` §10). The Hetzner
 console check. Teardown when the demo is done, then `gh workflow disable deploy-demo.yml`.
 
 ---
