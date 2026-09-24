@@ -132,3 +132,20 @@ nodes module's templates until it has been exercised on a live node).
 **2. The 672 wrong T2 rows of 22 September** (`docs/07` §4.3): `repairs/2026-09-22-t2-wrong-day.sql`,
 one transaction, aborts unless exactly 672 rows match. Run command in the file header. Then never
 `replay` the 22 September runs of `ote_intraday_market_xlsx`.
+
+**Done 2026-09-24 ~01:40–01:47 UTC, the author approving each command by hand.** (1)
+`make demo-metadata-block` first timed out: the firewall's admin rule still carried the
+2026-09-23 plan address (step 4 above). It was replaced in place with `hcloud firewall
+replace-rules` (same four rules, new `/32`) — **the Terraform state still says the old address**:
+export `TF_VAR_admin_cidr=<current>/32` before the next plan, or that plan puts the old one back.
+(2) The server took the rule; the agent hop failed on an unknown host key (BatchMode), the key
+was recorded through the server, and the target now does that itself; both nodes report the
+rule active. (3) `make demo-metadata-verify`: PASS, `000 rc=28`. (4) The SQL repair's first run
+aborted on its guard (6 048 rows, not 672 — nine wrong versions, `docs/07` §4.3), the guard was
+corrected, the second run did `DELETE 6048`, 0 left. Captures at 01:45 UTC ran normally after
+all four.
+
+**Seen while checking, not fixed:** the first scheduled `restore-drill` (03:30 Prague, 01:30 UTC)
+ended **OOMKilled** at its 512 MiB limit after the restored database had shut down cleanly, i.e.
+in the comparison step; the manual drill of 2026-09-23 12:46 UTC had passed. Open item: measure
+the drill's peak and raise the limit in the chart values, or make the comparison stream.

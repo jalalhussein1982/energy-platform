@@ -228,9 +228,19 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
   decision (a production database change). They are exactly the T2 rows whose payload is mapped
   to more than one date (**2026-09-24:** the repair is
   `deployment/own-cluster/repairs/2026-09-22-t2-wrong-day.sql` — one transaction that aborts
-  unless the set is exactly 672 rows, deletes them and prints what is left; run command in its
-  header. The agent could not run or even count it: its classifier refuses production reads and
-  writes. After the deletion, **do not `replay`** the 22 September runs of
+  unless the set is exactly **6 048 rows**, deletes them and prints what is left; run command in
+  its header. **The 672 above is the current view.** Profiled on 2026-09-24 (read-only): the base
+  table held **nine** wrong versions of 22 September — 23 September's file at nine points of
+  that day, fetched 13:37–18:10 UTC on 23 September, all before revision 7 — and every xlsx row
+  under 22 September was one of them (no payload unique to the day). The current view showed the
+  newest (`383dedd8…`); deleting only that one would have promoted the next. The script's first
+  run (guard at 672) aborted on 6 048 as designed, nothing deleted; the guard was then set to
+  6 048 with two more conditions (every payload also mapped under another day; every row fetched
+  before 18:15 UTC). **Executed 2026-09-24 ~01:44 UTC** (the author approved the agent's run by
+  hand): `DELETE 6048`, 0 xlsx rows left under 22 September, `COMMIT`. Afterwards the current view
+  of 22 September holds T1's 192 rows (`price_vwap`, `volume_total`) and nothing from T2;
+  23 September's 672 xlsx rows are untouched; the next captures (01:45 UTC) ran normally. The
+  wrong blobs stay in Bronze and the attempts in the fetch log. After the deletion, **do not `replay`** the 22 September runs of
   `ote_intraday_market_xlsx`: a replay re-processes each run's recorded capture, and those
   captures are the wrong blob (`energy_platform/runtime/replay.py`). Silver loses nothing that
   Bronze and the fetch log do not keep):

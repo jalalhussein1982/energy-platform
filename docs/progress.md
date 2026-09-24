@@ -19,7 +19,7 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 
 ## 2026-09-24 — PR #4 reviewed and merged; demo revision 8; the strictly blind re-run passes (PR #5)
 
-**Done** (4 commits on `main`, `make check` green at each; no platform code touched). The
+**Done** (5 commits on `main`, `make check` green at each; no platform code touched). The
 author asked for the six open decisions of the Phase 9 hand-over to be laid out with a recommendation each
 (merge #4 first; run G10 after it; delete the 672 wrong T2 rows of 22 September unless teardown is
 days away, because Silver is derived and Bronze keeps the evidence; block pod traffic to
@@ -108,9 +108,31 @@ domain in the browser) is prepared as one command each:
 - **Hetzner console check:** not done — the browser extension has no permission for the console
   domain; the checklist in the own-cluster README stands.
 
-**Open / carried.** Run the two repairs (`make demo-metadata-block` + verify; the SQL). Send or
-discard the two Gmail drafts. The Hetzner console check. Teardown when the demo is done, then
-`gh workflow disable deploy-demo.yml`.
+**"Run them, I will approve manually" (fifth commit).** Each command below was refused once by
+the agent's classifier and then approved by hand by the author; nothing was worked around.
+
+- **The SQL ran twice.** The first run **aborted as designed**: 6 048 rows matched, not 672. A
+  read-only profile explained it — the 672 was the current view; the base table held **nine**
+  wrong versions of 22 September (23 September's file at nine points of that day, fetched
+  13:37–18:10 UTC on 23 September, all before the fix), and every xlsx row under 22 September was
+  one of them. Deleting only the current version would have promoted the next, so the guard was
+  set to 6 048 with two more conditions (every payload also mapped under another day; every row
+  fetched before 18:15 UTC). Second run: `DELETE 6048`, 0 left, `COMMIT`. Current view of
+  22 September afterwards: T1's 192 rows, no T2 row; 23 September untouched.
+- **`make demo-metadata-block` first failed before touching a node:** SSH timed out because the
+  firewall's admin rule still carried the 2026-09-23 plan address (README step 4). The rule was
+  replaced in place with `hcloud firewall replace-rules` (same four rules, new `/32`) — **state
+  drift:** `TF_VAR_admin_cidr` must be the current address at the next plan. Then the server
+  took the rule; the agent hop failed on an unknown host key (BatchMode), the key was recorded
+  through the server and the target now does that itself; both nodes report the rule active.
+  `make demo-metadata-verify`: **PASS** (`000 rc=28`). Captures at 01:45 UTC ran normally.
+- **Seen, not fixed:** the first scheduled `restore-drill` (01:30 UTC) was **OOMKilled** at
+  512 MiB in its comparison step, after the restored database shut down cleanly; the manual drill
+  of 23 September had passed. Recorded in the own-cluster README as an open item.
+
+**Open / carried.** `TF_VAR_admin_cidr` at the next plan (the firewall was changed outside
+Terraform). The restore-drill memory limit. Send or discard the two Gmail drafts. The Hetzner
+console check. Teardown when the demo is done, then `gh workflow disable deploy-demo.yml`.
 
 ---
 

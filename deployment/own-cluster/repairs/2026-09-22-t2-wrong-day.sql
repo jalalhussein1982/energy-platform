@@ -13,8 +13,17 @@
 --     sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
 --     < deployment/own-cluster/repairs/2026-09-22-t2-wrong-day.sql
 --
--- The transaction aborts unless the row set is exactly the 672 rows counted on 2026-09-23; a
--- different count means the situation changed and docs/07 §4.3 must be re-read first.
+-- The transaction aborts unless the row set is exactly 6 048 rows = 9 versions × 672. The 672
+-- of docs/07 §4.3 was the CURRENT VIEW (the newest wrong version); the base table holds all
+-- nine wrong versions of 22 September — 23 September's file at nine points of that day, fetched
+-- 13:37–18:10 UTC on 2026-09-23, all before the fix (revision 7, 18:15 UTC). Deleting only the
+-- current one would promote the next wrong one, so all nine go. Two more guards: every payload
+-- must also appear under another day (it is another day's file), and every row must have been
+-- fetched before the fix. A different count means the situation changed: re-profile first.
+--
+-- EXECUTED 2026-09-24 ~01:44 UTC by the maintainer agent with the author's manual approval:
+-- DELETE 6048, 0 xlsx rows left for 2026-09-22, COMMIT. Kept as the record; a second run aborts
+-- on the guard (0 rows).
 --
 -- Do NOT `energyctl replay` the 22 September runs of ote_intraday_market_xlsx afterwards: a
 -- replay re-processes each run's recorded capture, and those captures are the wrong blob.
@@ -37,10 +46,24 @@ CREATE TEMP TABLE wrong_22 ON COMMIT DROP AS
 DO $$
 DECLARE
   n integer;
+  n_all integer;
+  n_late integer;
 BEGIN
   SELECT count(*) INTO n FROM wrong_22;
-  IF n <> 672 THEN
-    RAISE EXCEPTION 'expected 672 wrong rows for 2026-09-22, found % — nothing deleted', n;
+  IF n <> 6048 THEN
+    RAISE EXCEPTION 'expected 6048 wrong rows for 2026-09-22 (9 versions x 672), found % — nothing deleted', n;
+  END IF;
+  -- every xlsx row of 22 September must be in the set: the day has no file of its own
+  SELECT count(*) INTO n_all FROM observations
+   WHERE dataset_id = 'ote.idm_continuous' AND source_transport = 'xlsx' AND local_date = DATE '2026-09-22';
+  IF n_all <> n THEN
+    RAISE EXCEPTION '% xlsx rows under 2026-09-22 but only % share a payload with another day — nothing deleted', n_all, n;
+  END IF;
+  -- every row must predate the fix (ADR-033 amendment 2, revision 7, 2026-09-23 18:15 UTC)
+  SELECT count(*) INTO n_late FROM observations o JOIN wrong_22 w ON w.id = o.id
+   WHERE o.fetched_at >= TIMESTAMPTZ '2026-09-23 18:15:00+00';
+  IF n_late <> 0 THEN
+    RAISE EXCEPTION '% rows were fetched after the fix — re-profile before deleting', n_late;
   END IF;
 END
 $$;

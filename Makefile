@@ -295,6 +295,10 @@ DEMO_PROBE_IMAGE   ?= docker.io/curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4
 demo-metadata-block: ## Author, admin SSH key: install the node-level drop of pod traffic to 169.254.169.254 on the demo server and agent (deployment/own-cluster/node-metadata-block.sh)
 	@test -n "$(TF)" || { echo "demo-metadata-block: neither terraform nor tofu installed"; exit 1; }
 	@host="$$($(DEMO_TF_OUT) server_public_address)" || { echo "demo-metadata-block: no server_public_address in the hcloud state"; exit 1; }; \
+	if ! ssh-keygen -F "$(DEMO_AGENT_PRIVATE)" >/dev/null 2>&1; then \
+	  $(DEMO_SSH) "root@$$host" 'ssh-keyscan -t ed25519 $(DEMO_AGENT_PRIVATE) 2>/dev/null' >> $$HOME/.ssh/known_hosts \
+	    && echo "demo-metadata-block: agent host key recorded via the server (BatchMode refuses unknown hosts)"; \
+	fi; \
 	$(DEMO_SSH) "root@$$host" 'sh -s' < deployment/own-cluster/node-metadata-block.sh \
 	  && $(DEMO_SSH) -J "root@$$host" "root@$(DEMO_AGENT_PRIVATE)" 'sh -s' < deployment/own-cluster/node-metadata-block.sh \
 	  || { echo "demo-metadata-block: FAILED (remove with: systemctl disable --now energy-platform-metadata-block on the node)"; exit 1; }
