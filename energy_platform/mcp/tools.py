@@ -31,7 +31,7 @@ from energy_platform.contracts.manifest import (
     validate_manifest,
 )
 from energy_platform.harness.fixtures import FixtureError, record_from_file, record_live
-from energy_platform.harness.pr import BundleRefused, prepare_bundle
+from energy_platform.harness.pr import NOT_RUN_BY_BUNDLE, BundleRefused, prepare_bundle
 from energy_platform.harness.runner import run_target_tests
 from energy_platform.harness.scaffold import ScaffoldError, scaffold_target
 from energy_platform.harness.surface import (
@@ -438,6 +438,8 @@ class Tools:
             "bundle": str(bundle.path),
             "branch": bundle.branch,
             "files": list(bundle.files),
+            "not_run": list(NOT_RUN_BY_BUNDLE),
             "next": "a human or the CI bot runs `python -m scripts.apply_pr_bundle <bundle>` "
-            "and `gh pr create`; this tool never pushes (ADR-006 Level 2)",
+            "and `gh pr create`; this tool never pushes (ADR-006 Level 2). The bundle ran "
+            "surface, admission and goldens only; CI runs the target's pytest, ruff and mypy",
         }

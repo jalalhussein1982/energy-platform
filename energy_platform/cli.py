@@ -721,7 +721,8 @@ def pr_bundle(
     title: Annotated[str | None, typer.Option("--title")] = None,
     repo: Annotated[Path, typer.Option("--repo", help="repository root")] = Path("."),
 ) -> None:
-    """Prepare a Route A pull request bundle (all gates green, one target) — never pushes."""
+    """Prepare a Route A PR bundle: one target; surface, admission and goldens green (the
+    target's pytest, ruff and mypy are CI's and are named as not run) — never pushes."""
     try:
         bundle = prepare_bundle(repo, target_id, outbox, title=title)
     except BundleRefused as exc:

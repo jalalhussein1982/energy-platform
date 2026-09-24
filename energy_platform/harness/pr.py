@@ -2,9 +2,12 @@
 
 Platform code may not run ``git`` (ADR-027 §3), and pushing is the Level-2 boundary of ADR-006.
 So the harness produces a self-contained **bundle**: one target's files, the gate results that
-were green when it was made, a title and a body. ``scripts/apply_pr_bundle.py`` (git allowed
+were green when it was made (surface, admission, goldens — **not** the target's pytest, lint or
+types, which the sandbox cannot run and CI does; the bundle says so, review 2 AE-03), a title
+and a body. ``scripts/apply_pr_bundle.py`` (git allowed
 there) turns it into a branch and a commit outside the sandbox; a human or the CI bot pushes.
-A bundle is refused while any gate is red, so a red target cannot even ask for review.
+A bundle is refused while any of its gates is red, so a red target cannot even ask for review;
+CI is the boundary for the checks the bundle does not run.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from energy_platform.harness.pr_surface import classify
 from energy_platform.harness.surface import check_target
 
 BUNDLE_VERSION = 1
+NOT_RUN_BY_BUNDLE: tuple[str, ...] = ("target pytest", "ruff", "mypy")
 
 
 class BundleRefused(ValueError):
@@ -39,7 +43,11 @@ class Bundle:
 
 
 def gate_report(target: Path) -> dict[str, object]:
-    """The gates a Route A PR must pass, as data (05 §2)."""
+    """The gates a Route A PR must pass, as data (05 §2): surface, admission, goldens.
+
+    ``not_run`` names the checks this report does **not** cover (the target's pytest, ruff,
+    mypy): ``energyctl run-target-tests`` and CI run them. A green report is a partial verdict.
+    """
     surface = check_target(target)
     try:
         manifest = load_manifest(target / "manifest.yaml")
@@ -56,7 +64,13 @@ def gate_report(target: Path) -> dict[str, object]:
         and bool(goldens)
         and all(g["ok"] for g in goldens)
     )
-    return {"ok": ok, "surface": surface, "validation": validation, "goldens": goldens}
+    return {
+        "ok": ok,
+        "surface": surface,
+        "validation": validation,
+        "goldens": goldens,
+        "not_run": list(NOT_RUN_BY_BUNDLE),
+    }
 
 
 def _files_of(target: Path) -> list[Path]:
@@ -99,7 +113,9 @@ def prepare_bundle(
         "body": body
         or (
             f"Adds `targets/{target_id}/` only (manifest, fixtures, goldens, tests). "
-            "Gates were green when this bundle was prepared; CI re-runs them.\n\n"
+            "Surface, admission and golden gates were green when this bundle was prepared. "
+            "Not run by pr-bundle: the target's pytest, ruff and mypy — CI runs them and is the "
+            "gate for them.\n\n"
             "Route A adapter addition (ADR-022). No registry, platform or deployment change."
         ),
         "gates": gates,

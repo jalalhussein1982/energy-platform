@@ -193,7 +193,8 @@ fetched and why, and a table of fixtures with what each demonstrates and its exp
 ```bash
 make check                                  # the whole repository, green
 make pr-surface BASE=main                   # your change touches targets/my_source/ only
-ep pr-bundle my_source                      # refuses unless every gate is green; never pushes
+ep pr-bundle my_source                      # refuses unless surface, admission and goldens are green; never pushes;
+                                            # it does not run your pytest/ruff/mypy — `make check` above and CI do
 uv run python -m scripts.apply_pr_bundle .energy_platform/outbox/my_source-<stamp>.json --push
 gh pr create --base main --head target/my_source
 ```

@@ -29,6 +29,9 @@ def test_gate_report_and_bundle_for_a_green_target(tmp_path: Path) -> None:
     bundle = prepare_bundle(root, "ote_probe", tmp_path / "outbox")
     data = json.loads(bundle.path.read_text())
     assert data["target_id"] == "ote_probe" and data["branch"] == "target/ote_probe"
+    # review 2 AE-03: the bundle is a partial verdict and says so
+    assert data["gates"]["not_run"] == ["target pytest", "ruff", "mypy"]
+    assert "Not run by pr-bundle" in data["body"] and "pytest" in data["body"]
     assert verify_bundle(data) == []
     assert (
         set(bundle.files) == {f["path"] for f in data["files"]}
