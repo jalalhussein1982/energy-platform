@@ -1,0 +1,1 @@
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><GetImbalanceSettlementPeriodEResponse xmlns="http://www.ote-cr.cz/schema/service/public"><Result/></GetImbalanceSettlementPeriodEResponse></soap:Body></soap:Envelope>
