@@ -51,7 +51,10 @@ no dependency without an ADR; ADR-006: dependency changes are their own gate).
 - If A: `deps-allowlist.txt` gains the `boto3` closure; ADR-027 §3 amended; Phase 5 adds a
   `botocore` stub decision under ADR-029.
 - If B: `energy_platform/fetch/objectstore.py` with offline tests against a recorded MinIO
-  exchange; the local profile's MinIO ×2 (Phase 5) is the first live use.
+  exchange; the local profile's MinIO ×2 (Phase 5) is the first live use. *2026-09-24: the
+  local profile's servers are RustFS (ADR-036 amendment 4, MinIO's images withdrawn); the client
+  was re-verified against it — including `If-None-Match` and the lock headers — and gained the
+  bucket verbs `bucket_exists`, `create_bucket`, `put_bucket_versioning` for `energyctl bucket-init`.*
 - Either way the `Bronze` facade, the capture-log layout and the fixtures do not change: the
   backend is behind the protocol shipped in Phase 2.
 

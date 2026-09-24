@@ -6,7 +6,7 @@
 | Date | 2026-09-22 |
 | Resolves | D-3 (`02-architecture-decisions.md` §4.2); amends ADR-002 "pgBackRest/WAL-G with PITR" (tooling, not the guarantee); refines ADR-021 §1 (tiering job shape) and ADR-028 §3 with the V-12/V-13 outcomes |
 | Supersedes | — |
-| Amended | 2026-09-23, amendment 1 (below): §4 `statefulset` backup footprint bounded — compressed WAL shipped and pruned, daily base backup, drill fetches WAL from the base's start segment |
+| Amended | 2026-09-23, amendment 1 (below): §4 `statefulset` backup footprint bounded — compressed WAL shipped and pruned, daily base backup, drill fetches WAL from the base's start segment · 2026-09-24, amendment 4 (below): the `local` profile's servers are RustFS after MinIO's images were withdrawn; bucket bootstrap through the platform's client |
 
 ## Context
 
@@ -34,7 +34,7 @@ what each store can actually enforce:
 
    | Profile | Store A (hot, capture writes) | Store B (independent copy, replication writes only) | Immutability control |
    |---|---|---|---|
-   | `local` | MinIO 1 in the chart (`objectstore.local.enabled`), bucket created `--with-lock`, versioning on | MinIO 2 in the chart, plain bucket | Object Lock on A; B is a copy target |
+   | `local` | RustFS 1 in the chart (`objectstore.local.enabled`; MinIO until amendment 4), bucket created with Object Lock, versioning on | RustFS 2 in the chart, plain bucket | Object Lock on A; B is a copy target |
    | `tenant` (scenario A) | the platform's S3 endpoint by values | a second endpoint by values (another site or provider) | Object Lock where offered; otherwise the ADR-021 compensating control (copy-verify under the ledger, never overwrite by key) |
    | `own-cluster` / demo | Hetzner Object Storage, versioning **on**, bucket-level Object Lock COMPLIANCE `bronze.retention.days` (Terraform `storage` module over the `aws` provider) | OCI Object Storage Frankfurt over the S3-compatible endpoint, **versioning OFF, retention rule** `replica.retentionDays` (Terraform `oci` provider) | Object Lock on A; retention rule on B — the bucket-policy half of the ADR-021 fallback is **not** used (V-12: unenforceable against the owner) |
    | reference (record only) | CESNET RGW | MetaCentrum Swift | V-6; no release of ours |
@@ -230,7 +230,50 @@ together with a version-bearing `imageName`/`imageCatalogRef` for the operator's
 
 **Proof:** `tests/harness/test_chart.py::test_the_drill_refuses_database_modes_without_a_backup_chain`.
 
+## Amendment 4 (2026-09-24) — the local profile's servers after MinIO
+
+**Context.** On 2026-09-24 `make local-up` on a fresh kind cluster failed at the image pull:
+MinIO's community images (`quay.io/minio/minio`, `quay.io/minio/mc`, both pinned by digest) are
+no longer served by quay.io or Docker Hub, and `github.com/minio/minio` is archived (`07` §8.3).
+The digest pins did their job — nothing else was pulled in their place — but a pin cannot keep
+a publisher from withdrawing an image. The `local` profile row of §1 named a product that no
+longer exists as a pullable artefact; the demo (Hetzner, OCI) is unaffected.
+
+**Decision.**
+
+1. **The `local` profile's two stores are RustFS 1.0.0** (`docker.io/rustfs/rustfs@sha256:8cc98017…`),
+   chosen **by probe, not by README** (`docs/plans/phase-12.md` P12-D1): a scratch script ran the
+   candidate in Docker and exercised, with the AWS CLI, rclone and the platform's own
+   `ObjectStore` client, everything the profile relies on — create-bucket with Object Lock,
+   versioning, PUT with COMPLIANCE retention headers and HEAD returning the lock, DELETE of the
+   locked version refused (`AccessDenied`), the old version readable and kept after an
+   overwrite, ListObjectsV2 paging, `x-amz-storage-class` on PUT, `If-None-Match: *` honoured
+   (the ADR-024 am.3 create-only PUT), `rclone copy --immutable` and `check` A → B. All 23
+   steps pass (`07` §8.4). The first candidate to pass every step was the one; versitygw and
+   SeaweedFS were not needed.
+2. **Chart shape unchanged** (P12-D3): the same two StatefulSets, Services and port 9000, the
+   same PVC sizes, and the same Secret keys (`BRONZE_*`, `BRONZE_REPLICA_*`) as the servers'
+   root credentials — so the rclone aliases, the NetworkPolicies, the storage probe and the
+   drills are untouched. What changed is the image, its env (`RUSTFS_VOLUMES=/data`, console
+   off, logs to an emptyDir under the read-only root filesystem) and the readiness path.
+3. **Bucket bootstrap through the platform's client** (P12-D2): `energyctl bucket-init` — three
+   new verbs on `fetch.objectstore` (`bucket_exists`, `create_bucket(object_lock=…)`,
+   `put_bucket_versioning`) — replaces the `mc` job; the hook runs the platform image, creates
+   bucket A with Object Lock and versioning and bucket B plain, idempotently. One fewer
+   third-party image; the same signed client the platform trusts; reusable for a tenant's
+   first deploy.
+
+**Residual.** RustFS is a young project (1.0.0, 2026-09); the `local` profile is a laptop test
+bed, not a production store, and nothing of the demo's or a tenant's data depends on it. A
+withdrawal can happen again to any pinned image; the answer is the same probe, not a looser pin.
+HEAD does not echo `StorageClass` for STANDARD objects (as S3 itself does not); the tiering
+probe (ADR-021 §3) treats an absent class as STANDARD.
+
 ## Verification refs
+
+`07` §8.4 (the probe transcript and the clean-clone gate after amendment 4);
+`tests/fetch/test_objectstore.py::test_bucket_init_creates_a_locked_versioned_bucket_once`;
+`tests/harness/test_chart.py::test_local_object_stores_are_rustfs_with_the_bucket_init_hook_on_the_platform_image`.
 
 `00-assumptions.md` §5: 2026-09-22 · V-12 · CONFIRMED; 2026-09-22 · V-13 · CONFIRMED;
 2026-09-19 · V-6 · CONFIRMED (reference record); 2026-09-19 · V-10 · CONFIRMED (no managed

@@ -8,7 +8,7 @@ make local-down
 
 **Prerequisites:** Docker with ≥ 4 GB of memory for its VM, `kind` ≥ 0.33, `helm` ≥ 4 (3.x also
 works: the Makefile picks `--atomic` or `--rollback-on-failure` by major), `kubectl`, `uv`.
-No credentials: `make local-secrets` generates the Postgres password and the MinIO keys into
+No credentials: `make local-secrets` generates the Postgres password and the object-store keys into
 the one Secret the chart consumes (`energy-platform`); nothing is read from your environment.
 
 **Why a registry container** (`kind-registry`, `127.0.0.1:5001`): the chart only accepts an
@@ -17,8 +17,9 @@ containerd. `make local-image` pushes the platform image to the kind-attached re
 push's digest is what the deploy sets — the same by-digest path a real registry gives.
 
 **What runs** (namespace `energy-platform`, context `kind-energy-platform`): one Postgres
-StatefulSet (WAL archiving on), MinIO A (Object Lock + versioning, four erasure-coded paths on
-one volume) and MinIO B (plain), the `capture` / `process` / `recapture` CronJobs of every
+StatefulSet (WAL archiving on), RustFS A (Object Lock + versioning; the bucket is created by the
+`bucket-init` hook through the platform's own client) and RustFS B (plain) — MinIO until
+2026-09-24, when its images were withdrawn (ADR-036 amendment 4) —, the `capture` / `process` / `recapture` CronJobs of every
 committed target, the `gaps` CronJob (gap detector + freshness row), the replication, backup
 and restore-drill CronJobs, the freshness exporter. Hooks on every deploy: `migrate` → `smoke`
 (one fixture capture+process in a throwaway schema and Bronze). Layer-1 egress is verified by

@@ -20,6 +20,7 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-24 | Phase 10 | every review-2 finding closed: OTE cadence decided (ADR-033 am. 3); ownership, occurrences, generations, replay reclaim, create-only entries, invalidations (ADR-038), target-scoped freshness, RPO per domain, mode/FQDN/gate fixes, contributor path; three migrations with downgrades; 923 tests, 32 on PostgreSQL |
 
 ---
+| 2026-09-24 | Phase 12 | the local profile's object stores after MinIO: RustFS by probe, bucket bootstrap through the platform's client, the clean-clone gate green again |
 
 ## 2026-09-24 — Phase 11: Grafana dashboards over Silver, private
 
@@ -506,3 +507,37 @@ Note for Phase 6: `docs/07-operations.md` already exists (the Phase 5 runbook); 
 **Open / carried.** Scratch buckets left in both accounts (lock-protected until 2026-09-23); the private probe repo `energy-platform-v14-probe` (workflow only). V-11 (reference CNI egress enforcement) still open — not a Phase 5 gate. Merge of the four `target/*` branches follows this commit. Everything else as in the Phase 4 entry.
 
 **Next prompt** (03 Phase 5 starter, verbatim, in the Phase 4 entry of the archive).
+
+## 2026-09-24 — Phase 12: the local profile's object stores after MinIO (RustFS; the gate holds again)
+
+**Trigger.** Phase 11's local run found MinIO's community images withdrawn (`07` §8.3). The
+`local` profile could not start on any machine without the cached images.
+
+**Done** (five commits + this entry; plan `docs/plans/phase-12.md`):
+
+- 12.1 — probe, not README: RustFS 1.0.0 in Docker against the AWS CLI, rclone and the
+  platform's own client — 23/23 steps pass (Object Lock at create, versioning, COMPLIANCE
+  retention on PUT and in HEAD, delete of the locked version `AccessDenied`, old version kept
+  after overwrite, ListObjectsV2 paging, `If-None-Match: *`, `rclone copy --immutable` and
+  `check`). versitygw and SeaweedFS were not needed. Transcript in `07` §8.4.
+- 12.2 (`f388630`) — `ObjectStore.bucket_exists`, `create_bucket(object_lock=…)`,
+  `put_bucket_versioning`; `energyctl bucket-init [--replica]` (A locked + versioned, B plain,
+  idempotent); the fake gateway answers bucket-level verbs; tests.
+- 12.3 (`7bbbd0a`) — `objectstore.yaml` replaces `minio.yaml` (same two StatefulSets, Services,
+  ports, Secret keys, PVCs; RustFS by digest, console off, logs in an emptyDir, uid 10001,
+  readiness `/health/ready`); `hook-bucket-init.yaml` on the platform image at weight −20
+  replaces the `mc` job; `mcImage` gone, `resources.minio` → `resources.objectstore`; chart test
+  asserts no MinIO image in the render.
+- 12.4 — ADR-036 amendment 4, ADR-032 pointer, `07` §2 and §8.4, local README, README
+  reproduce block un-annotated, `05` C-71 (a store that only looks like one).
+- 12.5 — the gate on a fresh kind cluster: `local-up` PASS (bucket-init 21 s, migrate, smoke,
+  egress 3/3), `smoke-test` PASS, `rollback-drill` PASS (both phases), a hand-run
+  `capture-ceps-load` Job's blob in RustFS A **COMPLIANCE-locked** and its version undeletable,
+  Grafana by port-forward (health ok, anonymous 401, datasource OK via the read-only role, both
+  dashboards) — the check Phase 11 owed. Cluster torn down afterwards.
+
+**Open / carried.** Author (Level 3) items unchanged (`energyctl invalidate` for the 22-Sep
+xlsx captures, first-packet Jobs rerun with the node block, `TF_VAR_admin_cidr` at the next
+plan, Hetzner console, teardown when done; ČEPS `value1 = value2` question). Residual noted in
+ADR-036 am.4: RustFS is young; the local bucket has no default retention rule (rclone-written
+backups are not per-object locked, as before with MinIO). The demo (rev 23) is untouched.

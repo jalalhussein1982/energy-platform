@@ -30,9 +30,11 @@ Helm 4.3, Docker Desktop with 4 GB): `make image` → `kind create cluster` (one
 off) → `make local-registry` (a `registry:2` container on `127.0.0.1:5001` attached to the kind
 network; the node's containerd maps `localhost:5001` to it) → Cilium with
 `policyEnforcementMode: default` → `make local-image` (push; the deploy uses the push's digest)
-→ `make local-secrets` (random Postgres password and MinIO keys into the `energy-platform`
+→ `make local-secrets` (random Postgres password and object-store keys into the `energy-platform`
 Secret) → `make deploy-local` (`helm upgrade --install --rollback-on-failure --wait=watcher
---wait-for-jobs`, hooks `minio-init` −20, `migrate` −10, `smoke` 0) → `make local-egress-test`.
+--wait-for-jobs`, hooks `bucket-init` −20 (`minio-init` until 2026-09-24, §8.4), `migrate` −10,
+`smoke` 0) → `make local-egress-test`. Since 2026-09-24 the two object stores are RustFS, not
+MinIO (ADR-036 amendment 4; §8.3 for why, §8.4 for the proof).
 
 Result of the first green run:
 
@@ -597,3 +599,61 @@ the two MinIO StatefulSets and the `mc` init job with an S3-compatible server wh
 published and which implements Object Lock — candidates `ghcr.io/versity/versitygw` (v1.8.0,
 43 tags), `docker.io/rustfs/rustfs` (1.0.0), SeaweedFS — with the same `--with-lock` bucket
 semantics the local profile relies on (ADR-036 §1). The kind cluster was torn down afterwards.
+
+### 8.4 The local profile's object stores are RustFS (Phase 12, 2026-09-24)
+
+**The probe** (ADR-036 amendment 4, P12-D1). RustFS 1.0.0 in Docker on this laptop, exercised
+with the AWS CLI 2, rclone 1.75.1 and the platform's own client — every step the local profile
+relies on, in the order the platform uses them:
+
+```text
+== rustfs on http://127.0.0.1:19000 (container running)
+PASS  create-bucket --object-lock-enabled-for-bucket
+PASS  create-bucket (plain, B)
+INFO  create-bucket again: 200
+PASS  put-bucket-versioning
+PASS  get-bucket-versioning Enabled
+PASS  get-object-lock-configuration Enabled
+PASS  put-object with COMPLIANCE retention
+PASS  head-object reports COMPLIANCE (COMPLIANCE 2026-09-25)
+PASS  delete of the locked version refused ((AccessDenied))
+PASS  locked version still readable
+PASS  second PUT keeps both versions (2)
+PASS  list-objects-v2 paging (2 True True)
+PASS  put-object --storage-class STANDARD
+INFO  head StorageClass: <absent>
+PASS  client put with lock headers (etag "4ecfe9bccb3)
+PASS  client head size=10
+PASS  client list paging 3 keys
+PASS  If-None-Match: first True, second False
+INFO  read-back: b'one'
+PASS  rclone copy --immutable to B
+PASS  rclone check --one-way: 0 differences
+PASS  rclone --immutable refuses a changed object
+PASS  rclone copy A→B (server to server, incl. locked objects)
+```
+
+Two facts from the transcript matter for the chart: a repeated create-bucket answers 200 (so
+`bucket-init` checks `HEAD` first and treats 409 as "exists" for other servers), and HEAD omits
+`StorageClass` for STANDARD objects, as S3 itself does. The image runs as uid 10001, initialises
+`/data` and `/logs` at start (both are volumes under the read-only root filesystem), and has no
+console when `RUSTFS_CONSOLE_ENABLE=false`.
+
+**The gate** — `make local-down && make local-up && make smoke-test` on a fresh kind cluster
+(Docker Desktop 4 GB, kind 0.33, kindest/node v1.37.0), 2026-09-24:
+
+| Step | Result |
+|---|---|
+| `make local-up` | **PASS** — image built and pushed by digest, cluster + Cilium, `helm install` deployed on the first try: `bucket-init` hook complete in 21 s (`{"bucket": "bronze", "created": true, "object_lock": true, "versioning": true}`, `{"bucket": "bronze-replica", "created": true, "object_lock": false, "versioning": false}`), `migrate` (0001 … 0007) and `smoke` hooks complete; egress 3/3 (capture → OTE 302; metadata and cluster ranges blocked; process → OTE blocked) |
+| `make smoke-test` | **PASS** — smoke hook re-run, `gaps` + freshness row written, `energy_platform_freshness_age_seconds{target="ote_intraday_market"}` present, restore-drill dry run |
+| `make rollback-drill` | **PASS** — both phases (failing smoke, failing storage probe): upgrade failed as expected, release `deployed` after rollback, values restored, schema at `0007_reader_role`, 624 runs and 33 CronJobs unchanged, no throwaway schema left |
+| the store-A control, live | one `capture-ceps-load` Job run by hand: `bronze/blobs/cf/cf00cd0c…` in RustFS A has `ObjectLockMode: COMPLIANCE`, `RetainUntil` = +1 day (`values-local.yaml`), and `delete-object --version-id` answers **`AccessDenied`**; bucket A reports `ObjectLockEnabled: Enabled`, versioning `Enabled` |
+| Grafana on kind (the check Phase 11 owed) | `port-forward svc/energy-platform-grafana`: `/api/health` ok (12.2.0); anonymous `/api/search` → **401**; datasource `energy-platform Silver` health "Database Connection OK" through the read-only role; both dashboards provisioned |
+| pods after the drill | Postgres, RustFS A and B, exporter, Grafana running; hooks completed; the two `Error` pods are the drill's deliberately failed `smoke` and `storage-probe` hooks, kept for inspection by design |
+
+One observation, unchanged from MinIO: the WAL backups written by rclone (`backups/postgres/…`)
+carry no per-object lock, because the local bucket has Object Lock **enabled** but no default
+retention rule (the demo's Terraform sets one, ADR-036 §1); the platform's own PUTs are the
+ones the control protects, and the drill restores from those backups either way. The cluster
+was torn down after the run (`make local-down`); the capture CronJobs would otherwise keep
+fetching live every 15 minutes.

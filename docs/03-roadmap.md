@@ -266,6 +266,16 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 - [x] 11.3 ADR-039, `07` §7.1, README, `05` C-70
 - [x] 11.4 demo: Secret keys, `grafana.enabled`, deploy, a port-forward render
 
+## Phase 12 — the local profile's object stores after MinIO — done 2026-09-24
+
+**Goal.** Restore the clean-clone gate: MinIO's community images were withdrawn on 2026-09-24 (`07` §8.3), so the `local` profile's two stores and the `mc` init job are replaced by an S3 server that exists and passes an empirical Object Lock probe (ADR-036 amendment 4). Same semantics as the demo's stores; nothing else changes. Plan: `docs/plans/phase-12.md`.
+
+- [x] 12.1 probe the candidates in Docker (RustFS 1.0.0 passes all 23 steps; `07` §8.4)
+- [x] 12.2 `fetch.objectstore` bucket verbs, `energyctl bucket-init`, fake-gateway support, tests
+- [x] 12.3 chart: `objectstore.yaml` (RustFS by digest), `hook-bucket-init.yaml` on the platform image, values, `local-secrets`, chart test
+- [x] 12.4 ADR-036 amendment 4, ADR-032 pointer, `07` §2 and §8.4, local README, README, `05` C-71
+- [x] 12.5 the gate: `make local-down && make local-up && make smoke-test`, `make rollback-drill`, a live capture COMPLIANCE-locked in RustFS A, Grafana on kind — all PASS (`07` §8.4)
+
 ---
 
 ## Appendix A — Bootstrap prompt (paste into Claude Code at the start of Phase 0)
