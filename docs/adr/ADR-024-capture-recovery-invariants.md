@@ -97,6 +97,39 @@ not protect state transitions.
 - Devil's advocate: `reconcile` lists object storage on every process run. Bounded by the window
   (48 h ≈ 192 entries at 15-minute cadence) and cheap on S3 prefixes.
 
+## Amendment 1 (2026-09-24) — capture generations: the ledger follows every Bronze generation
+
+**Context.** Review 2 (DC-01, DC-02; `codex-review/2026-09-24/03-data-correctness.md`)
+reproduced on PostgreSQL two ways a durable correction was lost. (1) A correction captured
+while the ledger was down: §2's reconciliation inserts *missing* runs and advances a run only
+while it has no capture id, so an existing run kept its older capture and no pending work
+appeared — `reconciled=0`, the old price stayed current. (2) A correction registered while a
+worker held a claim on the older capture: `mark_recaptured` changed the run's capture id but
+not its fence, so the old worker's commit passed §4's fence check and wrote the old payload
+over a run that now named the new one.
+
+**Decision.**
+
+1. **A new generation invalidates in-flight work.** `mark_recaptured` bumps `runs.fence` and
+   clears the lease. A commit predicated on the previous fence affects zero rows and is
+   recorded `lost_lease` (§4, unchanged); the run stays `captured` on the new capture and the
+   next claim processes it.
+2. **Reconcile advances generations.** For every scheduled instant in its window, `reconcile`
+   compares the run's capture with the newest Bronze entry: a later attempt whose payload
+   differs is a generation the ledger missed, and the run is `mark_recaptured` to it. A later
+   attempt with the run's own payload is a poll, not a generation (nothing to process).
+   Intermediate generations the ledger never saw (A processed, B missed, C captured) are not
+   replayed live — the run advances to the newest; the restore drill's rebuild replays every
+   payload change (ADR-023 amendment 2) and holds them all.
+3. **The window covers corrections.** Reconcile looks back `reconcile.windowHours` **plus the
+   manifest's `cadence.correction.days`**, so a correction of D-3 captured during an outage is
+   found by the default 48-hour reconcile.
+
+**Proof:** `tests/store/test_store.py::test_review2_dc02_…` (both stores: the old claim's
+commit is `lost_lease`, no rows, the new claim completes);
+`tests/runtime/test_review2.py::test_dc01_…` (outage, subsequent unchanged poll, D-3) and
+`::test_dc02_…` through capture, claim and process.
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-19 · V-6 · CONFIRMED (object store listing and object lock, on which

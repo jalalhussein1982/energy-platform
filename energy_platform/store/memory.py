@@ -119,7 +119,16 @@ class MemoryStore:
         return run
 
     def mark_recaptured(self, run_id: int, capture_id: str, *, now: datetime) -> Run:
-        run = replace(self._runs[run_id], state="captured", capture_id=capture_id, updated_at=now)
+        # ADR-024 amendment 1: a new generation invalidates any in-flight claim (fence + 1)
+        run = replace(
+            self._runs[run_id],
+            state="captured",
+            capture_id=capture_id,
+            fence=self._runs[run_id].fence + 1,
+            lease_owner=None,
+            lease_until=None,
+            updated_at=now,
+        )
         self._runs[run_id] = run
         return run
 

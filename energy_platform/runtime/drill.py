@@ -33,10 +33,11 @@ from energy_platform.bronze.capture_log import CaptureEntry
 from energy_platform.contracts.manifest import Manifest
 from energy_platform.contracts.observation import observation_identity
 from energy_platform.fetch import Fetcher
+from energy_platform.parse import parser_ref
 from energy_platform.runtime.context import Runtime, utc_now
-from energy_platform.runtime.process import ProcessReport, process
+from energy_platform.runtime.process import ProcessReport, process, process_one
 from energy_platform.runtime.reconcile import reconcile
-from energy_platform.store import Store, StoreUnavailable
+from energy_platform.store import Store, StoreUnavailable, derivation_for
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +135,7 @@ def _rebuild(
     (docs/07 §4.3); payload hashes are."""
     reconciled = reconcile(rt, window=None)
     reports = list(process(rt))
+    derivation = derivation_for(rt.manifest, parser_ref(rt.manifest))
     by_run: dict[datetime, list[CaptureEntry]] = {}
     for entry in replica.log.list(rt.target_id):
         by_run.setdefault(entry.scheduled_for, []).append(entry)
@@ -151,8 +153,13 @@ def _rebuild(
         if run is None:
             continue
         for entry in distinct:
+            # claim and process this capture directly: ``process`` would first reconcile the
+            # run back to its newest generation (ADR-024 amendment 1) and skip the older one
             scratch.mark_recaptured(run.id, entry.capture_id, now=clock())
-            reports.extend(process(rt))
+            claim = scratch.claim(run.id, rt.owner, rt.lease_ttl, now=clock())
+            if claim is None:
+                continue
+            reports.append(process_one(rt, claim, derivation))
     return len(reconciled), tuple(reports)
 
 

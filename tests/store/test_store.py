@@ -640,3 +640,31 @@ def test_review2_dc04_a_returning_payload_is_current_again_and_an_exact_retry_is
     assert (back.inserted, back.occurrences) == (0, 1)
     assert len(store.all_rows("ote.idm_continuous")) == 2
     assert values(store)[1] == Decimal("170.13")
+
+
+def test_review2_dc02_a_recapture_fences_the_in_flight_claim(store: Store) -> None:
+    """Review 2 DC-02 (ADR-024 amendment 1): a worker holding a claim on capture A cannot
+    commit after the run was re-captured with B — the fence moved; the run stays pending on B."""
+    run_id = captured_run(store)
+    old = claim(store, run_id)
+    run = store.mark_recaptured(run_id, "c2", now=NOW + timedelta(seconds=1))
+    assert run.fence == old.fence + 1 and run.lease_owner is None and run.state == "captured"
+    late = store.commit(
+        old, state="processed", outcome="ok", derivation=D_A, observations=[obs()], now=NOW
+    )
+    assert late.lost_lease and late.inserted == 0
+    assert store.all_rows("ote.idm_continuous") == ()
+    after = store.get_run("ote_idm_soap", T0)
+    assert after is not None and after.state == "captured" and after.capture_id == "c2"
+    assert [a.outcome for a in store.attempts(run_id)] == ["lost_lease"]
+    fresh = claim(store, run_id, "w2", now=NOW + timedelta(seconds=2))
+    assert fresh.attempt.capture_id == "c2"
+    done = store.commit(
+        fresh,
+        state="processed",
+        outcome="ok",
+        derivation=D_A,
+        observations=[obs(value="171.99", sha=SHA_2)],
+        now=NOW + timedelta(seconds=3),
+    )
+    assert done.inserted == 1 and values(store)[1] == Decimal("171.99")

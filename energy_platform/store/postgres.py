@@ -271,8 +271,10 @@ class PostgresStore:
         return self._run(row)
 
     def mark_recaptured(self, run_id: int, capture_id: str, *, now: datetime) -> Run:
+        # ADR-024 amendment 1: a new generation invalidates any in-flight claim (fence + 1)
         row = self._one(
-            "UPDATE runs SET state = 'captured', capture_id = %s, updated_at = %s "
+            "UPDATE runs SET state = 'captured', capture_id = %s, fence = fence + 1, "
+            "lease_owner = NULL, lease_until = NULL, updated_at = %s "
             "WHERE id = %s RETURNING *",
             (capture_id, now, run_id),
         )

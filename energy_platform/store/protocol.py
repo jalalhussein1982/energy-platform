@@ -208,7 +208,10 @@ class Store(Protocol):
     def mark_recaptured(self, run_id: int, capture_id: str, *, now: datetime) -> Run:
         """ADR-033 §3: a forced re-capture whose payload changed makes the run pending again —
         ``state = captured`` and ``capture_id`` pointing at the new attempt, whatever the state
-        was (a ``processed`` run is lowered on purpose: the new content must be processed)."""
+        was (a ``processed`` run is lowered on purpose: the new content must be processed).
+        ADR-024 amendment 1 (review 2 DC-02): the **fence is bumped and the lease cleared**, so
+        a worker still holding a claim on the older capture loses at commit (``lost_lease``)
+        instead of writing the old payload over the run that now names the new one."""
         ...
 
     # ---------------------------------------------------------------- ledger: attempts
