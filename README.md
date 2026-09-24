@@ -149,7 +149,7 @@ One of them refused a source whose free API is for non-commercial use only
 |---|---|---|
 | A read API or consumer MCP over Silver (D-9) | the brief is ingestion; SQL on Silver is the interface | `02` §4.2 D-9 |
 | The OpenAI-compatible LLM client (triage runs on a deterministic stub) (G12) | "pipeline built, LLM step stubbed" (D-10). A real client needs an admitted host whose terms fit a commercial deliverable (the reference environment's inference is academic, ADR-028), and its egress must live in `fetch/` with the host registered. No such host is admitted | `02` D-10, ADR-009, plan P6-D4, `docs/plans/phase-9.md` |
-| A loader for a target's own `parser.py` (G13) | every committed target, including the settlement versions, is served by the generic parsers; dynamic import is banned outside `fetch/` and `scripts/` (ADR-027 §3), so a loader needs an ADR amending ADR-027 first | `05` §5 |
+| A loader for a target's own `parser.py` (G13) — `ep validate` and the PR gate refuse a target that ships one (2026-09-24) | every committed target, including the settlement versions, is served by the generic parsers; dynamic import is banned outside `fetch/` and `scripts/` (ADR-027 §3), so a loader needs an ADR amending ADR-027 first | `05` §5 |
 | `bronze.tiering.mode=move` exercised on kind (G14) | the chart renders the tier CronJob and the unit tests cover the move, but no cluster has run it against a real cold store. The demo runs `mode: none` because its object storage has one class (V-12) | ADR-021, `07` §5 |
 | ENTSO-E adapters | a registration token and an admission row first | `01` §4, §10 |
 | Gas intraday, a canary target group | out of v1 | `02` D-11, D-13 |

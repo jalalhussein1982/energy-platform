@@ -24,7 +24,7 @@ from energy_platform.bronze import sha256_hex
 from energy_platform.contracts.manifest import ManifestSyntaxError, load_manifest, validate_manifest
 from energy_platform.harness.goldens import run_target
 from energy_platform.harness.pr_surface import classify
-from energy_platform.harness.surface import check_target
+from energy_platform.harness.surface import check_target, unloadable_parser
 
 BUNDLE_VERSION = 1
 NOT_RUN_BY_BUNDLE: tuple[str, ...] = ("target pytest", "ruff", "mypy")
@@ -48,7 +48,7 @@ def gate_report(target: Path) -> dict[str, object]:
     ``not_run`` names the checks this report does **not** cover (the target's pytest, ruff,
     mypy): ``energyctl run-target-tests`` and CI run them. A green report is a partial verdict.
     """
-    surface = check_target(target)
+    surface = check_target(target) + unloadable_parser(target)
     try:
         manifest = load_manifest(target / "manifest.yaml")
         validation = validate_manifest(manifest).model_dump(mode="json")

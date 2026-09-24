@@ -344,6 +344,21 @@ def check_target(target: Path) -> list[str]:
     return problems
 
 
+def unloadable_parser(target: Path) -> list[str]:
+    """A ``parser.py`` passes the surface rules but is never executed: the platform has no
+    loader yet (README G13) and would silently use the generic parser. ``validate`` and the PR
+    gate refuse it so the contributor learns that before writing goldens against it (review 2
+    AE, scope limit 1). The surface rules themselves keep checking its syntax."""
+    parser = target / "parser.py"
+    if not parser.is_file():
+        return []
+    return [
+        f"{parser}: custom parsers are not loaded by the platform yet (README, G13): the generic "
+        "parser would be used and your parser ignored — remove parser.py, or stop and ask for a "
+        "platform loader (a platform PR, not a target PR)"
+    ]
+
+
 def target_dirs(root: Path) -> tuple[Path, ...]:
     if not root.is_dir():
         return ()

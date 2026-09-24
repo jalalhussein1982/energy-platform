@@ -9,6 +9,7 @@ from pathlib import Path
 from energy_platform.contracts.manifest import parse_manifest, validate_manifest
 from energy_platform.harness.goldens import run_pipeline
 from energy_platform.triage import HeuristicStubBackend, UnavailableBackend, triage
+from tests.harness.targets_builder import write_bronze_fixture
 from tests.triage.builders import REPO, drifted_t1, t1_target
 
 
@@ -79,3 +80,49 @@ def test_llm_unavailable_returns_no_proposal(tmp_path: Path) -> None:
                     else []
                 )
                 assert not any(n.startswith("energy_platform.triage") for n in names), module
+
+
+CEPS = REPO / "targets" / "ceps_load"
+
+
+def _ceps_target(tmp: Path) -> Path:
+    import shutil
+
+    target = tmp / "targets" / "ceps_load"
+    target.mkdir(parents=True)
+    shutil.copy(CEPS / "manifest.yaml", target / "manifest.yaml")
+    shutil.copytree(CEPS / "fixtures" / "ordinary_day", target / "fixtures" / "ordinary_day")
+    return target
+
+
+def test_review2_ae01_a_renamed_ceps_attribute_is_drift_not_health(tmp_path: Path) -> None:
+    """Review 2 AE-01: `value1=` → `value1New=` keeps the row count and loses one metric; the
+    inventory admits the platform's @attribute names, so the rename is seen."""
+    target = _ceps_target(tmp_path)
+    text = (CEPS / "fixtures" / "ordinary_day" / "blob").read_text(encoding="utf-8")
+    drifted = tmp_path / "captures" / "ceps-renamed"
+    write_bronze_fixture(drifted, "ceps_load", text.replace('value1="', 'value1New="').encode())
+    result = triage(target, drifted, HeuristicStubBackend(), tmp_path / "outbox")
+    assert result.status != "no_drift", result
+    assert result.drift is not None and result.drift.drifted
+    assert [m.source for m in result.drift.missing_sources] == ["@value1"]
+    assert "@value1New" in result.drift.unknown_fields
+
+
+def test_review2_ae01_a_renamed_required_ote_field_is_drift_not_an_empty_day(
+    tmp_path: Path,
+) -> None:
+    """Review 2 AE-01: `<Date>` → `<DeliveryDate>` makes the generic parser recognise no record;
+    the inventory falls back to the document's own record set and the report says so."""
+    target = t1_target(tmp_path)
+    drifted = drifted_t1(tmp_path, rename="DeliveryDate")  # renames Price by default; swap
+    text = (target / "fixtures" / "ordinary_day" / "blob").read_text(encoding="utf-8")
+    text = text.replace("<Date>", "<DeliveryDate>").replace("</Date>", "</DeliveryDate>")
+    drifted = tmp_path / "captures" / "ote-date-renamed"
+    write_bronze_fixture(drifted, "ote_intraday_market", text.encode("utf-8"))
+    result = triage(target, drifted, HeuristicStubBackend(), tmp_path / "outbox")
+    assert result.status != "no_drift", result
+    assert result.drift is not None and result.drift.no_records
+    assert [m.source for m in result.drift.missing_sources] == ["Date"]
+    assert "DeliveryDate" in result.drift.unknown_fields
+    assert result.drift.observations == 0

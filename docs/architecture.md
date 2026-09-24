@@ -76,7 +76,7 @@ flowchart TB
     SBX["constrained-agent mode<br/>sandbox: no shell, no secrets,<br/>no network by default"]
   end
 
-  TOOLS["energyctl or MCP, the ADR-007 eight tools<br/>read_repository, inspect_target, scaffold_target,<br/>write_target_file, validate_target, record_fixture,<br/>run_target_tests, open_pr"]
+  TOOLS["energyctl or MCP, the ADR-007 nine tools<br/>read_repository, inspect_target, scaffold_target,<br/>write_target_file, validate_target, record_fixture,<br/>run_target_tests, admission_request, open_pr"]
   TGT["targets/‹id›/ only, ADR-027<br/>manifest.yaml, optional parser.py, README,<br/>fixtures as Bronze objects, golden tests"]
   VAL{"energyctl validate"}
   PRA["Route A pull request<br/>targets/‹id›/ only"]

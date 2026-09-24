@@ -133,3 +133,17 @@ def test_apply_refuses_tampered_bundle_and_dirty_tree(tmp_path: Path) -> None:
         apply(bundle, checkout)
     assert main(["x", str(bad), "--repo", str(checkout)]) == 1
     assert main(["x"]) == 2
+
+
+def test_a_custom_parser_is_refused_by_the_gate_until_a_loader_exists(tmp_path: Path) -> None:
+    """Review 2 scope limit 1 (G13): a parser.py passes the surface rules but is never run; the
+    gate says so instead of letting goldens be written against code that is ignored."""
+    root = _repo(tmp_path)
+    make_target(root / "targets", "ote_probe", with_parser=True)
+    report = gate_report(root / "targets" / "ote_probe")
+    assert report["ok"] is False
+    problems = report["surface"]
+    assert isinstance(problems, list)
+    assert any("custom parsers are not loaded" in p for p in problems)
+    with pytest.raises(BundleRefused, match="gates are red"):
+        prepare_bundle(root, "ote_probe", tmp_path / "o")

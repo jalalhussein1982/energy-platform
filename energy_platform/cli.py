@@ -50,7 +50,7 @@ from energy_platform.harness.fixtures import FixtureError, record_from_file, rec
 from energy_platform.harness.pr import BundleRefused, prepare_bundle
 from energy_platform.harness.runner import run_target_tests
 from energy_platform.harness.scaffold import ScaffoldError, scaffold_target
-from energy_platform.harness.surface import check_target, target_dirs
+from energy_platform.harness.surface import check_target, target_dirs, unloadable_parser
 from energy_platform.mcp import serve_stdio
 from energy_platform.runtime import (
     Runtime,
@@ -258,7 +258,7 @@ def validate(
 def _validate_target(root: Path, target_id: str) -> int:
     target, m = _target_manifest(root, target_id)
     result = validate_manifest(m)
-    surface = check_target(target)
+    surface = check_target(target) + unloadable_parser(target)
     _echo({"target_id": target_id, "validation": _plain(result), "surface": surface})
     return max(_EXIT[result.status], 1 if surface else 0)
 

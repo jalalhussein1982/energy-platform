@@ -2,7 +2,7 @@
 
 In developer mode the MCP server is a convenience and **CI is the enforcement**. In
 constrained-agent mode the agent runs inside this container and the container is the
-**boundary** (ADR-027 §5): repository mutation happens only through the eight tools of
+**boundary** (ADR-027 §5): repository mutation happens only through the nine tools of
 `energy_platform.mcp`, and the process cannot reach anything the operator did not attach.
 
 ## What the container deliberately lacks
@@ -33,7 +33,8 @@ docker run --rm -i \
 The agent client (Claude Code, an MCP-capable IDE, a custom loop) talks JSON-RPC 2.0 on the
 container's stdin/stdout. `/workspace` is a checkout of this repository **without `.git`**
 (`git archive` or a sparse copy): the agent reads docs and examples and writes only under
-`targets/<id>/`. `/outbox` receives the bundle `open_pr` produces.
+`targets/<id>/`. `/outbox` receives the bundle `open_pr` produces and the Route B document
+`admission_request` produces (`/outbox/admissions/<id>.md`, 2026-09-24): a human files either.
 
 ## Egress
 

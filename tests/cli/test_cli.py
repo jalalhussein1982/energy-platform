@@ -371,3 +371,15 @@ def test_invalidate_writes_a_bronze_decision_beside_the_capture_log(tmp_path: Pa
         ],
     )
     assert unknown.exit_code == 1 and "not found" in unknown.output
+
+
+def test_validate_refuses_a_custom_parser_until_a_loader_exists(tmp_path: Path) -> None:
+    from tests.harness.targets_builder import make_target
+
+    root = tmp_path / "targets"
+    make_target(root, "ote_probe", with_parser=True)
+    result = runner.invoke(app, ["validate", "ote_probe", "--targets-root", str(root)])
+    assert result.exit_code == 1
+    assert "custom parsers are not loaded" in result.stdout
+    make_target(root, "ote_plain")
+    assert runner.invoke(app, ["validate", "ote_plain", "--targets-root", str(root)]).exit_code == 0

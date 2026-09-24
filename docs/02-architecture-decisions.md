@@ -297,7 +297,7 @@ Enforcement is mechanical: branch protection, CODEOWNERS on `energy_platform/` a
 
 ---
 
-### ADR-007 — MCP
+### ADR-007 — MCP *(2026-09-24: a ninth tool, `admission_request`, lets constrained-agent mode finish Route B — the document goes to the outbox; review 2 AE-04)*
 
 **Decision.** An MCP server exposes the golden path as tools (`read_repository`, `inspect_target`, `scaffold_target`, `write_target_file`, `validate_target`, `record_fixture`, `run_target_tests`, `open_pr`) and wraps the same library as the CLI (ADR-000).
 

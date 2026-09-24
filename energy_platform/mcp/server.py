@@ -61,8 +61,9 @@ class Server:
             "instructions": (
                 "Golden path (ADR-007): scaffold_target → write_target_file (manifest, goldens) → "
                 "record_fixture → validate_target → run_target_tests → open_pr. A target touches "
-                "only targets/<id>/. ADMISSION_REQUIRED means stop and file an admission request; "
-                "never invent a unit or edit a registry."
+                "only targets/<id>/. ADMISSION_REQUIRED means stop and call admission_request "
+                "(Route B: the document goes to the outbox for a human to file); never invent a "
+                "unit or edit a registry."
             ),
         }
 

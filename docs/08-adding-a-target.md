@@ -188,20 +188,38 @@ Say what the source is, where the contract comes from (the admission record), ho
 fetched and why, and a table of fixtures with what each demonstrates and its expected outcome
 (see `targets/ote_dam/README.md`).
 
+**`parser.py`:** the surface accepts one, but the platform has no loader for it yet (README, G13):
+`ep validate` and the PR gate refuse a target that ships one, so you cannot write goldens against
+code that would be ignored. A source the generic parsers cannot read needs a platform PR first.
+
 ## 9. Open the pull request (Route A)
+
+The primary route is plain Git, from the checkout you have been working in:
 
 ```bash
 make check                                  # the whole repository, green
 make pr-surface BASE=main                   # your change touches targets/my_source/ only
-ep pr-bundle my_source                      # refuses unless surface, admission and goldens are green; never pushes;
-                                            # it does not run your pytest/ruff/mypy — `make check` above and CI do
-uv run python -m scripts.apply_pr_bundle .energy_platform/outbox/my_source-<stamp>.json --push
+git switch -c target/my_source
+git add targets/my_source && git commit -m "feat(target): my_source (Route A, ADR-022)"
+git push -u origin target/my_source
 gh pr create --base main --head target/my_source
 ```
 
-Or with plain git: branch `target/my_source`, commit only `targets/my_source/`, push, open the PR.
 `main` is protected: the PR needs the 12 CI checks and a code-owner review. In the PR
 description say how you checked the goldens.
+
+The **bundle route** exists for an agent that has no Git (the sandbox, §11): `ep pr-bundle
+my_source` writes a self-contained bundle to `.energy_platform/outbox/` after checking surface,
+admission and goldens (not your pytest, ruff or mypy — `make check` and CI do those). The bundle
+is applied by a human **into a clean second checkout**, never into the working checkout that
+holds your uncommitted target (the apply refuses a dirty tree):
+
+```bash
+git clone <remote> ../energy-platform-clean
+uv run python -m scripts.apply_pr_bundle .energy_platform/outbox/my_source-<stamp>.json \
+    --repo ../energy-platform-clean --push
+gh pr create --base main --head target/my_source
+```
 
 ## 10. Route B — ask for admission, then stop
 
@@ -220,10 +238,12 @@ ownership) or refusal. Only after an admission do you continue with Route A.
 
 ## 11. With an agent (MCP)
 
-`ep mcp-serve` exposes the same path as eight tools: `read_repository`, `inspect_target`,
+`ep mcp-serve` exposes the same path as nine tools: `read_repository`, `inspect_target`,
 `scaffold_target`, `write_target_file`, `validate_target`, `record_fixture`,
-`run_target_tests`, `open_pr`. Writes outside `targets/<id>/` are refused, live fetches need the
-server started with `--allow-network`, and `open_pr` only prepares the bundle of §9.
+`run_target_tests`, `admission_request`, `open_pr`. Writes outside `targets/<id>/` are refused,
+live fetches need the server started with `--allow-network`, `open_pr` only prepares the bundle
+of §9, and `admission_request` writes the Route B document of §10 **to the outbox** — a human
+opens the PR that carries only that file; the agent cannot, and must not, do more.
 
 ## 12. When something is refused
 

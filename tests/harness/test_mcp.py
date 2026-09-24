@@ -21,6 +21,7 @@ ADR_007 = {
     "validate_target",
     "record_fixture",
     "run_target_tests",
+    "admission_request",
     "open_pr",
 }
 
@@ -32,6 +33,10 @@ def repo(tmp_path: Path) -> Path:
     (root / "targets" / "__init__.py").write_text("")
     (root / "docs").mkdir()
     (root / "docs" / "05-constraint-matrix.md").write_text("# 05\n")
+    (root / "docs" / "admissions").mkdir()
+    (root / "docs" / "admissions" / "TEMPLATE.md").write_text(
+        (EXAMPLES.parent / "docs" / "admissions" / "TEMPLATE.md").read_text(encoding="utf-8")
+    )
     (root / "README.md").write_text("# repo\n")
     (root / ".git").mkdir()
     (root / ".git" / "config").write_text("[core]\n")
@@ -304,3 +309,25 @@ def test_stdio_loop_round_trip(tools: Tools, repo: Path) -> None:
 def test_server_result_is_an_error_not_a_crash_for_guard_failures(tools: Tools) -> None:
     result = _call(Server(tools), "scaffold_target", target_id="Bad", modality="soap-xml")
     assert result["isError"] is True and "target id" in result["content"][0]["text"]
+
+
+def test_review2_ae04_admission_request_completes_route_b_in_the_outbox(
+    tools: Tools, repo: Path
+) -> None:
+    """Review 2 AE-04: the constrained agent can produce the Route B deliverable with its own
+    tool surface; the document lands in the outbox, never in the repository."""
+    make_target(
+        repo / "targets", "entsoe_probe", manifest=EXAMPLES / "manifests" / "entsoe_rest_xml.yaml"
+    )
+    verdict = tools.validate_target("entsoe_probe")
+    assert verdict["validation"]["status"] == "ADMISSION_REQUIRED"
+    assert "admission_request" in verdict["next"]
+    out = tools.admission_request("entsoe_probe")
+    path = Path(out["path"])
+    assert path == tools.outbox / "admissions" / "entsoe_probe.md" and path.is_file()
+    text = path.read_text(encoding="utf-8")
+    assert "entsoe_probe" in text and "web-api.tp.entsoe.eu" in text
+    assert out["status"] == "ADMISSION_REQUIRED" and "only" in out["next"]
+    assert not (repo / "docs" / "admissions" / "entsoe_probe.md").exists()  # repo untouched
+    with pytest.raises(ToolError, match="does not exist"):
+        tools.admission_request("ghost_target")

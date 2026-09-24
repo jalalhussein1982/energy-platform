@@ -30,6 +30,7 @@ from energy_platform.contracts.manifest import (
     load_manifest,
     validate_manifest,
 )
+from energy_platform.harness.admission import render_request
 from energy_platform.harness.fixtures import FixtureError, record_from_file, record_live
 from energy_platform.harness.pr import NOT_RUN_BY_BUNDLE, BundleRefused, prepare_bundle
 from energy_platform.harness.runner import run_target_tests
@@ -40,6 +41,7 @@ from energy_platform.harness.surface import (
     completeness,
     fixture_names,
     golden_paths,
+    unloadable_parser,
 )
 
 TOOL_NAMES: tuple[str, ...] = (
@@ -50,6 +52,7 @@ TOOL_NAMES: tuple[str, ...] = (
     "validate_target",
     "record_fixture",
     "run_target_tests",
+    "admission_request",
     "open_pr",
 )
 
@@ -135,6 +138,12 @@ TOOL_SPECS: dict[str, tuple[str, dict[str, Any]]] = {
     ),
     "run_target_tests": (
         "Surface rules, every golden through the platform pipeline, then the target's pytest.",
+        _schema(target_id=_s("target id", required=True)),
+    ),
+    "admission_request": (
+        "Route B (ADR-022): render docs/admissions/<id>.md for a target whose validation is "
+        "ADMISSION_REQUIRED, into the outbox — never into the repository. A human opens the PR "
+        "that carries only that file; nothing else changes until a maintainer admits the source.",
         _schema(target_id=_s("target id", required=True)),
     ),
     "open_pr": (
@@ -335,7 +344,7 @@ class Tools:
 
     def validate_target(self, target_id: str) -> dict[str, Any]:
         target = self._existing_target(target_id)
-        surface = check_target(target)
+        surface = check_target(target) + unloadable_parser(target)
         try:
             manifest = load_manifest(target / "manifest.yaml")
         except (ManifestSyntaxError, ValidationError, OSError) as exc:
@@ -352,10 +361,40 @@ class Tools:
         }
         if result.status == "ADMISSION_REQUIRED":
             out["next"] = (
-                "Route B (ADR-022): do not invent a unit or edit a registry; run "
-                f"`energyctl admission-request {target_id}` and open a PR with only that file"
+                "Route B (ADR-022): do not invent a unit or edit a registry; call "
+                f"admission_request({target_id!r}) — it writes docs/admissions/{target_id}.md to "
+                "the outbox for a human to open a PR with only that file (the CLI equivalent is "
+                f"`energyctl admission-request {target_id}`)"
             )
         return out
+
+    def admission_request(self, target_id: str) -> dict[str, Any]:
+        """ADR-007 amendment (review 2 AE-04): the constrained agent can finish Route B with
+        its own tool surface; the document lands in the outbox, the repository is untouched."""
+        target = self._existing_target(target_id)
+        try:
+            manifest = load_manifest(target / "manifest.yaml")
+        except (ManifestSyntaxError, ValidationError, OSError) as exc:
+            raise ToolError(f"manifest: {exc}") from exc
+        template = self.repo / "docs" / "admissions" / "TEMPLATE.md"
+        if not template.is_file():
+            raise ToolError("docs/admissions/TEMPLATE.md is missing from this checkout")
+        result = validate_manifest(manifest)
+        out_dir = self.outbox / "admissions"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{target_id}.md"
+        path.write_text(render_request(manifest, result, template=template), encoding="utf-8")
+        return {
+            "target_id": target_id,
+            "status": result.status,
+            "path": str(path),
+            "missing": result.missing.model_dump(mode="json"),
+            "next": (
+                f"fill every REPLACE_ME, then a human opens a PR that contains only "
+                f"docs/admissions/{target_id}.md (Route B, ADR-022); do not open a Route A PR "
+                "for this target until a maintainer admits the source"
+            ),
+        }
 
     def record_fixture(
         self,

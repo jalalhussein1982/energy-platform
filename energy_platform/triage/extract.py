@@ -16,9 +16,18 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any
 
 from energy_platform.contracts.manifest import Manifest
-from energy_platform.contracts.parser import Cell, TabularDocument
+from energy_platform.contracts.parser import (
+    Cell,
+    DecodedDocument,
+    JsonDocument,
+    JsonValue,
+    TabularDocument,
+    XmlDocument,
+    XmlElement,
+)
 from energy_platform.parse import DecodeError, ParseError, generic_parser
 from energy_platform.runtime.process import decode_payload
 
@@ -26,9 +35,11 @@ MAX_RECORDS = 3
 MAX_VALUE_CHARS = 64
 MAX_FIELDS = 64
 MAX_SAMPLE_CHARS = 4000
-SAFE_NAME = re.compile(r"^[^\W\d][\w .,:()/%@+-]{0,63}$")
+SAFE_NAME = re.compile(r"^@?[^\W\d][\w .,:()/%@+-]{0,63}$")
 """A source name the pipeline accepts in the sample and in a proposal: an element, attribute or
-column-header name (letters of any script first; letters, digits, spaces and ``.,:()/%@+-``)."""
+column-header name (letters of any script first, or the platform's ``@attribute`` form; letters,
+digits, spaces and ``.,:()/%@+-``). Review 2 AE-01: ``@date`` and ``@value1`` are real T3
+sources and used to be dropped as unsafe, which hid a renamed attribute."""
 
 # C0/C1 controls, zero-width and bidirectional formatting characters
 _UNSAFE_CHARS = re.compile(
@@ -64,17 +75,86 @@ class Sample:
         return json.dumps(self.as_dict(), ensure_ascii=True, sort_keys=True)
 
 
+def _record_fields(el: XmlElement) -> dict[str, Cell]:
+    """The generic XML parser's view of one element: attributes as ``@name``, leaf children."""
+    fields: dict[str, Cell] = {f"@{k}": v for k, v in el.attrib.items()}
+    for child in el.children:
+        if not child.children and child.local_name not in fields:
+            fields[child.local_name] = child.text
+    return fields
+
+
+def _largest_sibling_group(root: XmlElement) -> list[XmlElement]:
+    """The most numerous run of same-named siblings anywhere in the tree: what a record set
+    looks like whatever the elements are called (review 2 AE-01: a renamed required field made
+    the generic parser recognise no record at all, and the inventory vanished with it)."""
+    best: list[XmlElement] = []
+
+    def walk(el: XmlElement) -> None:
+        nonlocal best
+        groups: dict[str, list[XmlElement]] = {}
+        for child in el.children:
+            groups.setdefault(child.local_name, []).append(child)
+        for members in groups.values():
+            if len(members) > len(best):
+                best = members
+        for child in el.children:
+            walk(child)
+
+    walk(root)
+    return best
+
+
+def _largest_object_list(value: JsonValue) -> list[dict[str, Any]]:
+    best: list[dict[str, Any]] = []
+
+    def walk(node: JsonValue) -> None:
+        nonlocal best
+        if isinstance(node, list):
+            objects: list[dict[str, Any]] = [n for n in node if isinstance(n, dict)]
+            if len(objects) > len(best):
+                best = objects
+            for n in node:
+                walk(n)
+        elif isinstance(node, dict):
+            for n in node.values():
+                walk(n)
+
+    walk(value)
+    return best
+
+
+def inventory(manifest: Manifest, doc: DecodedDocument) -> list[dict[str, Cell]]:
+    """Record-shaped rows of the decoded document, **independently of the mapping**: the
+    generic parser's records when it recognises any; otherwise the document's own record set —
+    the largest run of same-named XML siblings, the largest JSON list of objects — so a renamed
+    required field shows up as a missing source and an unknown one, not as an empty document.
+    A table's header is its inventory before any parse; a sheet's header detection remains the
+    parser's (it needs the mapped column texts to find the header row)."""
+    if isinstance(doc, TabularDocument):
+        return [dict(zip(doc.header, row, strict=False)) for row in doc.rows]
+    rows = [dict(r.fields) for r in generic_parser(manifest).parse(doc)]
+    if rows:
+        return rows
+    if isinstance(doc, XmlDocument):
+        return [_record_fields(el) for el in _largest_sibling_group(doc.root)]
+    if isinstance(doc, JsonDocument):
+        return [
+            {str(k): (v if isinstance(v, str | int) or v is None else str(v)) for k, v in o.items()}
+            for o in _largest_object_list(doc.data)
+        ]
+    return []
+
+
 def extract(manifest: Manifest, payload: bytes) -> Sample:
     """The bounded sample of one payload, in the source's own vocabulary."""
     rows_in: list[dict[str, Cell]]
     try:
         doc = decode_payload(manifest, payload)
-        if isinstance(doc, TabularDocument):
-            rows_in = [dict(zip(doc.header, row, strict=False)) for row in doc.rows]
-            names = set(doc.header)
-        else:
-            rows_in = [dict(r.fields) for r in generic_parser(manifest).parse(doc)]
-            names = {n for r in rows_in for n in r}
+        rows_in = inventory(manifest, doc)
+        names = (
+            set(doc.header) if isinstance(doc, TabularDocument) else {n for r in rows_in for n in r}
+        )
     except (DecodeError, ParseError) as exc:
         return Sample(fields=(), records=(), parse_error=clean(f"{type(exc).__name__}: {exc}", 200))
     safe = sorted(n for n in names if SAFE_NAME.match(n))[:MAX_FIELDS]

@@ -103,10 +103,15 @@ class DriftReport:
     unknown_fields: tuple[str, ...]
     missing_sources: tuple[MissingSource, ...]
     observations: int
+    no_records: bool = False
+    """The document decoded and holds record-shaped data, yet the production parser recognised
+    no record: the declared shape no longer matches (review 2 AE-01) — drift, not an empty day."""
 
     @property
     def drifted(self) -> bool:
-        return bool(self.quarantine or self.unknown_fields or self.missing_sources)
+        return bool(
+            self.quarantine or self.unknown_fields or self.missing_sources or self.no_records
+        )
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -116,6 +121,7 @@ class DriftReport:
                 {"kind": m.kind, "name": m.name, "source": m.source} for m in self.missing_sources
             ],
             "observations": self.observations,
+            "no_records": self.no_records,
         }
 
 
@@ -165,6 +171,12 @@ def detect(manifest: Manifest, fixture_dir: Path, sample: Sample) -> DriftReport
         unknown = tuple(
             sorted(inventory - _referenced(manifest) - set(manifest.mapping.ignore_fields))
         )
+    # the production mapping's own drift signal (P2-D6) counts too, whatever the sample held
+    seen_unknown = set(unknown)
+    for event in outcome.events:
+        if event.kind == "unknown_field":
+            seen_unknown.update(n for n in _unknown_from_event(event.message) if SAFE_NAME.match(n))
+    unknown = tuple(sorted(seen_unknown - set(manifest.mapping.ignore_fields)))
     quarantine = outcome.quarantine or sample.parse_error
     return DriftReport(
         target_id=manifest.target_id,
@@ -172,6 +184,17 @@ def detect(manifest: Manifest, fixture_dir: Path, sample: Sample) -> DriftReport
         unknown_fields=unknown,
         missing_sources=tuple(missing),
         observations=len(outcome.observations),
+        no_records=bool(sample.fields) and not outcome.observations and quarantine is None,
+    )
+
+
+def _unknown_from_event(message: str) -> tuple[str, ...]:
+    """``fields not referenced by the mapping: ['a', 'b']`` → ``('a', 'b')``."""
+    start, end = message.find("["), message.rfind("]")
+    if start < 0 or end <= start:
+        return ()
+    return tuple(
+        part.strip().strip("'\"") for part in message[start + 1 : end].split(",") if part.strip()
     )
 
 
