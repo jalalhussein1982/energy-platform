@@ -24,6 +24,7 @@ No 01 §4 candidate was read. No latency figure is quoted (§6).
 2. **Auth, headers**: none required; `Content-Type: text/xml; charset=UTF-8` in responses; no `ETag`/`Last-Modified` on SOAP responses (conditional requests do not apply to T1/E1), both present on the XLSX (T2, §2.3).
 3. **Rate limits**: none observed on ten requests within a minute; nothing in the WSDL or the terms states a limit. The platform's politeness (ADR-033 §2) stays the only limit.
 4. **Terms of Use** (`/en/documentation/term-of-use`, read 2026-09-20, evidence row 3): "The Operator has exclusive access to all data published on the Website. Users have no right to reproduce, copy or duplicate the content of the website in any way without the prior written consent of the Operator unless the Operator agrees otherwise with the Users." → the 01 §10 fixture policy (synthetic until written confirmation) is the right one; **V-1/V-3 open item unchanged**: written confirmation of reuse and attribution wording is still needed before any live capture is redistributed. `robots.txt` allows all agents (evidence row 5).
+   **Answered 2026-09-24** (letter `docs/admissions/drafts/ote-reuse-and-redistribution.md`, reply quoted there): (a) automated collection and storage **for internal use only**; (b) samples **must not be published to third parties** — so every OTE fixture in the repository is synthetic **permanently**, there is no attribution wording, and the V-1/V-3 question for OTE is closed with a *no*; (c) the source's cadence expectations: day-ahead once a day after about 13:05 Prague, intraday either one daily summary or a fetch after each 15-minute contract closes. T1/T2's 15-minute cadence is that second option; E1's hourly polling from 12:00 on D−1 and the hourly `cadence.correction` re-reads of the previous three days were described in the letter but not endorsed in the reply — an **open cadence decision** for the maintainer, recorded in 01 §10. The reply's footer says an OTE e-mail is not a contract; it is the market desk's written answer, not a licence.
 5. **Decimals**: a dot, always; `Price` with 2 decimals, `Volume` with 3 on every item of every day read (T1 2026-09-19: 96 of 96).
 6. **Negative and zero prices are real**: minimum average price −4.21 EUR/MWh on 2026-03-29 and −0.17 on 2026-09-20 (T2 files; the T1 items carry the same values). No zero-volume period and no item without `Price` was seen on the four days; the "no trade → absent `Price`" case of 01 §9 is therefore fixture-only, taken from the WSDL's `minOccurs="0"`.
 
@@ -215,7 +216,7 @@ looked at, and nothing from this run was kept (temporary Bronze).
 
 ## 8. What was not verified
 
-- Redistribution rights for OTE and ČEPS (01 §10, V-1/V-3): unchanged, human action.
+- Redistribution rights: **OTE answered 2026-09-24 — internal use only, no redistribution** (§1.4); ČEPS (01 §10, V-1/V-3) still unanswered, human action.
 - ČEPS `function` values other than AVG, `version` values other than RT, and history depth.
 - OTE history depth beyond the four days read (2024-06-30 works; 01's P2Y is still an assumption).
 - Corrections after a delivery day (no second read of any day).

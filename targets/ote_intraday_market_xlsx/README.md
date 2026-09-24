@@ -36,7 +36,7 @@ columns as single-line texts. `Period` is a numeric cell (`1.0`), accepted as an
 
 Values are deterministic formulas, so any golden row can be checked by opening
 `fixtures/<name>/blob` with a spreadsheet tool (row 6 + period index → sheet row). Live files are
-not committed until OTE confirms redistribution (06 §1.4). Stale fetches are covered by the
+never committed: OTE refused redistribution on 2026-09-24 (06 §1.4). Stale fetches are covered by the
 platform: the file carries `ETag` and `Last-Modified`, the fetch layer sends conditional requests
 and Bronze marks an unchanged payload (`tests/bronze/test_bronze.py`).
 
@@ -46,7 +46,9 @@ and Bronze marks an unchanged payload (`tests/bronze/test_bronze.py`).
   labels are never parsed.
 - `cadence.correction {cron: "9 * * * *", days: 3}` declares the 01 §5 re-poll (runtime verb in
   Phase 5, ADR-033).
-- Polling the file every 15 minutes is not yet confirmed with OTE (01 §10 open item).
+- Polling: OTE's reply of 2026-09-24 names a daily summary or a read after each 15-minute contract
+  closes; the 15-minute poll is the latter. The hourly correction re-reads go beyond what OTE
+  described — cadence decision open (06 §1.4).
 
 ## Checks
 

@@ -32,7 +32,7 @@ The freshness SLI's partition is the current delivery day (ADR-037), so this tar
 
 ## Fixtures and hand-checked goldens
 
-All payloads are **synthetic** (OTE redistribution unconfirmed, docs/06 §1.4), wrapped with
+All payloads are **synthetic** (OTE refused redistribution on 2026-09-24, docs/06 §1.4), wrapped with
 `energyctl record-fixture --from-file`. They carry two of the unmapped fields
 (`PositiveImbalance`, `NegativeImbalance`) to exercise `ignore_fields`; their position in the item
 is illustrative. The one exception is `not_yet_published`: it is byte-identical to OTE's empty

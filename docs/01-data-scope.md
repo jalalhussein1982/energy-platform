@@ -311,11 +311,11 @@ string, extra column, changed unit header.
 
 | Target | Terms reviewed | robots.txt | Automated access documented by the source | Fixture policy | Open items |
 |---|---|---|---|---|---|
-| T1/E1 OTE SOAP | OTE Terms of Use (S09) read on 2026-09-19: copying restrictions, no availability guarantee | allowed (S15) | Yes, public web-service manual (S10) | Repository fixtures are **synthetic** with the real shape until OTE confirms redistribution; saved live samples stay in local evidence | Written confirmation of reuse and attribution wording |
-| T2 OTE XLSX | as above | allowed | Results page is public; no API statement for the file | synthetic | as above; confirm the file may be polled every 15 minutes |
+| T1/E1 OTE SOAP | OTE Terms of Use (S09) read on 2026-09-19: copying restrictions, no availability guarantee | allowed (S15) | Yes, public web-service manual (S10) | Repository fixtures are **synthetic** with the real shape, **permanently**: OTE answered 2026-09-24 that the data is for internal use only and must not be published to third parties (06 §1.4); saved live samples stay in local evidence | None on terms. Cadence: OTE expects one day-ahead read a day after ~13:05 Prague; E1's hourly polling from 12:00 on D−1 and the hourly correction re-reads are a maintainer decision (06 §1.4) |
+| T2 OTE XLSX | as above | allowed | Results page is public; no API statement for the file | synthetic, permanently (as above) | OTE named a daily summary or a read after each 15-minute contract closes; the 15-minute poll is the latter; correction re-reads as above |
 | T3 ČEPS SOAP | Not yet reviewed beyond the web-services page (S06) | **disallows all crawling** (S15) | Yes, "structured data delivery" interface with test client | synthetic | Terms of the web service; confirm robots rule does not cover the service; rate expectations |
 | ENTSO-E (candidate) | Not reviewed | n/a | REST with token (S07) | none until admitted | registration, terms, redistribution |
-| OTE imbalance settlement (held-out, admitted 2026-09-23 via Route B, ADR-022 §3; no adapter until Phase 7) | OTE Terms of Use (S09), as T1 | allowed (S15) | Yes, public web-service manual (S10), operation `GetImbalanceSettlementPeriodE` | synthetic with the real shape, as T1 | as T1; imbalance sign meaning and version timing [UNVERIFIED] (06 §9) |
+| OTE imbalance settlement (held-out, admitted 2026-09-23 via Route B, ADR-022 §3; no adapter until Phase 7) | OTE Terms of Use (S09), as T1 | allowed (S15) | Yes, public web-service manual (S10), operation `GetImbalanceSettlementPeriodE` | synthetic with the real shape, permanently, as T1 | as T1; imbalance sign meaning and version timing [UNVERIFIED] (06 §9; the timing question was not in the sent letter) |
 | Exchange pages (candidate) | Not reviewed | unknown | unknown | none | everything |
 
 Policy changes to this register need maintainer review. No agent or contributor may add a target

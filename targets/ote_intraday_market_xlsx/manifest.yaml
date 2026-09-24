@@ -6,7 +6,7 @@
 schema_version: 1
 target_id: ote_intraday_market_xlsx
 description: OTE continuous intraday market daily results file (XLSX; 96/92/100 rows; blank cells while the day is running)
-license: "OTE Terms of Use (docs/06 §1.4, read 2026-09-20): no reproduction without written consent; fixtures synthetic until confirmed; 15-minute polling of the file not yet confirmed with OTE (01 §10)"
+license: "OTE Terms of Use (read 2026-09-20): no reproduction without written consent; OTE market desk 2026-09-24: internal use only, no publication to third parties (docs/06 §1.4); fixtures synthetic permanently; OTE named a daily summary or a read after each 15-minute contract closes — the 15-minute poll is the latter (01 §10)"
 terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
 allowed_hosts:
   - www.ote-cr.cz

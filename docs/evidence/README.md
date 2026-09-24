@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | What this is | One row per live read used by `docs/06-source-verification.md` and, through it, by the committed fixtures' shapes. The original `message-board/evidence/` ledger of the 01 polling campaign was not supplied; this index is regenerated from this session's reads (03 Phase 4). |
-| Where the payloads are | `~/.config/energy-platform/evidence/2026-09-20/<name>.bin` with `<name>.headers`, outside the repository. **Raw captures are not committed** until OTE and ČEPS confirm redistribution (01 §10). The SHA-256 lets anyone holding the file prove it is the one read. |
+| Where the payloads are | `~/.config/energy-platform/evidence/2026-09-20/<name>.bin` with `<name>.headers`, outside the repository. **Raw captures are not committed**: OTE refused redistribution on 2026-09-24 (06 §1.4) and ČEPS has not answered (01 §10). The SHA-256 lets anyone holding the file prove it is the one read. |
 | How | `curl`, `--connect-timeout 10 -m 25`, no retries, `User-Agent: energy-platform-verify/0.1 (+bounded read)`; SOAP reads `POST` with `Content-Type: text/xml; charset=utf-8` and the operation's `SOAPAction`. One request per fact. |
 | Synthetic-fixture policy | Committed fixtures under `targets/<id>/fixtures/` copy the **shape** of the rows below (element and attribute names, header texts, row layout, item counts, DST label and offset patterns) with invented values (plan P4-D3). No committed byte comes from a payload listed here. |
 

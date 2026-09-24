@@ -134,7 +134,8 @@ ep record-fixture my_source --name ordinary_day --from-file saved.xml \
    --scheduled-for 2026-09-20T12:00:00+00:00                      # wrap a saved payload offline
 ```
 
-If the terms do not allow redistribution (OTE and ČEPS: not yet), commit **synthetic** fixtures
+If the terms do not allow redistribution (OTE: refused on 2026-09-24, so synthetic for good — 06 §1.4;
+ČEPS: not answered yet), commit **synthetic** fixtures
 with the real shape: a `--live` recording contains the real payload, so use it only to learn the
 shape, then delete that fixture directory; write a copy that keeps the structure and element
 names with changed values, and wrap it with `--from-file`. Fixtures are immutable: a new case

@@ -3,7 +3,7 @@
 schema_version: 1
 target_id: ote_imbalance_settlement
 description: OTE imbalance settlement, GetImbalanceSettlementPeriodE, daily version 0 (PT15M; historical PT60M)
-license: "OTE Terms of Use: no reproduction without written consent (docs/06 §1.4); redistribution unconfirmed; repository fixtures are synthetic"
+license: "OTE Terms of Use: no reproduction without written consent; OTE market desk 2026-09-24: internal use only, no publication to third parties (docs/06 §1.4); repository fixtures are synthetic permanently"
 terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
 allowed_hosts:
   - www.ote-cr.cz

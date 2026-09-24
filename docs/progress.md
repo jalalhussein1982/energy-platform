@@ -14,6 +14,33 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 | 2026-09-23 | Phase 8 | README, CI-porting note, docs index and ADR log; clean clone on a fresh VM: exit 0 in 199 s |
 | 2026-09-23 | Phase 9 | gap closure: deploy identity, secret scope, body cap, `uv` checksum, drills and deploy-on-push, V-11, an 11-hour observation, settlement v1; three defects found and fixed, one a real incident on the demo |
 | 2026-09-24 | Phase 9 follow-up | PR #4 (settlement v1) reviewed and merged, demo at revision 8; the strictly blind re-run (G10) run by the author and evaluated: PR #5 passes, F-3 closed; #5 merged, demo at revision 9, F-4 closed in full; the two repairs and the two letters prepared for the author |
+| 2026-09-24 | Source replies | OTE answered the reuse letter: internal use only, no redistribution, cadence expectations named; filed in `01` §10, `06` §1.4, the six OTE manifests and READMEs; ČEPS pending |
+
+---
+
+## 2026-09-24 — OTE's reply to the reuse letter filed
+
+**Done** (1 docs-and-manifests commit on `main`, `make check` green; no platform code touched).
+The OTE market desk answered the letter of 01:40 UTC at 08:19 UTC the same day, in three lines:
+(1) automated collection and storage **for internal use only**; (2) samples **must not be
+published to third parties**; (3) day-ahead once a day after about 13:05 Prague, intraday either
+one daily summary or a read after each 15-minute contract closes. Quoted verbatim, with the
+reading, in `docs/admissions/drafts/ote-reuse-and-redistribution.md`; filed in `06` §1.4 and §8,
+`01` §10 (the T1/E1, T2 and imbalance rows — a register update at the maintainer's direction),
+`08` §6, the evidence index, the imbalance admission, the six OTE manifests' `license` lines and
+the OTE target READMEs. Consequences: every OTE fixture is synthetic **permanently**, there is no
+attribution wording, V-1/V-3 for OTE is closed with a *no*, and the demo's live captures are
+within the consent (internal use). The sent letter had omitted the draft's question 4 (imbalance
+version timing), so `06` §9.1 stays observed, not confirmed. OTE's footer says an e-mail is not a
+contract; the reply is the desk's written answer, not a licence.
+
+**Open / carried.** **Cadence decision (maintainer):** T1/T2's 15-minute poll matches OTE's
+"after each contract closes"; E1's hourly polling from 12:00 on D−1 and the hourly
+`cadence.correction` re-reads of the previous three days were described in the letter but not
+endorsed in the reply — either keep them (nothing was objected to; no rate limit was named) or
+tighten E1 to one read after 13:05 plus a retry and drop the correction re-reads. No manifest
+cadence was changed. ČEPS has not answered. `TF_VAR_admin_cidr` at the next plan, the Hetzner
+console check and the teardown as before.
 
 ---
 

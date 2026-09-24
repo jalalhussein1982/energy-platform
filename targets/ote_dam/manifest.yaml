@@ -5,7 +5,7 @@
 schema_version: 1
 target_id: ote_dam
 description: OTE day-ahead market results per delivery period (SOAP, PT15M with the hourly price alongside; PT60M also served)
-license: "OTE Terms of Use (docs/06 §1.4, read 2026-09-20): no reproduction without written consent; fixtures synthetic until confirmed (01 §10)"
+license: "OTE Terms of Use (read 2026-09-20): no reproduction without written consent; OTE market desk 2026-09-24: internal use only, no publication to third parties (docs/06 §1.4); fixtures synthetic permanently (01 §10); OTE expects one read a day after ~13:05 Prague — cadence decision open"
 terms_url: https://www.ote-cr.cz/en/documentation/term-of-use
 allowed_hosts:
   - www.ote-cr.cz

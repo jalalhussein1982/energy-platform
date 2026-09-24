@@ -21,7 +21,7 @@
 | Endpoint / modality | SOAP 1.1, `https://www.ote-cr.cz/pw-data/services/PublicDataService`, action `http://www.ote-cr.cz/schema/service/public/GetImbalanceSettlementPeriodE` |
 | Request | `Version` (0 daily, 1 monthly, 2 final monthly settlement), `StartDate`, `EndDate`, optional `StartPeriod` / `EndPeriod` |
 | License / terms | OTE Terms of Use — https://www.ote-cr.cz/en/documentation/term-of-use (same as T1) |
-| Redistribution of raw captures confirmed? | No — as T1: repository fixtures are synthetic with the real shape (01 §10) |
+| Redistribution of raw captures confirmed? | **Refused** — OTE market desk 2026-09-24: internal use only, must not be published to third parties (06 §1.4); repository fixtures are synthetic with the real shape, permanently (01 §10) |
 | Publication cadence and latency observed | Not observed; no figure is quoted (the polling campaign was closed as not run, 2026-09-23) |
 
 ## Contract (decided)

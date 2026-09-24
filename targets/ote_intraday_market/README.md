@@ -16,7 +16,7 @@ live on four days (06 §3.5).
 Every fixture is a Bronze object written by `energyctl record-fixture --from-file` from a payload
 whose element names, item layout and item counts copy the live reads; values are invented
 (deterministic formulas, so a reader can check any golden row by opening `fixtures/<name>/blob`).
-Live payloads are not committed until OTE confirms redistribution (06 §1.4).
+Live payloads are never committed: OTE refused redistribution on 2026-09-24 (06 §1.4).
 
 | Fixture | Demonstrates | Expected outcome (golden) |
 |---|---|---|

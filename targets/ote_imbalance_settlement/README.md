@@ -37,7 +37,7 @@ The envelope, response, Result and Item element names match the admission and do
 The temporary live fixture was removed after inspection.
 
 OTE Terms of Use: https://www.ote-cr.cz/en/documentation/term-of-use.
-Redistribution permission is unconfirmed (admission and docs/06 §1.4); all committed payloads
+Redistribution was refused by OTE on 2026-09-24 (admission and docs/06 §1.4); all committed payloads
 are **synthetic**, wrapped as Bronze objects using CLI `record-fixture --from-file`.
 No live settlement values are committed.
 
