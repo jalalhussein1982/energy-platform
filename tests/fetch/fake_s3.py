@@ -54,6 +54,9 @@ class FakeS3:
     max_keys: int = 1000
     """Server-side page cap, as S3's 1000: a client asking for more gets this many."""
     objects: dict[str, StoredObject] = field(default_factory=dict)
+    buckets: dict[str, dict[str, str]] = field(default_factory=dict)
+    """Buckets created through the API (name → attributes such as object_lock, versioning); the
+    configured ``bucket`` always exists implicitly."""
     requests: list[Request] = field(default_factory=list)
     faults: list[int | None] = field(default_factory=list)
     """Consumed first: an HTTP status to answer with, or ``None`` for a connection error."""
@@ -65,6 +68,8 @@ class FakeS3:
     gateway that ignores the header keeps the last writer (review 2 DC-06 residual)."""
     after_put: Callable[[str], None] | None = None
     """Test hook run after a successful PUT (a concurrent writer overwriting the key)."""
+    created_only: bool = False
+    """When True the bucket exists only after a create-bucket call (bucket-init tests)."""
 
     def transport(self) -> Transport:
         return mock_transport(self.handle)
@@ -93,7 +98,8 @@ class FakeS3:
         key = path[len(prefix) + 1 :]
         if request.method == "GET" and not key:
             return self._list(request)
-        assert key, f"{request.method} on the bucket root"
+        if not key:
+            return self._bucket(request)
         if request.method == "PUT":
             return self._put(key, request)
         if request.method == "GET":
@@ -150,6 +156,34 @@ class FakeS3:
         if self.after_put is not None:
             self.after_put(key)
         return response(200, b"", {"etag": obj.etag})
+
+    def _bucket(self, request: Request) -> Response:
+        """Bucket-level verbs: HEAD (exists?), PUT (create, with the object-lock header),
+        PUT ?versioning (record the status)."""
+        params = request.url.params
+        if request.method == "HEAD":
+            return (
+                response(200)
+                if self.bucket in self.buckets or not self.created_only
+                else response(404)
+            )
+        if request.method == "PUT" and "versioning" in params:
+            self.buckets.setdefault(self.bucket, {})["versioning"] = (
+                "Enabled" if b"<Status>Enabled</Status>" in bytes(request.content) else "Suspended"
+            )
+            return response(200)
+        if request.method == "PUT":
+            if self.bucket in self.buckets:
+                return _error(
+                    409,
+                    "BucketAlreadyOwnedByYou",
+                    "Your previous request to create the named bucket succeeded",
+                )
+            self.buckets[self.bucket] = {
+                "object_lock": request.headers.get("x-amz-bucket-object-lock-enabled", "false")
+            }
+            return response(200)
+        raise AssertionError(f"unexpected bucket verb {request.method}")
 
     def _get(self, key: str) -> Response:
         obj = self.objects.get(key)

@@ -9,6 +9,7 @@ and only within ``history.max_age``; ``detect_gaps`` classifies expected instant
 """
 
 from energy_platform.runtime.backfill import backfill
+from energy_platform.runtime.buckets import BucketReport, bucket_init
 from energy_platform.runtime.capture import CaptureReport, capture
 from energy_platform.runtime.context import Runtime, delivery_day_for
 from energy_platform.runtime.cron import CronExpression, cron_instants
@@ -28,6 +29,7 @@ from energy_platform.runtime.replay import replay_derivation, replay_range
 from energy_platform.runtime.smoke import SmokeReport, fixture_fetcher_factory, smoke
 
 __all__ = [
+    "BucketReport",
     "CaptureReport",
     "CronExpression",
     "DrillReport",
@@ -39,6 +41,7 @@ __all__ = [
     "SmokeReport",
     "TargetDrillReport",
     "backfill",
+    "bucket_init",
     "capture",
     "compute_freshness",
     "cron_instants",

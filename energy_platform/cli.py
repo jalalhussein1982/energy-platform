@@ -31,6 +31,8 @@ from pydantic import ValidationError
 
 from energy_platform.bronze import Bronze, FileBlobStore, FileCaptureLog, Invalidation, load_fixture
 from energy_platform.bronze.config import (
+    PREFIX,
+    REPLICA_PREFIX,
     BronzeConfigError,
     bronze_from_env,
     object_store_from_env,
@@ -59,6 +61,7 @@ from energy_platform.mcp import serve_stdio
 from energy_platform.runtime import (
     Runtime,
     backfill,
+    bucket_init,
     capture,
     detect_gaps,
     fixture_fetcher_factory,
@@ -483,6 +486,34 @@ def restore_drill_cmd(
         f"restore-drill: {'OK' if report.ok else 'FAILED'} in {report.seconds:.1f}s", err=True
     )
     raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command("bucket-init")
+def bucket_init_cmd(
+    replica: Annotated[
+        bool,
+        typer.Option(
+            "--replica", help="also create store B's bucket (ENERGY_PLATFORM_S3_REPLICA_*), plain"
+        ),
+    ] = False,
+) -> None:
+    """ADR-036 amendment 4: create store A's bucket with Object Lock + versioning (and store B's
+    plain bucket with --replica) from the chart's S3 environment; idempotent; no `mc`."""
+    try:
+        hot = object_store_from_env(os.environ, PREFIX, "BRONZE")
+        reports = [bucket_init(hot, object_lock=True)]
+        if replica:
+            reports.append(
+                bucket_init(
+                    object_store_from_env(os.environ, REPLICA_PREFIX, "BRONZE_REPLICA"),
+                    object_lock=False,
+                )
+            )
+    except (BronzeConfigError, ObjectStoreError) as exc:
+        typer.echo(f"bucket-init: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    for report in reports:
+        _echo(report)
 
 
 @app.command("storage-probe")

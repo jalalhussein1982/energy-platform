@@ -336,6 +336,45 @@ class ObjectStore:
         self._raise_unless(response, {200}, key)
         return True
 
+    # ------------------------------------------------------------------ buckets (Phase 12)
+
+    def bucket_exists(self) -> bool:
+        """``HEAD`` on the bucket: 200 → exists, 404 → not, anything else raises."""
+        response = self._request("HEAD", self._bucket_url({}))
+        if response.status_code == 404:
+            return False
+        self._raise_unless(response, {200}, self.bucket)
+        return True
+
+    def create_bucket(self, *, object_lock: bool = False) -> bool:
+        """Create the bucket (``x-amz-bucket-object-lock-enabled: true`` turns Object Lock and
+        versioning on at creation, the store-A control of ADR-036 §1). ``True`` when created,
+        ``False`` when it already existed (409 ``BucketAlreadyOwnedByYou`` / ``…Exists``, or a
+        gateway that answers 200 again); the local profile's bootstrap is idempotent."""
+        if self.bucket_exists():
+            return False
+        headers = {"x-amz-bucket-object-lock-enabled": "true"} if object_lock else {}
+        response = self._request("PUT", self._bucket_url({}), headers=headers)
+        if response.status_code == 409:
+            return False
+        self._raise_unless(response, {200}, self.bucket)
+        return True
+
+    def put_bucket_versioning(self, *, enabled: bool = True) -> None:
+        """``PUT ?versioning``: Object Lock needs it; a copy target (store B) does not."""
+        status = "Enabled" if enabled else "Suspended"
+        body = (
+            '<VersioningConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+            f"<Status>{status}</Status></VersioningConfiguration>"
+        ).encode()
+        response = self._request(
+            "PUT",
+            self._bucket_url({"versioning": ""}),
+            headers={"content-type": "application/xml"},
+            body=body,
+        )
+        self._raise_unless(response, {200}, f"{self.bucket}?versioning")
+
     def get(self, key: str) -> bytes | None:
         """The object's bytes, or ``None`` when it does not exist (404)."""
         response = self._request("GET", self._object_url(key))
@@ -399,7 +438,8 @@ class ObjectStore:
             f"{_uri_encode(k, keep_slash=False)}={_uri_encode(v, keep_slash=False)}"
             for k, v in sorted(params.items())
         )
-        return f"{self._base}/{_uri_encode(self.bucket, keep_slash=False)}?{query}"
+        base = f"{self._base}/{_uri_encode(self.bucket, keep_slash=False)}"
+        return f"{base}?{query}" if query else base
 
     def _http(self) -> httpx.Client:
         if self._client is None:

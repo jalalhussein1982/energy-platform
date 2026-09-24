@@ -302,3 +302,23 @@ def test_bad_keys_are_refused_locally() -> None:
         with pytest.raises(ObjectStoreError, match="bad_key"):
             s.get(key)
     assert fake.requests == []
+
+
+def test_bucket_init_creates_a_locked_versioned_bucket_once() -> None:
+    """Phase 12 (ADR-036 amendment 4): the local profile's bootstrap through the platform's
+    client — create with the object-lock header, versioning on, a second run is a no-op."""
+    from energy_platform.runtime import bucket_init
+
+    fake = FakeS3(created_only=True)
+    s = store(fake)
+    assert s.bucket_exists() is False
+    first = bucket_init(s, object_lock=True)
+    assert first.created and first.object_lock and first.versioning
+    assert fake.buckets[fake.bucket] == {"object_lock": "true", "versioning": "Enabled"}
+    second = bucket_init(s, object_lock=True)
+    assert second.created is False  # idempotent
+    plain = FakeS3(created_only=True)
+    report = bucket_init(store(plain), object_lock=False)
+    assert report.created and plain.buckets[plain.bucket] == {"object_lock": "false"}
+    verbs = [(m, p) for m, p in fake.calls()]
+    assert ("PUT", "/bronze") in verbs and ("PUT", "/bronze?versioning=") in verbs
