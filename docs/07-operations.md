@@ -105,6 +105,17 @@ kept running throughout: an atomic upgrade that fails its hook changes nothing. 
 the node block on to confirm the first-packet behaviour under the new gate (author's action; the
 previous 9 of 9 predate the node block).
 
+**Rerun with the node block on, 2026-09-24 ~23:00 UTC (the author approved the Job creation by
+hand): 3 of 3 PASS.** The gated Jobs (the platform image's `wait-egress-policy` as the init
+container, `--dns-metrics-canary-port 9153`, then curl at t=0) reported "enforced after
+1.27–1.30 s (2 attempts; policy canary denied)" on every pod; capture → OTE 302; capture →
+`169.254.169.254` **timed out (curl 28)** — the node-level drop answers now, where the pod policy
+alone used to refuse (curl 7); process → OTE refused (curl 7). Two false starts the same
+evening: the first Jobs carried no `imagePullSecrets`, so the gate's image pull was anonymous
+(`ghcr.io … 401`) and the Jobs hit their deadline — a test Job that copies a CronJob's init
+container must copy its pull secret too. Manifest kept outside the repository
+(`~/.config/energy-platform/evidence/2026-09-24/gated-egress-test-job.yaml`).
+
 ## 3. Terraform (`own-cluster`)
 
 `make terraform-validate` (2026-09-22, OpenTofu 1.12.6): `fmt -check`, `validate` and `test`
@@ -134,6 +145,16 @@ now has Terraform 1.16.3 next to OpenTofu 1.12.6 and `make` prefers `terraform`,
 a Terraform plan: `tofu show` cannot read it ("string field contains invalid UTF-8") and it must
 be applied with `terraform`. `make terraform-validate` under Terraform 1.16.3: both roots valid,
 4/4 mock runs pass; the lock files are now Terraform's.
+
+**Re-plan, 2026-09-24 22:29 UTC** (`hcloud-20260924-222903.tfplan`, Terraform 1.16, `TF_VAR_admin_cidr`
+= the laptop's current address, the one the 2026-09-23 plan was applied with): **0 to add, 1 to
+change, 0 to destroy** — the firewall's three admin rules (6443 extra source, 22, ICMP) go from
+the address set by hand on 2026-09-24 01:40 UTC (`hcloud firewall replace-rules`, `07` §4.3 era)
+back to the current one; "Objects have changed outside of Terraform" was the only note. Nothing
+else drifted: the CLI inventory (2 × cx23 in nbg1, one 10 GB volume, one network, one SSH key
+matching the author's laptop key, one firewall applied to both servers, no floating IPs, load
+balancers or snapshots; about €6.64 per server per month) matches the state file resource for
+resource. `terraform apply <plan>` remains the author's.
 
 ## 4. Tenant and demo deploys
 
@@ -277,6 +298,39 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
                              WHERE dataset_id = 'ote.idm_continuous' AND source_transport = 'xlsx'
                              GROUP BY 1 HAVING count(DISTINCT local_date) > 1);
   ```
+
+  **Done, 2026-09-24 20:49–21:18 UTC (the author approved the Job by hand).** Three corrections
+  to the paragraph above, all from the Bronze capture log itself (`captures/ote_intraday_market_xlsx/2026/09/2{1,2}/`
+  read from store A), not from Silver:
+
+  - **It was not nine captures.** Nine was the number of distinct wrong *versions* in the base
+    table. The truthful set is every capture whose stored blob is a version of the 23 September
+    file: **31 under 22 September** (8 distinct blobs, fetched 14:37–18:10 UTC on 23 September;
+    every 200 of that day; the day's 49 `304`s share the own file's blob and are clean) and
+    **82 under 21 September** (74 by blob plus 8 that fetched the 23 September file at a moment
+    no 23 September capture saw). The 21 September ones matter too: six of them were
+    re-processed by the backfill on 24 September 16:48–16:52 UTC and only lose to the correct
+    capture (`…T214500Z:7`, the day's own file, 19:09 UTC) on ordering.
+  - **The hand deletion did not hold, as ADR-038 predicted.** By 2026-09-24 afternoon the base
+    table again held 672 xlsx rows under 22 September from a wrong capture (`…T003000Z:2`,
+    re-processed by the backfill at 16:52 UTC). Deleting rows is not a repair.
+  - **22 September has its own file after all.** OTE republished `IM_15MIN_22_09_2026_EN.xlsx`
+    (`Last-Modified: 24 Sep 2026 14:10 GMT`); the 06:45 slot's backfill fetched it with a 200
+    at 14:37 UTC (`…T064500Z:1`, blob `0a9dab38…`) and processed it at 14:48. The current view
+    of 22 September is now T1's 192 SOAP rows plus T2's 672 rows **from the day's own file**
+    (spot check 17:30 UTC: SOAP `price_vwap` 432.00 sits inside the xlsx `price_min` 344.44 /
+    `price_max` 597.06). The "cannot be repaired by capture" above was true on the 23rd, not
+    on the 24th.
+
+  The run: one Job from the process CronJob's pod template (same image, env, pull secret and
+  egress gate; `/bin/sh -c` loop over the 113 ids; manifest and id list in
+  `~/.config/energy-platform/evidence/2026-09-24/`), `energyctl invalidate … --reason "23
+  September's file stored under another delivery day (ADR-033 amendment 2, docs/07 s4.3)"` each:
+  113 Bronze objects `invalidations/ote_intraday_market_xlsx/<stamp>_<attempt>.json` created,
+  113 rows in `invalidations`, 29 minutes (about 15 s per verb: interpreter start, S3, ledger).
+  Afterwards `observation_occurrences_valid` holds no occurrence of the 113 captures; the
+  current view's 22 September xlsx rows come from `…T064500Z:1` only (not invalidated); the
+  replay and the restore drill quarantine the 113 by construction (`runtime/process.py`).
 
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 

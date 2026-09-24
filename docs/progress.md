@@ -21,6 +21,7 @@ review 1, Phases 0–4) are in [`archive/progress-2026-09-19-to-20.md`](archive/
 
 ---
 | 2026-09-24 | Phase 12 | the local profile's object stores after MinIO: RustFS by probe, bucket bootstrap through the platform's client, the clean-clone gate green again |
+| 2026-09-24 | Author items run | invalidations recorded (113, not nine), egress Jobs 3/3 with the node block, Terraform re-plan (1 change: the admin address), Hetzner inventory checked |
 
 ## 2026-09-24 — Phase 11: Grafana dashboards over Silver, private
 
@@ -541,3 +542,29 @@ xlsx captures, first-packet Jobs rerun with the node block, `TF_VAR_admin_cidr` 
 plan, Hetzner console, teardown when done; ČEPS `value1 = value2` question). Residual noted in
 ADR-036 am.4: RustFS is young; the local bucket has no default retention rule (rclone-written
 backups are not per-object locked, as before with MinIO). The demo (rev 23) is untouched.
+
+## 2026-09-24 (late) — the author's Level 3 items, run with the author approving each cluster write by hand
+
+The author said "run these, I approve manually"; the auto-mode classifier refused each
+`kubectl create`/`apply` on the demo once and let it through on the author's "retry".
+
+- **Invalidations (`07` §4.3):** the set is **113 captures, not nine** — 31 under 22 September
+  and 82 under 21 September, every capture whose blob is a version of the 23 September file,
+  computed from the Bronze capture log. Two findings on the way: the hand-deleted rows of 22
+  September had come back through the backfill (ADR-038's reason to exist), and OTE republished
+  22 September's own file on the 24th, which the backfill captured at 14:37 UTC — 22 September
+  is now correct on both transports. One Job on the platform image ran `energyctl invalidate`
+  113 times (29 min); `observation_occurrences_valid` and the current views exclude them.
+- **Egress Jobs with the node block (`07` §2.1):** 3 of 3 PASS; the metadata address now times
+  out (node-level drop) where the pod policy used to refuse. Lesson: a test Job copying a
+  CronJob's init container must copy `imagePullSecrets` too (two deadline failures, anonymous
+  `ghcr.io` 401).
+- **Terraform (`07` §3):** `hcloud-20260924-222903.tfplan` = 0 add / **1 change** / 0 destroy —
+  the three admin firewall rules back to the laptop's current address. Apply is the author's.
+- **Hetzner inventory** by CLI matches the state (two cx23, one volume, one network, one key,
+  one firewall; nothing else in the project; ≈ €14/month with the volume).
+
+**Open / carried.** Author: `terraform apply` of the plan above; the teardown when the demo is
+done (`terraform destroy`, then disable `deploy-demo.yml`). ČEPS `value1 = value2` question.
+The invalidation Job `invalidate-23sep-file-under-21-22` stays in the namespace as a record
+(Complete); the gated egress Jobs were deleted.
