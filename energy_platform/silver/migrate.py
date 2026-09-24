@@ -57,6 +57,45 @@ def downgrade(dsn: str, revision: str = "base", *, schema: str | None = None) ->
     command.downgrade(_config(dsn, schema), revision)
 
 
+_ROLE_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+READER_GROUP = "energy_reader"
+
+
+def grant_reader(dsn: str, user: str, password: str) -> None:
+    """Create or rotate a **login** role ``user`` that is a member of the read-only group
+    ``energy_reader`` (migration 0007, ADR-039): what a dashboard connects as. The password
+    comes from the environment (the namespace Secret), never from a migration or a values file.
+    Fails loudly if the group role does not exist (the migration could not create it: cnpg /
+    external modes with a plain application user — an operator does it, docs/07 §7.1)."""
+    if not _ROLE_NAME.match(user):
+        raise ValueError(f"{user!r} is not a plain lowercase role name")
+    if not password:
+        raise ValueError("the reader password is empty")
+    with psycopg.connect(dsn) as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname = %s", (READER_GROUP,)
+        ).fetchone()
+        if exists is None:
+            raise RuntimeError(
+                f"group role {READER_GROUP} does not exist: run the migrations with a user "
+                "that may CREATE ROLE, or create it by hand (ADR-039)"
+            )
+        login = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (user,)).fetchone()
+        ident = sql.Identifier(user)
+        if login is None:
+            conn.execute(
+                sql.SQL("CREATE ROLE {} LOGIN PASSWORD {} IN ROLE {}").format(
+                    ident, sql.Literal(password), sql.Identifier(READER_GROUP)
+                )
+            )
+        else:
+            conn.execute(
+                sql.SQL("ALTER ROLE {} WITH LOGIN PASSWORD {}").format(ident, sql.Literal(password))
+            )
+            conn.execute(sql.SQL("GRANT {} TO {}").format(sql.Identifier(READER_GROUP), ident))
+        conn.commit()
+
+
 def create_schema(dsn: str, name: str) -> None:
     """``CREATE SCHEMA`` for a throwaway smoke schema (P5-D5); fails if it exists."""
     with psycopg.connect(dsn) as conn:

@@ -72,7 +72,7 @@ from energy_platform.runtime import (
     storage_probe,
 )
 from energy_platform.silver import downgrade, upgrade
-from energy_platform.silver.migrate import create_schema, drop_schema
+from energy_platform.silver.migrate import create_schema, drop_schema, grant_reader
 from energy_platform.store import MemoryStore, Store, StoreUnavailable
 from energy_platform.store.postgres import PostgresStore
 from energy_platform.store.unavailable import UnavailableStore
@@ -271,6 +271,18 @@ def _validate_target(root: Path, target_id: str) -> int:
 def migrate(
     dsn: DsnOpt = None,
     down: Annotated[str | None, typer.Option("--downgrade", help="target revision or base")] = None,
+    reader_user: Annotated[
+        str | None,
+        typer.Option(
+            "--reader-user",
+            help="after upgrading, create or rotate this read-only login role (a member of "
+            "energy_reader, migration 0007) with the password in --reader-password-env (ADR-039)",
+        ),
+    ] = None,
+    reader_env_name: Annotated[
+        str,
+        typer.Option("--reader-password-env", help="name of the environment variable holding it"),
+    ] = "GRAFANA_DB_PASSWORD",
 ) -> None:
     """Apply the Silver/ledger migrations, or downgrade to a revision (each has one)."""
     if dsn is None:
@@ -279,6 +291,18 @@ def migrate(
     if down is not None:
         downgrade(dsn, down)
         typer.echo(f"downgraded to {down}")
+    elif reader_user is not None:
+        upgrade(dsn)
+        password = os.environ.get(reader_env_name, "")
+        if not password:
+            typer.echo(f"migrate: {reader_env_name} is not set; no reader role granted", err=True)
+            raise typer.Exit(code=1)
+        try:
+            grant_reader(dsn, reader_user, password)
+        except (ValueError, RuntimeError) as exc:
+            typer.echo(f"migrate: reader role: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        typer.echo(f"migrated to head; reader role {reader_user} granted (energy_reader)")
     else:
         upgrade(dsn)
         typer.echo("migrated to head")
