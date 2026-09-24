@@ -23,6 +23,8 @@ postgres:
     enabled: true
     baseSchedule: "15 2 * * *"          # ADR-036 amendment 1: one base a day
     walSchedule: "*/10 * * * *"         # RPO 15 min with archive_timeout 300
+    walStaleAfterSeconds: 1800
+    baseStaleAfterSeconds: 172800
 bronze:
   endpoint: https://nbg1.your-objectstorage.com        # store A (V-12)
   bucket: energy-platform-bronze                       # roots/hcloud output bucket_a
@@ -41,7 +43,11 @@ bronze:
     endpoint: ""
     bucket: energy-platform-bronze-replica             # roots/hcloud output bucket_b (retention rule, V-13)
     region: eu-frankfurt-1
-    schedule: "17 * * * *"
+    # ADR-036 amendment 2: the independent copy follows the 15-minute capture cadence, seven
+    # minutes after each capture instant (the `check --min-age 5m` then covers that capture);
+    # RPO for a store-A loss = 15 min + copy time
+    schedule: "7,22,37,52 * * * *"
+    staleAfterSeconds: 2700
 secrets:
   existingSecret: energy-platform                      # created by the author from the Terraform outputs
 metrics:

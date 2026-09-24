@@ -55,6 +55,8 @@ postgres:
     enabled: false
     baseSchedule: "15 2 * * *"            # pg-backup: one compressed base a day (before replicate :17 and the 03:30 drill)
     walSchedule: "*/10 * * * *"           # pg-wal-ship: RPO = archive_timeout 5 min + 10 min = 15 min (ADR-002)
+    baseStaleAfterSeconds: 172800         # alert when no base backup succeeded for 2 days (ADR-036 amendment 2)
+    walStaleAfterSeconds: 1800            # alert when no WAL shipment succeeded for 30 min (3 x walSchedule)
 
 bronze:
   endpoint: ""                           # REQUIRED: https://host[:port] (http needs allowInsecure)
@@ -81,7 +83,8 @@ bronze:
     bucket: ""
     region: us-east-1
     allowInsecure: false
-    schedule: "17 * * * *"
+    schedule: "17 * * * *"               # RPO for a store-A loss = this interval (ADR-036 amendment 2)
+    staleAfterSeconds: 7200              # alert when no replication succeeded for 2 h (2 x schedule)
 
 objectstore:
   local:                                 # two MinIOs for the local profile (ADR-036 §1)

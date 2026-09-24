@@ -424,7 +424,13 @@ def test_observability_renders_per_adr_037(tmp_path: Path) -> None:
         "EnergyPlatformFreshnessStale",
         "EnergyPlatformRestoreDrillFailed",
         "EnergyPlatformReconciliationMismatch",
+        "EnergyPlatformReplicationStale",
+        "EnergyPlatformWalShipmentStale",
+        "EnergyPlatformBaseBackupStale",
     } <= names
+    stale = {r["alert"]: r["expr"] for g in rules["groups"] for r in g["rules"]}
+    assert "kube_cronjob_status_last_successful_time" in stale["EnergyPlatformReplicationStale"]
+    assert stale["EnergyPlatformReplicationStale"].endswith("> 7200")  # 2 x the hourly default
     exporter = named(docs, "Deployment")["ep-energy-platform-metrics"]
     annotations = exporter["spec"]["template"]["metadata"]["annotations"]
     assert (
@@ -484,3 +490,22 @@ def test_policy_gate_runs_first_in_every_payload_pod_behind_its_flag(tmp_path: P
             assert first["args"][:1] == ["wait-egress-policy"]
             assert all("valueFrom" not in e for e in first.get("env", []))  # no credential
             assert first["securityContext"]["readOnlyRootFilesystem"] is True
+
+
+def test_demo_replicates_every_fifteen_minutes_and_alerts_on_staleness(tmp_path: Path) -> None:
+    """ADR-036 amendment 2 (review 2 DEP-01): the independent copy follows the capture cadence
+    on the demo, and the alert thresholds follow the schedules."""
+    docs = render(
+        tmp_path, TENANT, DEMO, extra=("--set", "bronze.replica.endpoint=https://b.example")
+    )
+    replicate = named(docs, "CronJob")["ep-energy-platform-replicate"]
+    assert replicate["spec"]["schedule"] == "7,22,37,52 * * * *"
+    rules = yaml.safe_load(
+        named(docs, "ConfigMap")["ep-energy-platform-alert-rules"]["data"][
+            "energy-platform.rules.yaml"
+        ]
+    )
+    exprs = {r["alert"]: r["expr"] for g in rules["groups"] for r in g["rules"]}
+    assert exprs["EnergyPlatformReplicationStale"].endswith("> 2700")
+    assert exprs["EnergyPlatformWalShipmentStale"].endswith("> 1800")
+    assert exprs["EnergyPlatformBaseBackupStale"].endswith("> 172800")

@@ -174,6 +174,8 @@ Blob store and capture log are separate: an unchanged page produces a new captur
 | Gold | none (rebuild) | rebuild time |
 | Full rebuild from Bronze | — | documented and benchmarked |
 
+*(2026-09-24: the RPO is stated per failure domain — worker, database node, store A, whole environment — in ADR-036 amendment 2; the figures above hold for the database-node domain.)*
+
 **Restore drill.** A scheduled CI job restores Bronze and Postgres into a scratch environment and asserts row counts and checksums. A backup that has never been restored is a hypothesis.
 
 **Rejected.** Parquet and Postgres as dual authoritative Silver (dual-write inconsistency). A single-failure-domain object store described as "backup".

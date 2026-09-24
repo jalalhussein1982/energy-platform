@@ -171,6 +171,47 @@ backup prefix (`rclone --s3-object-lock-*`) — not verified on Hetzner's gatewa
 volume bounded the 90-day lock costs little; a separate backup bucket — two more buckets and a
 second replication pair for the same effect.
 
+## Amendment 2 (2026-09-24) — RPO per failure domain; the independent copy follows the cadence
+
+**Context.** Review 2 (DEP-01, `codex-review/2026-09-24/04-deployment-and-ha.md`): ADR-002's
+table states Bronze RPO ≤ the polling interval and Silver RPO ≤ 15 minutes, and amendment 1
+made the Silver figure true — **for the loss of the database node while store A is up**. The
+demo replicated A → B once an hour, so for the loss of store A or its provider the independent
+copy could be an hour behind, and nothing watched its age: a job that never runs has no
+failed-Job metric.
+
+**Decision.**
+
+1. The RPO is stated per failure domain, and each figure names the mechanism that makes it true:
+
+   | Failure domain | Bronze RPO | Silver RPO | Mechanism |
+   |---|---|---|---|
+   | a worker or a pod | 0 | 0 | Bronze first, fenced commits (ADR-024) |
+   | the database node / instance, store A up | 0 | `archive_timeout` + `walSchedule` = 15 min | WAL shipped to A (amendment 1) |
+   | store A or its provider | replication interval + copy time | the same (WAL and bases live in A until copied) | `replicate` A → B (§3) |
+   | the whole environment (nodes, stores A, identities) | as store A | as store A, plus the Bronze-only rebuild time | store B + the restore drill (§5) |
+
+2. **The replication interval follows the capture cadence.** Demo: `7,22,37,52 * * * *`, seven
+   minutes after each 15-minute capture instant so the `check --min-age 5m` covers that
+   capture; RPO for a store-A loss = 15 minutes + copy time. The chart default stays hourly and
+   says what that means.
+3. **Age is watched, not only failure.** Three alert rules over kube-state-metrics'
+   `kube_cronjob_status_last_successful_time` (the dependency the drill alert already has):
+   `EnergyPlatformReplicationStale` (`bronze.replica.staleAfterSeconds`, demo 45 min),
+   `EnergyPlatformWalShipmentStale` (`postgres.backup.walStaleAfterSeconds`, 30 min) and
+   `EnergyPlatformBaseBackupStale` (`postgres.backup.baseStaleAfterSeconds`, 2 days). A stale
+   copy pages while ingestion looks healthy.
+4. **What the drill measures.** Its wall clock is the *replay* duration on warm infrastructure
+   (`docs/07` §5.3 states the two phases and the whole Job separately); the RTO for the loss of
+   the whole environment is that plus replacement nodes, identities and secrets, and resumed
+   schedules — measured only by an exercise that rebuilds them, which the demo has not run.
+
+**Consequences.** `02`'s RPO table carries a dated pointer here; `05` unchanged; `docs/07` §5
+names the three rules. Rejected: replicating on every capture (a Job per fetch, and the 5-minute
+`min-age` check would never settle) and a replica-age gauge computed by the platform (the
+exporter reads Postgres, the copy lives in object storage; kube-state-metrics already knows
+when the Job last succeeded).
+
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-22 · V-12 · CONFIRMED; 2026-09-22 · V-13 · CONFIRMED;

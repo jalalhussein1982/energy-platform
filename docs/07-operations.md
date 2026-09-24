@@ -263,6 +263,12 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
 
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
+**RPO per failure domain (ADR-036 amendment 2, 2026-09-24):** a worker 0; the database node 15 min
+(WAL shipped to A); store A or its provider = the replication interval + copy time (demo: 15 min,
+`7,22,37,52 * * * *`); the whole environment = as store A plus the rebuild. Three alert rules watch
+the *age* of the last successful replication, WAL shipment and base backup (kube-state-metrics),
+because a job that never runs has no failed-Job metric.
+
 Measured on the local profile, 2026-09-22 (MinIO A → MinIO B on one kind node; the numbers are
 mechanics, not the demo's cross-provider figures, which the replication CronJob measures on
 the demo cluster once it exists):

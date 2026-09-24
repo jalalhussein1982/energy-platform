@@ -63,4 +63,27 @@ groups:
           severity: page
         annotations:
           summary: "Bronze A → B replication reported differences or failed (ADR-036 §3; needs kube-state-metrics)"
+      # ADR-036 amendment 2: the RPO for a store-A loss is the replication interval — a job that
+      # never runs has no failed-Job metric, so the age of the last success is watched too
+      - alert: EnergyPlatformReplicationStale
+        expr: time() - max(kube_cronjob_status_last_successful_time{cronjob=~".*-replicate"}) > {{ .Values.bronze.replica.staleAfterSeconds }}
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "no successful Bronze A → B replication for {{ .Values.bronze.replica.staleAfterSeconds }} s: the independent copy is older than the RPO (ADR-036 amendment 2; needs kube-state-metrics)"
+      - alert: EnergyPlatformWalShipmentStale
+        expr: time() - max(kube_cronjob_status_last_successful_time{cronjob=~".*-pg-wal-ship"}) > {{ .Values.postgres.backup.walStaleAfterSeconds }}
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "no successful WAL shipment for {{ .Values.postgres.backup.walStaleAfterSeconds }} s: Silver RPO exceeded while ingestion may look healthy (ADR-036 amendment 2; needs kube-state-metrics)"
+      - alert: EnergyPlatformBaseBackupStale
+        expr: time() - max(kube_cronjob_status_last_successful_time{cronjob=~".*-pg-backup"}) > {{ .Values.postgres.backup.baseStaleAfterSeconds }}
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "no successful base backup for {{ .Values.postgres.backup.baseStaleAfterSeconds }} s: the restore replays a longer WAL chain (ADR-036 amendment 2; needs kube-state-metrics)"
 {{- end -}}
