@@ -152,3 +152,4 @@ in the comparison step; the manual drill of 2026-09-23 12:46 UTC had passed. **F
 completed the comparison in 406 s — and failed on the drill's rule instead: superseded captures
 and replica lag read as "missing" — the rule was fixed the same night (`docs/07` §5.3): every
 distinct capture of a run is replayed, and the comparison is bounded by the replica's newest capture.
+Proved at revision 13: both phases OK (777 s and 1 216 s), 77 MiB peak in the drill container.

@@ -149,7 +149,10 @@ of a run from the replica log, oldest first, newest last; the comparison is boun
 replica's newest capture instant, and lag is a counted, named, non-failing condition
 (`lagging_runs`). Three drill tests (loss = a middle capture missing; lag = the newest missing;
 superseded captures replayed); the harness now stamps `fetched_at` from its clock. `make check`
-887 green.
+887 green. **Proved on the demo at revision 13:** manual drill both phases OK (777 s against the
+restored database, all seven targets, 57 120 xlsx versions reproduced, lag named not failed;
+1 216 s for the Bronze-only rebuild), 77 MiB peak in the drill container — the nightly drill at
+01:30 UTC now has nothing known to fail on.
 
 
 **Open / carried.** `TF_VAR_admin_cidr` at the next plan (the firewall was

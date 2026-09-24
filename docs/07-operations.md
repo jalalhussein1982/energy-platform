@@ -414,6 +414,18 @@ capture of a run. The test harness now stamps `fetched_at` from its clock, so ca
 and ledger instants share one time line. The nine deleted versions of §4.3 still come back as
 "extra", by design.
 
+**Proved on the demo (manual drill `restore-drill-manual-3`, revision 13, 02:52–03:26 UTC,
+Job succeeded, exit 0).** Phase 1, against the restored database: **OK in 777 s**, all seven
+targets — `ceps_load` identical 8 910 versions (10 lagging runs named), `ote_intraday_market`
+identical 7 896 (10 lagging), `ote_imbalance_settlement` identical 576 (1 lagging), `ote_dam`
+and the two monthly targets identical, `ote_intraday_market_xlsx` live ⊆ rebuild with all
+**57 120** live versions reproduced and the rebuild ahead by 11 424 (the nine deleted versions
+of §4.3 among them; 3 lagging). Phase 2, the Bronze-only rebuild into a fresh schema: **OK in
+1 216 s**. Peak memory seen during phase 2: 77 MiB for the drill container, 156 MiB for the
+scratch PostgreSQL; the platform's captures and processing ran normally throughout. RTO figure
+for the demo at this size (≈ 75 000 Silver versions, seven targets): a full rebuild from store B
+in about 13 minutes.
+
 ## 6. Rollback drill (ADR-016 §6, ADR-025 §5)
 
 `make rollback-drill` on kind, 2026-09-22 06:02–06:04 (`deployment/local/drills/rollback.sh`;
