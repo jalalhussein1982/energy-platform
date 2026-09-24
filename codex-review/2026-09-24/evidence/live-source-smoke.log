@@ -1,0 +1,5 @@
+uv sync --frozen --group dev
+Checked 56 packages in 11ms
+uv run pytest -m live tests/live
+.......                                                                  [100%]
+7 passed in 2.18s

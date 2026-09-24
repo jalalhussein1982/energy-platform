@@ -1,0 +1,94 @@
+{
+  "meaning_of_exit_zero": "All three reported defects were reproduced; this is not a product pass.",
+  "started_at_utc": "2026-09-24T14:30:11.547125+00:00",
+  "repository": "/Users/jalalhussein/Desktop/Desktop - Jalal’s MacBook Air/task-cze",
+  "python": "3.12.13",
+  "source_sha256": {
+    "energy_platform/triage/extract.py": "aa5e6196a8be52596cde6bcaf93e09a264fe73ad8ea09619a73dcd0de16bfbd5",
+    "energy_platform/triage/pipeline.py": "d876337cda75456b079e7488563a9a26288c6f658d98946553756a3bd6fae125",
+    "energy_platform/harness/pr.py": "e3970a951212c08184970e2b75f2907ab33005e8816b1a0544aac81a0782832d",
+    "energy_platform/harness/runner.py": "88456f3a64c70899ebcd3204e2278b9f83673566d20477238ed60c06051b910a",
+    "energy_platform/mcp/tools.py": "f24b2e475581caf22e46f45d79a8b087bbc9b5590fcd5355d6f2d70efb34f34b"
+  },
+  "probes": {
+    "AE-01": {
+      "reproduced": true,
+      "cases": [
+        {
+          "target": "ceps_load",
+          "replacement": [
+            "value1=",
+            "value1New="
+          ],
+          "sample_fields": [],
+          "sample_dropped_fields": 3,
+          "pipeline_observations": 192,
+          "pipeline_null_values": 96,
+          "pipeline_events": [
+            "partition_status",
+            "unknown_field"
+          ],
+          "triage_status": "no_drift",
+          "triage_drift": {
+            "quarantine": null,
+            "unknown_fields": [],
+            "missing_sources": [],
+            "observations": 192
+          },
+          "proposal_written": false
+        },
+        {
+          "target": "ote_intraday_market",
+          "replacement": [
+            "Date>",
+            "DeliveryDate>"
+          ],
+          "sample_fields": [],
+          "sample_dropped_fields": 0,
+          "pipeline_observations": 0,
+          "pipeline_null_values": 0,
+          "pipeline_events": [],
+          "triage_status": "no_drift",
+          "triage_drift": {
+            "quarantine": null,
+            "unknown_fields": [],
+            "missing_sources": [],
+            "observations": 0
+          },
+          "proposal_written": false
+        }
+      ]
+    },
+    "AE-03": {
+      "positive_control_ok": true,
+      "positive_control_pytest_exit": 0,
+      "run_target_tests_ok": false,
+      "failing_pytest_exit": 1,
+      "sentinel_failure_in_pytest_output": true,
+      "gate_report_ok": true,
+      "bundle_created": true,
+      "failing_test_in_bundle": true,
+      "reproduced": true
+    },
+    "AE-04": {
+      "validation_status": "ADMISSION_REQUIRED",
+      "next_instruction": "Route B (ADR-022): do not invent a unit or edit a registry; run `energyctl admission-request entsoe_probe` and open a PR with only that file",
+      "available_tools": [
+        "read_repository",
+        "inspect_target",
+        "scaffold_target",
+        "write_target_file",
+        "validate_target",
+        "record_fixture",
+        "run_target_tests",
+        "open_pr"
+      ],
+      "admission_call_error": "unknown tool 'admission_request'; tools are ['read_repository', 'inspect_target', 'scaffold_target', 'write_target_file', 'validate_target', 'record_fixture', 'run_target_tests', 'open_pr']",
+      "admission_write_error": "'../../docs/admissions/entsoe_probe.md' escapes targets/entsoe_probe/",
+      "reproduced": true
+    }
+  },
+  "blocked_network_attempts": 0,
+  "temporary_directory_removed": true,
+  "all_reported_defects_reproduced": true
+}

@@ -1,0 +1,535 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "alpha.kubernetes.io/provided-node-ip": "10.10.1.20",
+                    "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"42:83:00:ee:c8:d6\"}",
+                    "flannel.alpha.coreos.com/backend-type": "vxlan",
+                    "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+                    "flannel.alpha.coreos.com/public-ip": "10.10.1.20",
+                    "k3s.io/hostname": "energy-platform-demo-agent-1",
+                    "k3s.io/internal-ip": "10.10.1.20",
+                    "k3s.io/node-args": "[\"agent\",\"--server\",\"https://10.10.1.10:6443\",\"--token\",\"********\",\"--node-ip\",\"10.10.1.20\",\"--flannel-iface\",\"enp7s0\"]",
+                    "k3s.io/node-config-hash": "EONNJRJ3HQEOQZKRJMMNLYTRSHZWBADOA3FQYTJ7I5Y2FMTYCIIA====",
+                    "k3s.io/node-env": "{}",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-09-23T06:26:05Z",
+                "finalizers": [
+                    "wrangler.cattle.io/node"
+                ],
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "k3s",
+                    "beta.kubernetes.io/os": "linux",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "energy-platform-demo-agent-1",
+                    "kubernetes.io/os": "linux",
+                    "node.kubernetes.io/instance-type": "k3s"
+                },
+                "name": "energy-platform-demo-agent-1",
+                "resourceVersion": "126761",
+                "uid": "25317f0b-f4a8-4a85-9fc1-ab3fc0973ba1"
+            },
+            "spec": {
+                "podCIDR": "10.42.1.0/24",
+                "podCIDRs": [
+                    "10.42.1.0/24"
+                ],
+                "providerID": "k3s://energy-platform-demo-agent-1"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "10.10.1.20",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "energy-platform-demo-agent-1",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "2",
+                    "ephemeral-storage": "37958761033",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3911560Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "39020108Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3911560Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:21Z",
+                        "lastTransitionTime": "2026-09-23T06:26:04Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:21Z",
+                        "lastTransitionTime": "2026-09-23T06:26:04Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:21Z",
+                        "lastTransitionTime": "2026-09-23T06:26:04Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:21Z",
+                        "lastTransitionTime": "2026-09-23T06:26:04Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "declaredFeatures": [
+                    "ExtendWebSocketsToKubelet",
+                    "InPlacePodLevelResourcesVerticalScaling",
+                    "InPlacePodVerticalScalingInitContainers",
+                    "RestartAllContainersOnContainerExits"
+                ],
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6"
+                        ],
+                        "sizeBytes": 160299139
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:1bde92efb00939d597332c12e2f873ea4f8a5d7ad6c74d2d492e3b5816ffc526"
+                        ],
+                        "sizeBytes": 85762475
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:5d4a99f5aafb937bb6d0e52aea2b08b36e00b365e39e1c0081bfa31949d69607"
+                        ],
+                        "sizeBytes": 85762143
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:71f31008b488659eb54e1a963fa58dd86ba4be298139611960e0bdd916359176"
+                        ],
+                        "sizeBytes": 85761055
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:1ad543284ec522e6957aea769f9374e02071f61e4bc7eff56256adc8a76d7601"
+                        ],
+                        "sizeBytes": 85760125
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:552a8ec76f28b34895f58f072a09ae845615b8272515f77f015631d6f377ef30"
+                        ],
+                        "sizeBytes": 85760091
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:b895026d9f184c54bcb9e4115063124881806ce21f41fc3c1d9b3c4f60fcbe13"
+                        ],
+                        "sizeBytes": 85760060
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:66c49c8a41cebb87dd7a3278fb0bda3e7b35540b1d7afdafa103b8047217d818"
+                        ],
+                        "sizeBytes": 85650091
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:4a838ba6d2843bf60b6042d120b5975361b30df473864e87acc41377774b81e6"
+                        ],
+                        "sizeBytes": 85561233
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:e97e8395e785b738b4f49811ed930b6e07df710a60b63dc6a4c731c30a50a1f9"
+                        ],
+                        "sizeBytes": 85560647
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:c90e7e06ca6692eb89c65f4043d6b8bdd59bd236a36984a8d2fb0ee70be5f8c0"
+                        ],
+                        "sizeBytes": 85558519
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:41c0ab8e6edddd194cb2579785c0bd6f53698c699cee001a43329b3e96c552a9"
+                        ],
+                        "sizeBytes": 85557768
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:e3cf1c7397900f04f9e915efbd86c87146abf4735b40363eda55bb14c5cc6d62"
+                        ],
+                        "sizeBytes": 85551802
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:53301405bbc58739e0118870c048eb34b984b21572e80b7a0f212e41cd3d25f6"
+                        ],
+                        "sizeBytes": 85528296
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:22e8b5d910bcc520c0a989ebc68dcd18591f3f4d6eb5f53c662f54cbc95ebf52"
+                        ],
+                        "sizeBytes": 85527965
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:c5814b93a4732f5a625a69db9e8eca15d9c92789c6a9382c6cda7c58598f0311"
+                        ],
+                        "sizeBytes": 85527939
+                    },
+                    {
+                        "names": [
+                            "docker.io/rclone/rclone@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5"
+                        ],
+                        "sizeBytes": 33928643
+                    },
+                    {
+                        "names": [
+                            "quay.io/prometheuscommunity/postgres-exporter@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e"
+                        ],
+                        "sizeBytes": 11784792
+                    },
+                    {
+                        "names": [
+                            "docker.io/curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777"
+                        ],
+                        "sizeBytes": 10680594
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-library-busybox@sha256:101b4afd76732482eff9b95cae5f94bcf295e521fbec4e01b69c5421f3f3f3e5",
+                            "docker.io/rancher/mirrored-library-busybox:1.37.0"
+                        ],
+                        "sizeBytes": 2151353
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-pause@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
+                            "docker.io/rancher/mirrored-pause:3.10.2"
+                        ],
+                        "sizeBytes": 320805
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "4b37ee22-2cd6-4314-a93f-fada99408541",
+                    "containerRuntimeVersion": "containerd://2.3.4-k3s1.36",
+                    "kernelVersion": "6.8.0-138-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.36.4+k3s1",
+                    "machineID": "30cf086be8c845508b5a9eb58914d796",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 24.04.4 LTS",
+                    "systemUUID": "30cf086b-e8c8-4550-8b5a-9eb58914d796"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": false,
+                            "userNamespaces": false
+                        },
+                        "name": "runhcs-wcow-process"
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "v1",
+            "kind": "Node",
+            "metadata": {
+                "annotations": {
+                    "alpha.kubernetes.io/provided-node-ip": "10.10.1.10",
+                    "flannel.alpha.coreos.com/backend-data": "{\"VNI\":1,\"VtepMAC\":\"ea:99:b7:b9:7e:12\"}",
+                    "flannel.alpha.coreos.com/backend-type": "vxlan",
+                    "flannel.alpha.coreos.com/kube-subnet-manager": "true",
+                    "flannel.alpha.coreos.com/public-ip": "10.10.1.10",
+                    "k3s.io/encryption-config-hash": "start-5ce808bf5ccd1acca745eb2cf45e2b5099af5d8f54c760f7aab8679a40ce5f10",
+                    "k3s.io/hostname": "energy-platform-demo-server",
+                    "k3s.io/internal-ip": "10.10.1.10",
+                    "k3s.io/node-args": "[\"server\",\"--disable\",\"traefik\",\"--disable\",\"servicelb\",\"--secrets-encryption\",\"true\",\"--write-kubeconfig-mode\",\"0600\",\"--tls-san\",\"10.10.1.10\",\"--tls-san\",\"46.225.239.152\",\"--node-ip\",\"10.10.1.10\",\"--flannel-iface\",\"enp7s0\",\"--cluster-cidr\",\"10.42.0.0/16\",\"--service-cidr\",\"10.43.0.0/16\",\"--token\",\"********\",\"--kube-apiserver-arg\",\"authentication-config=/etc/rancher/k3s/authn.yaml\"]",
+                    "k3s.io/node-config-hash": "2WMESVW3UN4CRL2HX3PCC22QT45ZEEBCJVWUF25GR76F6X3TANFQ====",
+                    "k3s.io/node-env": "{}",
+                    "node.alpha.kubernetes.io/ttl": "0",
+                    "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+                },
+                "creationTimestamp": "2026-09-23T06:25:21Z",
+                "finalizers": [
+                    "wrangler.cattle.io/node"
+                ],
+                "labels": {
+                    "beta.kubernetes.io/arch": "amd64",
+                    "beta.kubernetes.io/instance-type": "k3s",
+                    "beta.kubernetes.io/os": "linux",
+                    "kubernetes.io/arch": "amd64",
+                    "kubernetes.io/hostname": "energy-platform-demo-server",
+                    "kubernetes.io/os": "linux",
+                    "node-role.kubernetes.io/control-plane": "true",
+                    "node.kubernetes.io/instance-type": "k3s"
+                },
+                "name": "energy-platform-demo-server",
+                "resourceVersion": "126753",
+                "uid": "e86c773e-2c5f-4cf5-a734-247b25abfc2d"
+            },
+            "spec": {
+                "podCIDR": "10.42.0.0/24",
+                "podCIDRs": [
+                    "10.42.0.0/24"
+                ],
+                "providerID": "k3s://energy-platform-demo-server"
+            },
+            "status": {
+                "addresses": [
+                    {
+                        "address": "10.10.1.10",
+                        "type": "InternalIP"
+                    },
+                    {
+                        "address": "energy-platform-demo-server",
+                        "type": "Hostname"
+                    }
+                ],
+                "allocatable": {
+                    "cpu": "2",
+                    "ephemeral-storage": "37958761033",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3911568Ki",
+                    "pods": "110"
+                },
+                "capacity": {
+                    "cpu": "2",
+                    "ephemeral-storage": "39020108Ki",
+                    "hugepages-1Gi": "0",
+                    "hugepages-2Mi": "0",
+                    "memory": "3911568Ki",
+                    "pods": "110"
+                },
+                "conditions": [
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:15Z",
+                        "lastTransitionTime": "2026-09-23T06:25:21Z",
+                        "message": "kubelet has sufficient memory available",
+                        "reason": "KubeletHasSufficientMemory",
+                        "status": "False",
+                        "type": "MemoryPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:15Z",
+                        "lastTransitionTime": "2026-09-23T06:25:21Z",
+                        "message": "kubelet has no disk pressure",
+                        "reason": "KubeletHasNoDiskPressure",
+                        "status": "False",
+                        "type": "DiskPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:15Z",
+                        "lastTransitionTime": "2026-09-23T06:25:21Z",
+                        "message": "kubelet has sufficient PID available",
+                        "reason": "KubeletHasSufficientPID",
+                        "status": "False",
+                        "type": "PIDPressure"
+                    },
+                    {
+                        "lastHeartbeatTime": "2026-09-24T14:21:15Z",
+                        "lastTransitionTime": "2026-09-23T06:25:22Z",
+                        "message": "kubelet is posting ready status",
+                        "reason": "KubeletReady",
+                        "status": "True",
+                        "type": "Ready"
+                    }
+                ],
+                "daemonEndpoints": {
+                    "kubeletEndpoint": {
+                        "Port": 10250
+                    }
+                },
+                "declaredFeatures": [
+                    "ExtendWebSocketsToKubelet",
+                    "InPlacePodLevelResourcesVerticalScaling",
+                    "InPlacePodVerticalScalingInitContainers",
+                    "RestartAllContainersOnContainerExits"
+                ],
+                "features": {
+                    "supplementalGroupsPolicy": true
+                },
+                "images": [
+                    {
+                        "names": [
+                            "docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6"
+                        ],
+                        "sizeBytes": 160299139
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:1bde92efb00939d597332c12e2f873ea4f8a5d7ad6c74d2d492e3b5816ffc526"
+                        ],
+                        "sizeBytes": 85762475
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:5d4a99f5aafb937bb6d0e52aea2b08b36e00b365e39e1c0081bfa31949d69607"
+                        ],
+                        "sizeBytes": 85762143
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:71f31008b488659eb54e1a963fa58dd86ba4be298139611960e0bdd916359176"
+                        ],
+                        "sizeBytes": 85761055
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:b895026d9f184c54bcb9e4115063124881806ce21f41fc3c1d9b3c4f60fcbe13"
+                        ],
+                        "sizeBytes": 85760060
+                    },
+                    {
+                        "names": [
+                            "ghcr.io/jalalhussein1982/energy-platform@sha256:c5814b93a4732f5a625a69db9e8eca15d9c92789c6a9382c6cda7c58598f0311"
+                        ],
+                        "sizeBytes": 85527939
+                    },
+                    {
+                        "names": [
+                            "docker.io/rclone/rclone@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5"
+                        ],
+                        "sizeBytes": 33928643
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-coredns-coredns@sha256:900f9c109f7a33545d3c811516e8376df9019147b750f5ce3e254468769176ea",
+                            "docker.io/rancher/mirrored-coredns-coredns:1.14.6"
+                        ],
+                        "sizeBytes": 23758055
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-metrics-server@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0",
+                            "docker.io/rancher/mirrored-metrics-server:v0.9.0"
+                        ],
+                        "sizeBytes": 23258428
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/local-path-provisioner@sha256:e757967a5ec338f6a9b371c5a9688bedaa8c3578ea3dd4db329ea0084be0a86f",
+                            "docker.io/rancher/local-path-provisioner:v0.0.37"
+                        ],
+                        "sizeBytes": 15066012
+                    },
+                    {
+                        "names": [
+                            "docker.io/curlimages/curl@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777"
+                        ],
+                        "sizeBytes": 10680594
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-library-busybox@sha256:101b4afd76732482eff9b95cae5f94bcf295e521fbec4e01b69c5421f3f3f3e5",
+                            "docker.io/rancher/mirrored-library-busybox:1.37.0"
+                        ],
+                        "sizeBytes": 2151353
+                    },
+                    {
+                        "names": [
+                            "docker.io/rancher/mirrored-pause@sha256:f548e0e8e3dc1896ca956272154dde3314e8cc4fde0a57577ee9fa1c63f5baf4",
+                            "docker.io/rancher/mirrored-pause:3.10.2"
+                        ],
+                        "sizeBytes": 320805
+                    }
+                ],
+                "nodeInfo": {
+                    "architecture": "amd64",
+                    "bootID": "a9282140-734e-4c4f-ab1b-c036d0b7bd98",
+                    "containerRuntimeVersion": "containerd://2.3.4-k3s1.36",
+                    "kernelVersion": "6.8.0-138-generic",
+                    "kubeProxyVersion": "",
+                    "kubeletVersion": "v1.36.4+k3s1",
+                    "machineID": "59780ac293af4d73882f8459937c86cd",
+                    "operatingSystem": "linux",
+                    "osImage": "Ubuntu 24.04.4 LTS",
+                    "systemUUID": "59780ac2-93af-4d73-882f-8459937c86cd"
+                },
+                "runtimeHandlers": [
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": ""
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": true,
+                            "userNamespaces": true
+                        },
+                        "name": "runc"
+                    },
+                    {
+                        "features": {
+                            "recursiveReadOnlyMounts": false,
+                            "userNamespaces": false
+                        },
+                        "name": "runhcs-wcow-process"
+                    }
+                ]
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
+

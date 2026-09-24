@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "energy_platform_imports": 0,
+  "positive_fixtures": 42,
+  "native_rows_counted": 45493,
+  "sample_values_and_utc_instants_checked": 215,
+  "targets": [
+    {
+      "target": "ceps_load",
+      "positive_fixtures": 7,
+      "native_row_counts_checked": 1072,
+      "golden_values_checked": 24
+    },
+    {
+      "target": "ote_dam",
+      "positive_fixtures": 6,
+      "native_row_counts_checked": 1632,
+      "golden_values_checked": 26
+    },
+    {
+      "target": "ote_imbalance_settlement",
+      "positive_fixtures": 7,
+      "native_row_counts_checked": 1233,
+      "golden_values_checked": 32
+    },
+    {
+      "target": "ote_imbalance_settlement_final",
+      "positive_fixtures": 3,
+      "native_row_counts_checked": 17856,
+      "golden_values_checked": 42
+    },
+    {
+      "target": "ote_imbalance_settlement_monthly",
+      "positive_fixtures": 3,
+      "native_row_counts_checked": 17856,
+      "golden_values_checked": 23
+    },
+    {
+      "target": "ote_intraday_market",
+      "positive_fixtures": 9,
+      "native_row_counts_checked": 1140,
+      "golden_values_checked": 29
+    },
+    {
+      "target": "ote_intraday_market_xlsx",
+      "positive_fixtures": 7,
+      "native_row_counts_checked": 4704,
+      "golden_values_checked": 39
+    }
+  ]
+}

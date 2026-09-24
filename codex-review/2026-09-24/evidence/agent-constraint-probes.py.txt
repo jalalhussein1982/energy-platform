@@ -1,0 +1,214 @@
+"""Offline counterexamples for AE-01, AE-03, and AE-04.
+
+Run from the repository root:
+    PYTHONDONTWRITEBYTECODE=1 .venv/bin/python \
+        codex-review/2026-09-24/evidence/agent-constraint-probes.py.txt
+
+Exit 0 means all reported defects were reproduced, NOT that the product passed.
+The script makes no Git calls. Targets, fixtures, and bundle output live in an
+automatically removed temporary directory; only JSON is written to stdout.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
+from unittest.mock import patch
+
+sys.dont_write_bytecode = True
+os.environ["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
+
+REPO = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO))
+
+from energy_platform.bronze import blob_key, load_fixture, sha256_hex, write_fixture
+from energy_platform.contracts.manifest import load_manifest
+from energy_platform.harness.goldens import run_pipeline
+from energy_platform.harness.pr import gate_report, prepare_bundle
+from energy_platform.harness.runner import run_target_tests
+from energy_platform.mcp.tools import TOOL_NAMES, ToolError, Tools
+from energy_platform.triage import HeuristicStubBackend, triage
+from energy_platform.triage.extract import extract
+from tests.harness.targets_builder import EXAMPLES, make_target
+
+
+def main() -> int:
+    report = {
+        "meaning_of_exit_zero": "All three reported defects were reproduced; this is not a product pass.",
+        "started_at_utc": datetime.now(UTC).isoformat(),
+        "repository": str(REPO),
+        "python": sys.version.split()[0],
+        "source_sha256": {
+            name: hashlib.sha256((REPO / name).read_bytes()).hexdigest()
+            for name in (
+                "energy_platform/triage/extract.py",
+                "energy_platform/triage/pipeline.py",
+                "energy_platform/harness/pr.py",
+                "energy_platform/harness/runner.py",
+                "energy_platform/mcp/tools.py",
+            )
+        },
+        "probes": {},
+    }
+    blocked_attempts = []
+
+    def blocked(*args, **kwargs):
+        blocked_attempts.append("network entry point called")
+        raise RuntimeError("network disabled in audit evidence script")
+
+    with (
+        tempfile.TemporaryDirectory(prefix="ep-agent-constraints-review-") as tmp,
+        patch("socket.socket", blocked),
+        patch("socket.create_connection", blocked),
+        patch("socket.getaddrinfo", blocked),
+    ):
+        scratch = Path(tmp)
+        os.environ["HYPOTHESIS_STORAGE_DIRECTORY"] = str(scratch / "hypothesis")
+
+        # AE-01: keep the original manifest, change only field spelling in a
+        # copied synthetic payload, and preserve the Bronze integrity contract.
+        triage_cases = []
+        for tid, old, new in (
+            ("ceps_load", b"value1=", b"value1New="),
+            ("ote_intraday_market", b"Date>", b"DeliveryDate>"),
+        ):
+            target = REPO / "targets" / tid
+            manifest = load_manifest(target / "manifest.yaml")
+            entry, payload = load_fixture(target / "fixtures" / "ordinary_day")
+            changed = payload.replace(old, new)
+            assert changed != payload, f"probe did not change the {tid} payload"
+            digest = sha256_hex(changed)
+            entry = entry.model_copy(
+                update={
+                    "payload_sha256": digest,
+                    "raw_ref": blob_key(digest),
+                    "size": len(changed),
+                }
+            )
+            fixture = scratch / "triage" / tid / "capture"
+            write_fixture(fixture, entry, changed)
+            sample = extract(manifest, changed)
+            pipeline = run_pipeline(manifest, fixture)
+            result = triage(
+                target,
+                fixture,
+                HeuristicStubBackend(),
+                scratch / "triage" / tid / "outbox",
+            )
+            triage_cases.append(
+                {
+                    "target": tid,
+                    "replacement": [old.decode(), new.decode()],
+                    "sample_fields": list(sample.fields),
+                    "sample_dropped_fields": sample.dropped_fields,
+                    "pipeline_observations": len(pipeline.observations),
+                    "pipeline_null_values": sum(o.value is None for o in pipeline.observations),
+                    "pipeline_events": sorted({event.kind for event in pipeline.events}),
+                    "triage_status": result.status,
+                    "triage_drift": result.drift.as_dict() if result.drift else None,
+                    "proposal_written": result.proposal_path is not None,
+                }
+            )
+        ae01_reproduced = (
+            triage_cases[0]["triage_status"] == "no_drift"
+            and triage_cases[0]["pipeline_null_values"] == 96
+            and "unknown_field" in triage_cases[0]["pipeline_events"]
+            and triage_cases[1]["triage_status"] == "no_drift"
+            and triage_cases[1]["pipeline_observations"] == 0
+        )
+        report["probes"]["AE-01"] = {"reproduced": ae01_reproduced, "cases": triage_cases}
+
+        # AE-03: establish the positive control, then add an ordinary failing
+        # Python test. No target-specific gate or test configuration is changed.
+        repo = scratch / "bundle-repo"
+        root = repo / "targets"
+        root.mkdir(parents=True)
+        (root / "__init__.py").write_text("")
+        target = make_target(root, "probe_target")
+        baseline = run_target_tests(target)
+        assert baseline.ok, baseline.lines()
+        (target / "tests" / "test_failure.py").write_text(
+            'def test_known_failure() -> None:\n'
+            '    assert False, "REVIEW_SENTINEL_FAILURE"\n'
+        )
+        failing = run_target_tests(target)
+        gates = gate_report(target)
+        bundle = prepare_bundle(repo, "probe_target", scratch / "bundle-outbox")
+        bundled_failure = "targets/probe_target/tests/test_failure.py" in bundle.files
+        ae03 = {
+            "positive_control_ok": baseline.ok,
+            "positive_control_pytest_exit": baseline.pytest_exit,
+            "run_target_tests_ok": failing.ok,
+            "failing_pytest_exit": failing.pytest_exit,
+            "sentinel_failure_in_pytest_output": "REVIEW_SENTINEL_FAILURE" in failing.pytest_output,
+            "gate_report_ok": gates["ok"],
+            "bundle_created": bundle.path.exists(),
+            "failing_test_in_bundle": bundled_failure,
+        }
+        ae03["reproduced"] = (
+            baseline.ok
+            and not failing.ok
+            and failing.pytest_exit == 1
+            and gates["ok"]
+            and bundle.path.exists()
+            and bundled_failure
+        )
+        report["probes"]["AE-03"] = ae03
+
+        # AE-04: use the repository's own unadmitted-source test example, so the
+        # observed missing-tool behavior is tied to an actual Route B response.
+        make_target(
+            root,
+            "entsoe_probe",
+            manifest=EXAMPLES / "manifests" / "entsoe_rest_xml.yaml",
+        )
+        tools = Tools(repo=repo, outbox=scratch / "mcp-outbox")
+        validation = tools.validate_target("entsoe_probe")
+        errors = {}
+        for name, args in (
+            ("admission_request", {"target_id": "entsoe_probe"}),
+            (
+                "write_target_file",
+                {
+                    "target_id": "entsoe_probe",
+                    "path": "../../docs/admissions/entsoe_probe.md",
+                    "content": "# Admission request\n",
+                },
+            ),
+        ):
+            try:
+                tools.call(name, args)
+                errors[name] = None
+            except ToolError as exc:
+                errors[name] = str(exc)
+        ae04 = {
+            "validation_status": validation["validation"]["status"],
+            "next_instruction": validation.get("next"),
+            "available_tools": list(TOOL_NAMES),
+            "admission_call_error": errors["admission_request"],
+            "admission_write_error": errors["write_target_file"],
+        }
+        ae04["reproduced"] = (
+            ae04["validation_status"] == "ADMISSION_REQUIRED"
+            and "admission_request" not in TOOL_NAMES
+            and errors["admission_request"] is not None
+            and errors["write_target_file"] is not None
+        )
+        report["probes"]["AE-04"] = ae04
+
+    report["blocked_network_attempts"] = len(blocked_attempts)
+    report["temporary_directory_removed"] = not scratch.exists()
+    report["all_reported_defects_reproduced"] = all(
+        probe["reproduced"] for probe in report["probes"].values()
+    )
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0 if report["all_reported_defects_reproduced"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

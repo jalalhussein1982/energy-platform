@@ -1,0 +1,57 @@
+"""Replay selected review probes on an ephemeral Unix-socket PostgreSQL only.
+Run with scripts/with_postgres.sh, after unsetting both application DSN variables.
+Creates scratch schemas in the disposable database; refuses non-helper DSNs.
+"""
+import os
+import runpy
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+from energy_platform.silver.migrate import create_schema, upgrade
+from energy_platform.store.postgres import PostgresStore
+from energy_platform.store import StoreUnavailable
+from tests.runtime.harness import runtime as memory_runtime
+
+DSN = os.environ['ENERGY_PLATFORM_TEST_DSN']
+assert DSN.startswith('postgresql:///postgres?host=/tmp/ep-pg.'), 'Ephemeral helper database required'
+counter = 0
+connections = []
+
+def postgres_store():
+    global counter
+    counter += 1
+    schema = f'review_probe_{counter}'
+    create_schema(DSN, schema)
+    upgrade(DSN, schema=schema)
+    store = PostgresStore(DSN, schema=schema)
+    connections.append(store)
+    return store
+
+class TogglePostgres:
+    def __init__(self):
+        self.inner = postgres_store()
+        self.down = False
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+    def ensure_run(self, *args, **kwargs):
+        if self.down:
+            raise StoreUnavailable('injected post-Bronze outage')
+        return self.inner.ensure_run(*args, **kwargs)
+
+def runtime(*args, **kwargs):
+    if kwargs.get('store') is None:
+        kwargs['store'] = postgres_store()
+    return memory_runtime(*args, **kwargs)
+
+namespace = runpy.run_path(str(Path(__file__).with_name('data-correctness-probes.py.txt')))
+for name in ('correction_outage','correction_race','ownership','reversion','replay_crash','freshness_scope'):
+    probe = namespace[name]
+    probe.__globals__['MemoryStore'] = postgres_store
+    probe.__globals__['ToggleStore'] = TogglePostgres
+    probe.__globals__['runtime'] = runtime
+    probe()
+for connection in connections:
+    connection.close()
+print('Six counterexample groups reproduced against ephemeral PostgreSQL.')

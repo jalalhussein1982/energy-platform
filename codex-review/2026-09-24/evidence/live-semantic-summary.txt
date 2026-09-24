@@ -1,0 +1,39 @@
+BEGIN
+    metric    | source_transport | count 
+--------------+------------------+-------
+ price_last   | xlsx             |   288
+ price_max    | xlsx             |   288
+ price_min    | xlsx             |   288
+ price_vwap   | soap             |    96
+ price_vwap   | xlsx             |   288
+ volume_buy   | xlsx             |   288
+ volume_sell  | xlsx             |   288
+ volume_total | soap             |    96
+ volume_total | xlsx             |   288
+(9 rows)
+
+ local_date | source_transport | count 
+------------+------------------+-------
+ 2026-09-22 | soap             |   192
+(1 row)
+
+            target_id             |  status  |    partition_start     |     partition_end      |      expected_by       | newest_delivery_start  |        last_capture_at        
+----------------------------------+----------+------------------------+------------------------+------------------------+------------------------+-------------------------------
+ ceps_load                        | late     | 2026-09-24 13:00:00+00 | 2026-09-24 14:00:00+00 | 2026-09-24 14:15:00+00 | 2026-09-24 13:30:00+00 | 2026-09-24 14:01:23.845007+00
+ ote_dam                          | complete | 2026-09-23 22:00:00+00 | 2026-09-24 22:00:00+00 | 2026-09-24 23:00:00+00 | 2026-09-25 21:45:00+00 | 2026-09-24 14:01:02.399749+00
+ ote_imbalance_settlement         | partial  | 2026-09-23 22:00:00+00 | 2026-09-24 22:00:00+00 | 2026-09-24 23:17:00+00 | 2026-09-23 21:45:00+00 | 2026-09-24 13:18:17.580844+00
+ ote_imbalance_settlement_final   | partial  | 2026-09-23 22:00:00+00 | 2026-09-24 22:00:00+00 | 2026-09-26 22:00:00+00 | 2026-09-23 21:45:00+00 | 
+ ote_imbalance_settlement_monthly | partial  | 2026-09-23 22:00:00+00 | 2026-09-24 22:00:00+00 | 2026-09-26 22:00:00+00 | 2026-09-23 21:45:00+00 | 
+ ote_intraday_market              | partial  | 2026-09-23 22:00:00+00 | 2026-09-24 22:00:00+00 | 2026-09-24 22:15:00+00 | 2026-09-24 13:45:00+00 | 2026-09-24 14:15:59.884529+00
+ ote_intraday_market_xlsx         | partial  | 2026-09-23 22:00:00+00 | 2026-09-24 22:00:00+00 | 2026-09-24 22:15:00+00 | 2026-09-24 13:45:00+00 | 2026-09-24 14:16:15.544949+00
+(7 rows)
+
+        target_id         |       kind       | severity | count 
+--------------------------+------------------+----------+-------
+ ceps_load                | partition_status | info     |    12
+ ote_dam                  | partition_status | info     |     2
+ ote_intraday_market      | partition_status | info     |    12
+ ote_intraday_market_xlsx | partition_status | info     |     4
+(4 rows)
+
+COMMIT

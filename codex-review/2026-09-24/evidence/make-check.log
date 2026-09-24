@@ -1,0 +1,14 @@
+uv sync --frozen --group dev
+   Building energy-platform @ file:///private/tmp/energy-review-ho5i3iiz
+  × Failed to build `energy-platform @
+  │ file:///private/tmp/energy-review-ho5i3iiz`
+  ├─▶ Failed to resolve requirements from `build-system.requires`
+  ├─▶ No solution found when resolving: `hatchling==1.32.3`
+  ╰─▶ Because hatchling was not found in the cache and you require
+      hatchling==1.32.3, we can conclude that your requirements are
+      unsatisfiable.
+
+      hint: Packages were unavailable because the network was disabled. When
+      the network is disabled, registry packages may only be read from the
+      cache.
+make: *** [sync] Error 1

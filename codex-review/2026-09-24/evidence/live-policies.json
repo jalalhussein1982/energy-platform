@@ -1,0 +1,445 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "energy-platform",
+                    "meta.helm.sh/release-namespace": "energy-platform"
+                },
+                "creationTimestamp": "2026-09-23T12:20:12Z",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/instance": "energy-platform",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "energy-platform",
+                    "app.kubernetes.io/version": "0.0.1",
+                    "energy-platform.io/residency": "DE",
+                    "helm.sh/chart": "energy-platform-0.5.0"
+                },
+                "name": "energy-platform-allow-dns",
+                "namespace": "energy-platform",
+                "resourceVersion": "21190",
+                "uid": "4d7fe064-0e30-4558-8777-028992381af4"
+            },
+            "spec": {
+                "egress": [
+                    {
+                        "ports": [
+                            {
+                                "port": 53,
+                                "protocol": "UDP"
+                            },
+                            {
+                                "port": 53,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "to": [
+                            {
+                                "namespaceSelector": {
+                                    "matchLabels": {
+                                        "kubernetes.io/metadata.name": "kube-system"
+                                    }
+                                },
+                                "podSelector": {
+                                    "matchLabels": {
+                                        "k8s-app": "kube-dns"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "podSelector": {
+                    "matchLabels": {
+                        "app.kubernetes.io/instance": "energy-platform",
+                        "app.kubernetes.io/name": "energy-platform"
+                    }
+                },
+                "policyTypes": [
+                    "Egress"
+                ]
+            }
+        },
+        {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "energy-platform",
+                    "meta.helm.sh/release-namespace": "energy-platform"
+                },
+                "creationTimestamp": "2026-09-23T12:20:12Z",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/instance": "energy-platform",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "energy-platform",
+                    "app.kubernetes.io/version": "0.0.1",
+                    "energy-platform.io/residency": "DE",
+                    "helm.sh/chart": "energy-platform-0.5.0"
+                },
+                "name": "energy-platform-allow-internet-fetch",
+                "namespace": "energy-platform",
+                "resourceVersion": "21191",
+                "uid": "9e4e4104-467d-41af-bc01-fc2adfa09544"
+            },
+            "spec": {
+                "egress": [
+                    {
+                        "ports": [
+                            {
+                                "port": 443,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "to": [
+                            {
+                                "ipBlock": {
+                                    "cidr": "0.0.0.0/0",
+                                    "except": [
+                                        "10.0.0.0/8",
+                                        "172.16.0.0/12",
+                                        "192.168.0.0/16",
+                                        "169.254.0.0/16",
+                                        "100.64.0.0/10",
+                                        "127.0.0.0/8",
+                                        "10.42.0.0/16",
+                                        "10.43.0.0/16"
+                                    ]
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "podSelector": {
+                    "matchExpressions": [
+                        {
+                            "key": "energy-platform.io/role",
+                            "operator": "In",
+                            "values": [
+                                "capture",
+                                "recapture",
+                                "backfill"
+                            ]
+                        }
+                    ],
+                    "matchLabels": {
+                        "app.kubernetes.io/instance": "energy-platform",
+                        "app.kubernetes.io/name": "energy-platform"
+                    }
+                },
+                "policyTypes": [
+                    "Egress"
+                ]
+            }
+        },
+        {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "energy-platform",
+                    "meta.helm.sh/release-namespace": "energy-platform"
+                },
+                "creationTimestamp": "2026-09-23T12:20:12Z",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/instance": "energy-platform",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "energy-platform",
+                    "app.kubernetes.io/version": "0.0.1",
+                    "energy-platform.io/residency": "DE",
+                    "helm.sh/chart": "energy-platform-0.5.0"
+                },
+                "name": "energy-platform-allow-metrics-ingress",
+                "namespace": "energy-platform",
+                "resourceVersion": "21193",
+                "uid": "bb4caa0c-4582-41ba-bef2-ae546c64a7ca"
+            },
+            "spec": {
+                "ingress": [
+                    {
+                        "from": [
+                            {
+                                "podSelector": {}
+                            }
+                        ],
+                        "ports": [
+                            {
+                                "port": 9187,
+                                "protocol": "TCP"
+                            }
+                        ]
+                    }
+                ],
+                "podSelector": {
+                    "matchLabels": {
+                        "app.kubernetes.io/instance": "energy-platform",
+                        "app.kubernetes.io/name": "energy-platform",
+                        "energy-platform.io/role": "metrics"
+                    }
+                },
+                "policyTypes": [
+                    "Ingress"
+                ]
+            }
+        },
+        {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "energy-platform",
+                    "meta.helm.sh/release-namespace": "energy-platform"
+                },
+                "creationTimestamp": "2026-09-23T12:20:12Z",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/instance": "energy-platform",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "energy-platform",
+                    "app.kubernetes.io/version": "0.0.1",
+                    "energy-platform.io/residency": "DE",
+                    "helm.sh/chart": "energy-platform-0.5.0"
+                },
+                "name": "energy-platform-allow-object-store-egress",
+                "namespace": "energy-platform",
+                "resourceVersion": "21194",
+                "uid": "04dc3ea4-b4f3-4123-ae07-4bd6c45bee92"
+            },
+            "spec": {
+                "egress": [
+                    {
+                        "ports": [
+                            {
+                                "port": 443,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "to": [
+                            {
+                                "ipBlock": {
+                                    "cidr": "88.198.120.0/25"
+                                }
+                            },
+                            {
+                                "ipBlock": {
+                                    "cidr": "134.70.40.0/21"
+                                }
+                            },
+                            {
+                                "ipBlock": {
+                                    "cidr": "134.70.48.0/22"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "podSelector": {
+                    "matchExpressions": [
+                        {
+                            "key": "energy-platform.io/role",
+                            "operator": "In",
+                            "values": [
+                                "capture",
+                                "process",
+                                "recapture",
+                                "backfill",
+                                "gaps",
+                                "hook",
+                                "drill",
+                                "backup",
+                                "replicate",
+                                "tier",
+                                "metrics"
+                            ]
+                        }
+                    ],
+                    "matchLabels": {
+                        "app.kubernetes.io/instance": "energy-platform",
+                        "app.kubernetes.io/name": "energy-platform"
+                    }
+                },
+                "policyTypes": [
+                    "Egress"
+                ]
+            }
+        },
+        {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "energy-platform",
+                    "meta.helm.sh/release-namespace": "energy-platform"
+                },
+                "creationTimestamp": "2026-09-23T12:20:12Z",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/instance": "energy-platform",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "energy-platform",
+                    "app.kubernetes.io/version": "0.0.1",
+                    "energy-platform.io/residency": "DE",
+                    "helm.sh/chart": "energy-platform-0.5.0"
+                },
+                "name": "energy-platform-allow-postgres-egress",
+                "namespace": "energy-platform",
+                "resourceVersion": "21196",
+                "uid": "56d8800b-2e05-4d9d-a21b-07676f5fddd8"
+            },
+            "spec": {
+                "egress": [
+                    {
+                        "ports": [
+                            {
+                                "port": 5432,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "to": [
+                            {
+                                "podSelector": {
+                                    "matchLabels": {
+                                        "app.kubernetes.io/instance": "energy-platform",
+                                        "app.kubernetes.io/name": "energy-platform",
+                                        "energy-platform.io/role": "postgres"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "podSelector": {
+                    "matchExpressions": [
+                        {
+                            "key": "energy-platform.io/role",
+                            "operator": "In",
+                            "values": [
+                                "capture",
+                                "process",
+                                "recapture",
+                                "backfill",
+                                "gaps",
+                                "hook",
+                                "drill",
+                                "backup",
+                                "replicate",
+                                "tier",
+                                "metrics"
+                            ]
+                        }
+                    ],
+                    "matchLabels": {
+                        "app.kubernetes.io/instance": "energy-platform",
+                        "app.kubernetes.io/name": "energy-platform"
+                    }
+                },
+                "policyTypes": [
+                    "Egress"
+                ]
+            }
+        },
+        {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "energy-platform",
+                    "meta.helm.sh/release-namespace": "energy-platform"
+                },
+                "creationTimestamp": "2026-09-23T12:20:12Z",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/instance": "energy-platform",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "energy-platform",
+                    "app.kubernetes.io/version": "0.0.1",
+                    "energy-platform.io/residency": "DE",
+                    "helm.sh/chart": "energy-platform-0.5.0"
+                },
+                "name": "energy-platform-allow-postgres-ingress",
+                "namespace": "energy-platform",
+                "resourceVersion": "21195",
+                "uid": "d28aa274-cf24-484c-8aaf-050fd2a1b93e"
+            },
+            "spec": {
+                "ingress": [
+                    {
+                        "from": [
+                            {
+                                "podSelector": {
+                                    "matchLabels": {
+                                        "app.kubernetes.io/instance": "energy-platform",
+                                        "app.kubernetes.io/name": "energy-platform"
+                                    }
+                                }
+                            }
+                        ],
+                        "ports": [
+                            {
+                                "port": 5432,
+                                "protocol": "TCP"
+                            }
+                        ]
+                    }
+                ],
+                "podSelector": {
+                    "matchLabels": {
+                        "app.kubernetes.io/instance": "energy-platform",
+                        "app.kubernetes.io/name": "energy-platform",
+                        "energy-platform.io/role": "postgres"
+                    }
+                },
+                "policyTypes": [
+                    "Ingress"
+                ]
+            }
+        },
+        {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "annotations": {
+                    "meta.helm.sh/release-name": "energy-platform",
+                    "meta.helm.sh/release-namespace": "energy-platform"
+                },
+                "creationTimestamp": "2026-09-23T12:20:12Z",
+                "generation": 1,
+                "labels": {
+                    "app.kubernetes.io/instance": "energy-platform",
+                    "app.kubernetes.io/managed-by": "Helm",
+                    "app.kubernetes.io/name": "energy-platform",
+                    "app.kubernetes.io/version": "0.0.1",
+                    "energy-platform.io/residency": "DE",
+                    "helm.sh/chart": "energy-platform-0.5.0"
+                },
+                "name": "energy-platform-default-deny",
+                "namespace": "energy-platform",
+                "resourceVersion": "21192",
+                "uid": "ff828759-a6b7-4f4b-b7dd-aa2c23089e9b"
+            },
+            "spec": {
+                "podSelector": {
+                    "matchLabels": {
+                        "app.kubernetes.io/instance": "energy-platform",
+                        "app.kubernetes.io/name": "energy-platform"
+                    }
+                },
+                "policyTypes": [
+                    "Ingress",
+                    "Egress"
+                ]
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
+

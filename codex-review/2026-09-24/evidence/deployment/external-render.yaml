@@ -1,0 +1,4230 @@
+---
+# Source: energy-platform/templates/metrics.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-energy-platform-allow-metrics-ingress
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: energy-platform
+      app.kubernetes.io/instance: audit
+      energy-platform.io/role: metrics
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9187
+
+---
+# Source: energy-platform/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-energy-platform-default-deny
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: energy-platform
+      app.kubernetes.io/instance: audit
+  policyTypes: [Ingress, Egress]
+
+---
+# Source: energy-platform/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-energy-platform-allow-dns
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: energy-platform
+      app.kubernetes.io/instance: audit
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+# Source: energy-platform/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-energy-platform-allow-postgres-egress
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: energy-platform
+      app.kubernetes.io/instance: audit
+    matchExpressions:
+      - key: energy-platform.io/role
+        operator: In
+        values: ["capture","process","recapture","backfill","gaps","hook","drill","backup","replicate","tier","metrics"]
+  policyTypes: [Egress]
+  egress:
+    - to:
+      ports:
+        - protocol: TCP
+          port: 5432
+
+---
+# Source: energy-platform/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-energy-platform-allow-object-store-egress
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: energy-platform
+      app.kubernetes.io/instance: audit
+    matchExpressions:
+      - key: energy-platform.io/role
+        operator: In
+        values: ["capture","process","recapture","backfill","gaps","hook","drill","backup","replicate","tier","metrics"]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 203.0.113.0/24
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Source: energy-platform/templates/networkpolicy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audit-energy-platform-allow-internet-fetch
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: energy-platform
+      app.kubernetes.io/instance: audit
+    matchExpressions:
+      - key: energy-platform.io/role
+        operator: In
+        values: ["capture", "recapture", "backfill"]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# Source: energy-platform/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: audit-energy-platform
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+automountServiceAccountToken: false
+
+---
+# Source: energy-platform/templates/metrics.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-energy-platform-metrics-queries
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+data:
+  queries.yaml: |
+    energy_platform_freshness:
+      query: >-
+        SELECT target_id AS target,
+               EXTRACT(EPOCH FROM (now() - newest_delivery_start)) AS age_seconds,
+               EXTRACT(EPOCH FROM (now() - computed_at)) AS computed_age_seconds
+        FROM target_freshness
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - age_seconds: {usage: "GAUGE", description: "age of the newest observation (ADR-012 SLI)"}
+        - computed_age_seconds: {usage: "GAUGE", description: "age of the freshness row itself"}
+    energy_platform_freshness_status:
+      query: >-
+        SELECT f.target_id AS target, s.status,
+               (f.status = s.status)::int AS active
+        FROM target_freshness f
+        CROSS JOIN (VALUES ('pending'), ('partial'), ('late'), ('complete')) AS s(status)
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - status: {usage: "LABEL", description: "pending | partial | late | complete (01 §5)"}
+        - active: {usage: "GAUGE", description: "1 when this is the target's current state"}
+    energy_platform_freshness_periods:
+      query: >-
+        SELECT target_id AS target, 'observed' AS kind, observed_periods AS count FROM target_freshness
+        UNION ALL
+        SELECT target_id AS target, 'expected' AS kind, expected_periods AS count FROM target_freshness
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - kind: {usage: "LABEL", description: "observed | expected"}
+        - count: {usage: "GAUGE", description: "periods in the partition"}
+    energy_platform:
+      query: >-
+        SELECT target_id AS target, source_unavailable::int AS source_unavailable,
+               pipeline_failed::int AS pipeline_failed, stale_fetch_streak
+        FROM target_freshness
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - source_unavailable: {usage: "GAUGE", description: "newest attempt failed in the fetch layer"}
+        - pipeline_failed: {usage: "GAUGE", description: "newest attempt failed after Bronze"}
+        - stale_fetch_streak: {usage: "GAUGE", description: "consecutive unchanged captures"}
+    energy_platform_runs:
+      query: >-
+        SELECT target_id AS target, state, count(*) AS total FROM runs GROUP BY 1, 2
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - state: {usage: "LABEL", description: "ledger run state (ADR-024 §3)"}
+        - total: {usage: "GAUGE", description: "runs in this state"}
+    energy_platform_quality_events:
+      query: >-
+        SELECT target_id AS target, kind, count(*) AS last_hour FROM quality_events
+        WHERE created_at > now() - interval '1 hour' AND kind <> 'partition_status' GROUP BY 1, 2
+      metrics:
+        - target: {usage: "LABEL", description: "target id"}
+        - kind: {usage: "LABEL", description: "quality event kind (reconciliation_mismatch, …)"}
+        - last_hour: {usage: "GAUGE", description: "quality events of this kind in the last hour"}
+
+---
+# Source: energy-platform/templates/metrics.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audit-energy-platform-alert-rules
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+data:
+  energy-platform.rules.yaml: |
+    groups:
+      - name: energy-platform-freshness
+        rules:
+          - alert: EnergyPlatformTargetLate
+            expr: energy_platform_freshness_status_active{status="late"} == 1
+            for: 30m
+            labels:
+              severity: page
+            annotations:
+              summary: "{{ $labels.target }} is late: expected publication passed and the partition is not complete (01 §5)"
+          - alert: EnergyPlatformPipelineFailed
+            expr: energy_platform_pipeline_failed == 1
+            for: 15m
+            labels:
+              severity: page
+            annotations:
+              summary: "{{ $labels.target }}: the newest attempt failed after Bronze — our incident (ADR-012)"
+          - alert: EnergyPlatformSourceUnavailable
+            expr: energy_platform_source_unavailable == 1
+            for: 1h
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.target }}: the source is unreachable for an hour — the source's incident, not ours (ADR-012)"
+          - alert: EnergyPlatformFreshnessStale
+            expr: energy_platform_freshness_computed_age_seconds > 2700
+            for: 5m
+            labels:
+              severity: page
+            annotations:
+              summary: "{{ $labels.target }}: no freshness row for 45 minutes — the gap detector itself stopped"
+          - alert: EnergyPlatformExporterDown
+            expr: absent(energy_platform_freshness_computed_age_seconds)
+            for: 15m
+            labels:
+              severity: page
+            annotations:
+              summary: "no freshness metrics at all: exporter, database or scrape path down"
+          - alert: EnergyPlatformReconciliationMismatch
+            expr: energy_platform_quality_events_last_hour{kind="reconciliation_mismatch"} > 0
+            for: 15m
+            labels:
+              severity: page
+            annotations:
+              summary: "{{ $labels.target }}: the two OTE transports disagree on a shared metric — one of them holds wrong data (01 §3; 2026-09-23 a backfill stored another day's file and 9 544 of these went unseen)"
+          - alert: EnergyPlatformRestoreDrillFailed
+            expr: kube_job_status_failed{job_name=~".*restore-drill.*"} > 0
+            for: 1m
+            labels:
+              severity: page
+            annotations:
+              summary: "a backup could not be restored or the rebuild from Bronze differs from live (ADR-002; needs kube-state-metrics)"
+          - alert: EnergyPlatformReplicationFailed
+            expr: kube_job_status_failed{job_name=~".*replicate.*"} > 0
+            for: 1m
+            labels:
+              severity: page
+            annotations:
+              summary: "Bronze A → B replication reported differences or failed (ADR-036 §3; needs kube-state-metrics)"
+
+---
+# Source: energy-platform/templates/metrics.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: audit-energy-platform-metrics
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: metrics
+spec:
+  selector:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    energy-platform.io/role: metrics
+  ports:
+    - name: metrics
+      port: 9187
+      targetPort: metrics
+
+---
+# Source: energy-platform/templates/metrics.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audit-energy-platform-metrics
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: energy-platform
+      app.kubernetes.io/instance: audit
+      energy-platform.io/role: metrics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: energy-platform
+        app.kubernetes.io/instance: audit
+        energy-platform.io/role: metrics
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9187"
+        prometheus.io/path: /metrics
+    spec:
+      serviceAccountName: audit-energy-platform
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: exporter
+          image: quay.io/prometheuscommunity/postgres-exporter@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
+          args:
+            - --disable-default-metrics
+            - --extend.query-path=/etc/exporter/queries.yaml
+            - --web.listen-address=:9187
+          env:
+            
+            - name: ENERGY_PLATFORM_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: energy-platform
+                  key: ENERGY_PLATFORM_DSN
+            # lib/pq defaults to sslmode=require; the chart's own Postgres speaks plain TCP inside
+            # the namespace (NetworkPolicy-scoped), so statefulset mode disables it explicitly.
+            - name: DATA_SOURCE_NAME
+              value: "$(ENERGY_PLATFORM_DSN)"
+          ports:
+            - name: metrics
+              containerPort: 9187
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits:
+              cpu: 200m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: queries
+              mountPath: /etc/exporter
+              readOnly: true
+      volumes:
+        - name: queries
+          configMap:
+            name: audit-energy-platform-metrics-queries
+
+---
+# Source: energy-platform/templates/cronjob-gaps.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-gaps
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: gaps
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: gaps
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: gaps
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - gaps
+                - --all
+                - --lookback-hours
+                - "48"
+                - --with-freshness
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-replicate.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-replicate
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: replicate
+spec:
+  schedule: "17 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: replicate
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: replicate
+              image: docker.io/rclone/rclone@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  rclone copy A:energy-platform-bronze B:energy-platform-bronze-replica --immutable --checksum --s3-no-check-bucket --stats-one-line -v
+                  rclone check A:energy-platform-bronze B:energy-platform-bronze-replica --one-way --min-age 5m
+                  echo "replicate: A→B verified (blobs, capture log, backups)"
+              env:
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                - name: HOME
+                  value: /tmp
+                - name: RCLONE_CONFIG_A_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_A_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_A_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: RCLONE_CONFIG_A_REGION
+                  value: "us-east-1"
+                - name: RCLONE_CONFIG_A_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_A_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_A_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+                - name: RCLONE_CONFIG_B_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_B_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_B_ENDPOINT
+                  value: "https://s3b.tenant.example"
+                - name: RCLONE_CONFIG_B_REGION
+                  value: "us-east-1"
+                - name: RCLONE_CONFIG_B_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_B_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_REPLICA_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_B_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_REPLICA_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-restore-drill.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-restore-drill
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: drill
+spec:
+  schedule: "30 3 * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: drill
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          # uid 999 = the postgres image's user: initdb and postgres need their uid in /etc/passwd;
+          # rclone and the platform image run as any non-root uid
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            fsGroup: 999
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            - name: fetch
+              image: docker.io/rclone/rclone@sha256:45401ad7410db1d67ffdb58e19059ad20b0d8e0285a60e38bbec55cc1019c7a5
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  NEWEST=$(rclone lsf -R B:energy-platform-bronze-replica/backups/postgres/ --dirs-only --max-depth 3 2>/dev/null | grep -E '^[0-9]+/base/[0-9]{8}T[0-9]{6}Z/$' | awk -F/ '{ print $3 " " $1 }' | sort | tail -1)
+                  if [ -z "$NEWEST" ]; then
+                    case " $RESTORE_DRILL_ARGS " in *" --dry-run "*) echo "restore-drill: dry run — no base backup under B:energy-platform-bronze-replica/backups/postgres/ yet; the scratch cluster will start empty"; exit 0;; esac
+                    echo "restore-drill: no base backup under B:energy-platform-bronze-replica/backups/postgres/ yet"; exit 1
+                  fi
+                  LATEST=${NEWEST% *}; SYSID=${NEWEST#* }
+                  rclone copy "B:energy-platform-bronze-replica/backups/postgres/$SYSID/base/$LATEST" /restore/base --stats-one-line -v
+                  START=$(cat /restore/base/START_WAL 2>/dev/null || true)
+                  if ! rclone lsf "B:energy-platform-bronze-replica/backups/postgres/$SYSID/wal/" --files-only > /restore/wal-all.list 2> /restore/lsf.err; then
+                    grep -q "directory not found" /restore/lsf.err || { cat /restore/lsf.err; exit 1; }
+                  fi
+                  awk -v s="$START" '{ n = $0; sub(/\.gz$/, "", n); if (s == "" || (n "") >= (s "")) print }' /restore/wal-all.list > /restore/wal.list
+                  rclone copy "B:energy-platform-bronze-replica/backups/postgres/$SYSID/wal" /restore/wal --files-from /restore/wal.list --no-traverse --stats-one-line -v
+                  echo "restore-drill: fetched cluster $SYSID base $LATEST and $(wc -l < /restore/wal.list) of $(wc -l < /restore/wal-all.list) archived WAL files (from ${START:-the beginning}) from store B"
+              env:
+                - name: RCLONE_CONFIG
+                  value: /tmp/rclone.conf
+                - name: HOME
+                  value: /tmp
+                - name: RCLONE_CONFIG_B_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_B_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_B_ENDPOINT
+                  value: "https://s3b.tenant.example"
+                - name: RCLONE_CONFIG_B_REGION
+                  value: "us-east-1"
+                - name: RCLONE_CONFIG_B_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_B_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_REPLICA_ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_B_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_REPLICA_SECRET_ACCESS_KEY
+                - name: RESTORE_DRILL_ARGS
+                  value: ""
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: restore
+                  mountPath: /restore
+            - name: prep
+              image: docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  if [ ! -f /restore/base/base.tar.gz ]; then
+                    # dry run on a cluster with no backup yet: an empty scratch cluster so the
+                    # drill verb can still reach a server (the fetch step said why)
+                    initdb -U energy --auth=trust -D /restore/pgdata >/dev/null
+                    printf "listen_addresses = '127.0.0.1'\nunix_socket_directories = '/var/run/postgresql'\n" >> /restore/pgdata/postgresql.auto.conf
+                    printf 'local all all trust\nhost all all 127.0.0.1/32 trust\n' > /restore/pgdata/pg_hba.conf
+                    echo "restore-drill: empty scratch cluster initialised (nothing to restore yet)"
+                    exit 0
+                  fi
+                  mkdir -p /restore/pgdata /restore/pgdata/pg_wal
+                  tar -xzf /restore/base/base.tar.gz -C /restore/pgdata
+                  tar -xzf /restore/base/pg_wal.tar.gz -C /restore/pgdata/pg_wal
+                  rm -f /restore/pgdata/postmaster.pid /restore/pgdata/recovery.conf
+                  chmod 0700 /restore/pgdata
+                  cat >> /restore/pgdata/postgresql.auto.conf <<'EOF'
+                  restore_command = 'if [ -f /restore/wal/%f.gz ]; then gzip -dc /restore/wal/%f.gz > %p; else cp /restore/wal/%f %p; fi'
+                  archive_mode = off
+                  listen_addresses = '127.0.0.1'
+                  unix_socket_directories = '/var/run/postgresql'
+                  EOF
+                  printf 'local all all trust\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all ::1/128 scram-sha-256\n' > /restore/pgdata/pg_hba.conf
+                  touch /restore/pgdata/recovery.signal
+                  echo "restore-drill: scratch PGDATA prepared for PITR to the end of the archive"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: restore
+                  mountPath: /restore
+                - name: tmp
+                  mountPath: /tmp
+            - name: scratch-postgres
+              image: docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6
+              restartPolicy: Always
+              command: ["postgres", "-D", "/restore/pgdata"]
+              env:
+                - name: PGDATA
+                  value: /restore/pgdata
+              startupProbe:
+                exec:
+                  command: ["pg_isready", "-h", "127.0.0.1", "-U", "energy"]
+                periodSeconds: 5
+                failureThreshold: 120
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 1Gi
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+              volumeMounts:
+                - name: restore
+                  mountPath: /restore
+                - name: run
+                  mountPath: /var/run/postgresql
+                - name: tmp
+                  mountPath: /tmp
+          containers:
+            - name: drill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  DB=energy; case " $RESTORE_DRILL_ARGS " in *" --dry-run "*) [ -d /restore/base ] && [ -f /restore/base/base.tar.gz ] || DB=postgres;; esac
+                  SCRATCH="postgresql://energy:$POSTGRES_PASSWORD@127.0.0.1:5432/$DB"
+                  echo "== restore-drill: against the RESTORED database (backups)"
+                  /app/.venv/bin/python -m energy_platform.cli restore-drill --scratch-dsn "$SCRATCH" $RESTORE_DRILL_ARGS
+                  echo "== restore-drill: Bronze-only rebuild into a fresh schema (ADR-024 §2)"
+                  /app/.venv/bin/python -m energy_platform.cli restore-drill --scratch-dsn "$SCRATCH" --scratch-schema rebuild $RESTORE_DRILL_ARGS
+              env:
+                - name: RESTORE_DRILL_ARGS
+                  value: ""
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+                - name: ENERGY_PLATFORM_S3_REPLICA_ENDPOINT
+                  value: "https://s3b.tenant.example"
+                - name: ENERGY_PLATFORM_S3_REPLICA_BUCKET
+                  value: "energy-platform-bronze-replica"
+                - name: ENERGY_PLATFORM_S3_REPLICA_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_REPLICA_ALLOW_INSECURE
+                  value: "false"
+                - name: BRONZE_REPLICA_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_REPLICA_ACCESS_KEY_ID
+                - name: BRONZE_REPLICA_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_REPLICA_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+                - name: restore
+                  mountPath: /restore
+                  readOnly: true
+          volumes:
+            - name: restore
+              emptyDir: {}
+            - name: run
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-capture-ceps-load
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: capture
+    energy-platform.io/target: ceps_load
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: capture
+            energy-platform.io/target: ceps_load
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: capture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - capture
+                - -m
+                - /app/targets/ceps_load/manifest.yaml
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-process-ceps-load
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: process
+    energy-platform.io/target: ceps_load
+spec:
+  schedule: "3-59/15 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: process
+            energy-platform.io/target: ceps_load
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: process
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - process
+                - -m
+                - /app/targets/ceps_load/manifest.yaml
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-backfill-ceps-load
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: backfill
+    energy-platform.io/target: ceps_load
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: backfill
+            energy-platform.io/target: ceps_load
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - backfill
+                - -m
+                - /app/targets/ceps_load/manifest.yaml
+                - --live
+                - --limit
+                - "8"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-recapture-ceps-load
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: recapture
+    energy-platform.io/target: ceps_load
+spec:
+  schedule: "11 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: recapture
+            energy-platform.io/target: ceps_load
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recapture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - recapture
+                - -m
+                - /app/targets/ceps_load/manifest.yaml
+                - --days
+                - "1"
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-capture-ote-dam
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: capture
+    energy-platform.io/target: ote_dam
+spec:
+  schedule: "0 12-23 * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: capture
+            energy-platform.io/target: ote_dam
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: capture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - capture
+                - -m
+                - /app/targets/ote_dam/manifest.yaml
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-process-ote-dam
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: process
+    energy-platform.io/target: ote_dam
+spec:
+  schedule: "3 12-23 * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: process
+            energy-platform.io/target: ote_dam
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: process
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - process
+                - -m
+                - /app/targets/ote_dam/manifest.yaml
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-backfill-ote-dam
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: backfill
+    energy-platform.io/target: ote_dam
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: backfill
+            energy-platform.io/target: ote_dam
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - backfill
+                - -m
+                - /app/targets/ote_dam/manifest.yaml
+                - --live
+                - --limit
+                - "8"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-recapture-ote-dam
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: recapture
+    energy-platform.io/target: ote_dam
+spec:
+  schedule: "13 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: recapture
+            energy-platform.io/target: ote_dam
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recapture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - recapture
+                - -m
+                - /app/targets/ote_dam/manifest.yaml
+                - --days
+                - "1"
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-capture-ote-imbalance-settleme
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: capture
+    energy-platform.io/target: ote_imbalance_settlement
+spec:
+  schedule: "17 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: capture
+            energy-platform.io/target: ote_imbalance_settlement
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: capture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - capture
+                - -m
+                - /app/targets/ote_imbalance_settlement/manifest.yaml
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-process-ote-imbalance-settleme
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: process
+    energy-platform.io/target: ote_imbalance_settlement
+spec:
+  schedule: "20 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: process
+            energy-platform.io/target: ote_imbalance_settlement
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: process
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - process
+                - -m
+                - /app/targets/ote_imbalance_settlement/manifest.yaml
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-backfill-ote-imbalance-settlem
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: backfill
+    energy-platform.io/target: ote_imbalance_settlement
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: backfill
+            energy-platform.io/target: ote_imbalance_settlement
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - backfill
+                - -m
+                - /app/targets/ote_imbalance_settlement/manifest.yaml
+                - --live
+                - --limit
+                - "8"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-recapture-ote-imbalance-settle
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: recapture
+    energy-platform.io/target: ote_imbalance_settlement
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: recapture
+            energy-platform.io/target: ote_imbalance_settlement
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recapture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - recapture
+                - -m
+                - /app/targets/ote_imbalance_settlement/manifest.yaml
+                - --days
+                - "3"
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-capture-ote-imbalance-settleme
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: capture
+    energy-platform.io/target: ote_imbalance_settlement_final
+spec:
+  schedule: "37 7 1 * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: capture
+            energy-platform.io/target: ote_imbalance_settlement_final
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: capture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - capture
+                - -m
+                - /app/targets/ote_imbalance_settlement_final/manifest.yaml
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-process-ote-imbalance-settleme
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: process
+    energy-platform.io/target: ote_imbalance_settlement_final
+spec:
+  schedule: "40 7 1 * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: process
+            energy-platform.io/target: ote_imbalance_settlement_final
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: process
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - process
+                - -m
+                - /app/targets/ote_imbalance_settlement_final/manifest.yaml
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-backfill-ote-imbalance-settlem
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: backfill
+    energy-platform.io/target: ote_imbalance_settlement_final
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: backfill
+            energy-platform.io/target: ote_imbalance_settlement_final
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - backfill
+                - -m
+                - /app/targets/ote_imbalance_settlement_final/manifest.yaml
+                - --live
+                - --limit
+                - "8"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-recapture-ote-imbalance-settle
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: recapture
+    energy-platform.io/target: ote_imbalance_settlement_final
+spec:
+  schedule: "57 7 * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: recapture
+            energy-platform.io/target: ote_imbalance_settlement_final
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recapture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - recapture
+                - -m
+                - /app/targets/ote_imbalance_settlement_final/manifest.yaml
+                - --days
+                - "31"
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-capture-ote-imbalance-settleme
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: capture
+    energy-platform.io/target: ote_imbalance_settlement_monthly
+spec:
+  schedule: "27 7 1 * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: capture
+            energy-platform.io/target: ote_imbalance_settlement_monthly
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: capture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - capture
+                - -m
+                - /app/targets/ote_imbalance_settlement_monthly/manifest.yaml
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-process-ote-imbalance-settleme
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: process
+    energy-platform.io/target: ote_imbalance_settlement_monthly
+spec:
+  schedule: "30 7 1 * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: process
+            energy-platform.io/target: ote_imbalance_settlement_monthly
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: process
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - process
+                - -m
+                - /app/targets/ote_imbalance_settlement_monthly/manifest.yaml
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-backfill-ote-imbalance-settlem
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: backfill
+    energy-platform.io/target: ote_imbalance_settlement_monthly
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: backfill
+            energy-platform.io/target: ote_imbalance_settlement_monthly
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - backfill
+                - -m
+                - /app/targets/ote_imbalance_settlement_monthly/manifest.yaml
+                - --live
+                - --limit
+                - "8"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-recapture-ote-imbalance-settle
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: recapture
+    energy-platform.io/target: ote_imbalance_settlement_monthly
+spec:
+  schedule: "47 7 * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: recapture
+            energy-platform.io/target: ote_imbalance_settlement_monthly
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recapture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - recapture
+                - -m
+                - /app/targets/ote_imbalance_settlement_monthly/manifest.yaml
+                - --days
+                - "31"
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-capture-ote-intraday-market
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: capture
+    energy-platform.io/target: ote_intraday_market
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: capture
+            energy-platform.io/target: ote_intraday_market
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: capture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - capture
+                - -m
+                - /app/targets/ote_intraday_market/manifest.yaml
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-process-ote-intraday-market
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: process
+    energy-platform.io/target: ote_intraday_market
+spec:
+  schedule: "3-59/15 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: process
+            energy-platform.io/target: ote_intraday_market
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: process
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - process
+                - -m
+                - /app/targets/ote_intraday_market/manifest.yaml
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-backfill-ote-intraday-market
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: backfill
+    energy-platform.io/target: ote_intraday_market
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: backfill
+            energy-platform.io/target: ote_intraday_market
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - backfill
+                - -m
+                - /app/targets/ote_intraday_market/manifest.yaml
+                - --live
+                - --limit
+                - "8"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-recapture-ote-intraday-market
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: recapture
+    energy-platform.io/target: ote_intraday_market
+spec:
+  schedule: "7 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: recapture
+            energy-platform.io/target: ote_intraday_market
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recapture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - recapture
+                - -m
+                - /app/targets/ote_intraday_market/manifest.yaml
+                - --days
+                - "3"
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-capture-ote-intraday-market-xl
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: capture
+    energy-platform.io/target: ote_intraday_market_xlsx
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: capture
+            energy-platform.io/target: ote_intraday_market_xlsx
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: capture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - capture
+                - -m
+                - /app/targets/ote_intraday_market_xlsx/manifest.yaml
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-process-ote-intraday-market-xl
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: process
+    energy-platform.io/target: ote_intraday_market_xlsx
+spec:
+  schedule: "3-59/15 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: process
+            energy-platform.io/target: ote_intraday_market_xlsx
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: process
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - process
+                - -m
+                - /app/targets/ote_intraday_market_xlsx/manifest.yaml
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-backfill-ote-intraday-market-x
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: backfill
+    energy-platform.io/target: ote_intraday_market_xlsx
+spec:
+  schedule: "37 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: backfill
+            energy-platform.io/target: ote_intraday_market_xlsx
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: backfill
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - backfill
+                - -m
+                - /app/targets/ote_intraday_market_xlsx/manifest.yaml
+                - --live
+                - --limit
+                - "8"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+
+---
+# Source: energy-platform/templates/cronjob-target.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-energy-platform-recapture-ote-intraday-market
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: recapture
+    energy-platform.io/target: ote_intraday_market_xlsx
+spec:
+  schedule: "9 * * * *"
+  timeZone: "Europe/Prague"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: energy-platform
+            app.kubernetes.io/instance: audit
+            energy-platform.io/role: recapture
+            energy-platform.io/target: ote_intraday_market_xlsx
+        spec:
+          restartPolicy: Never
+          serviceAccountName: audit-energy-platform
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: recapture
+              image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+              imagePullPolicy: IfNotPresent
+              args:
+                - recapture
+                - -m
+                - /app/targets/ote_intraday_market_xlsx/manifest.yaml
+                - --days
+                - "3"
+                - --live
+                - --start-jitter-seconds
+                - "60"
+              env:
+                - name: ENERGY_PLATFORM_TARGETS
+                  value: /app/targets
+                - name: ENERGY_PLATFORM_BRONZE
+                  value: s3
+                - name: TMPDIR
+                  value: /tmp
+                
+                - name: ENERGY_PLATFORM_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: ENERGY_PLATFORM_DSN
+                - name: ENERGY_PLATFORM_S3_ENDPOINT
+                  value: "https://s3.tenant.example"
+                - name: ENERGY_PLATFORM_S3_BUCKET
+                  value: "energy-platform-bronze"
+                - name: ENERGY_PLATFORM_S3_REGION
+                  value: "us-east-1"
+                - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+                  value: "false"
+                - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+                  value: "COMPLIANCE"
+                - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+                  value: "90"
+                - name: BRONZE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_ACCESS_KEY_ID
+                - name: BRONZE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: energy-platform
+                      key: BRONZE_SECRET_ACCESS_KEY
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+---
+# Source: energy-platform/templates/hook-migrate.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: audit-energy-platform-migrate
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: hook
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: energy-platform
+        app.kubernetes.io/instance: audit
+        energy-platform.io/role: hook
+    spec:
+      restartPolicy: Never
+      serviceAccountName: audit-energy-platform
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          args:
+            - migrate
+          env:
+            - name: ENERGY_PLATFORM_TARGETS
+              value: /app/targets
+            - name: ENERGY_PLATFORM_BRONZE
+              value: s3
+            - name: TMPDIR
+              value: /tmp
+            
+            - name: ENERGY_PLATFORM_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: energy-platform
+                  key: ENERGY_PLATFORM_DSN
+            - name: ENERGY_PLATFORM_S3_ENDPOINT
+              value: "https://s3.tenant.example"
+            - name: ENERGY_PLATFORM_S3_BUCKET
+              value: "energy-platform-bronze"
+            - name: ENERGY_PLATFORM_S3_REGION
+              value: "us-east-1"
+            - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+              value: "false"
+            - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+              value: "COMPLIANCE"
+            - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+              value: "90"
+            - name: BRONZE_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: energy-platform
+                  key: BRONZE_ACCESS_KEY_ID
+            - name: BRONZE_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: energy-platform
+                  key: BRONZE_SECRET_ACCESS_KEY
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+---
+# Source: energy-platform/templates/hook-smoke.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: audit-energy-platform-smoke
+  labels:
+    helm.sh/chart: "energy-platform-0.5.0"
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: audit
+    app.kubernetes.io/version: "0.0.1"
+    app.kubernetes.io/managed-by: Helm
+    energy-platform.io/residency: "CZ"
+    energy-platform.io/role: hook
+  annotations:
+    helm.sh/hook: post-install,post-upgrade,test
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: energy-platform
+        app.kubernetes.io/instance: audit
+        energy-platform.io/role: hook
+    spec:
+      restartPolicy: Never
+      serviceAccountName: audit-energy-platform
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: smoke
+          image: energy-platform@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          args:
+            - smoke
+            - -m
+            - /app/targets/ote_intraday_market/manifest.yaml
+            - --fixture
+            - /app/targets/ote_intraday_market/fixtures/ordinary_day
+          env:
+            - name: ENERGY_PLATFORM_TARGETS
+              value: /app/targets
+            - name: ENERGY_PLATFORM_BRONZE
+              value: dir
+            - name: TMPDIR
+              value: /tmp
+            
+            - name: ENERGY_PLATFORM_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: energy-platform
+                  key: ENERGY_PLATFORM_DSN
+            - name: ENERGY_PLATFORM_S3_ENDPOINT
+              value: "https://s3.tenant.example"
+            - name: ENERGY_PLATFORM_S3_BUCKET
+              value: "energy-platform-bronze"
+            - name: ENERGY_PLATFORM_S3_REGION
+              value: "us-east-1"
+            - name: ENERGY_PLATFORM_S3_ALLOW_INSECURE
+              value: "false"
+            - name: ENERGY_PLATFORM_S3_RETENTION_MODE
+              value: "COMPLIANCE"
+            - name: ENERGY_PLATFORM_S3_RETENTION_DAYS
+              value: "90"
+            - name: BRONZE_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: energy-platform
+                  key: BRONZE_ACCESS_KEY_ID
+            - name: BRONZE_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: energy-platform
+                  key: BRONZE_SECRET_ACCESS_KEY
+            - name: ENERGY_PLATFORM_BRONZE_DIR
+              value: /tmp/smoke-bronze
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+

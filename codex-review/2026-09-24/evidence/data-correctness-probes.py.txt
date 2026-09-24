@@ -1,0 +1,249 @@
+"""Read-only-to-source, offline audit probes. Run from the repository root:
+
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python codex-review/2026-09-24/evidence/data-correctness-probes.py.txt
+
+Only in-memory stores are mutated. No network, database, cloud, or git access.
+Assertions capture the defects observed on 2026-09-24, not the desired behavior.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from threading import Barrier
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
+from energy_platform.bronze import Bronze, MemoryBlobStore, MemoryCaptureLog
+from energy_platform.contracts.manifest import load_manifest
+from energy_platform.fetch.client import FetchResult
+from energy_platform.parse import parser_ref
+from energy_platform.runtime import (
+    capture, process, process_one, reconcile, replay_range, restore_drill,
+)
+from energy_platform.runtime.freshness import compute_freshness
+from energy_platform.store import MemoryStore, StoreUnavailable, derivation_for
+from tests.runtime.harness import DAY, SCHEDULED, T1, T2, Clock, runtime
+from tests.store.rows import D_A, FETCH_1, FETCH_2, SHA_1, SHA_2, obs
+from tests.synthetic import ote_im_price_period_response
+
+
+def emit(name, **result):
+    print(json.dumps({"probe": name, **result}, sort_keys=True, default=str))
+
+
+class ToggleStore(MemoryStore):
+    down = False
+
+    def ensure_run(self, *args, **kwargs):
+        if self.down:
+            raise StoreUnavailable("injected post-Bronze outage")
+        return super().ensure_run(*args, **kwargs)
+
+
+def correction_outage():
+    state = {"corrected": False}
+
+    def payload():
+        raw = ote_im_price_period_response(DAY)
+        return raw.replace(b"170.13", b"171.99") if state["corrected"] else raw
+
+    store = ToggleStore()
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    rt = runtime(T1, payload=payload, store=store, clock=clock)
+    capture(rt, SCHEDULED)
+    process(rt)
+    state["corrected"] = True
+    clock.advance(timedelta(hours=1))
+    store.down = True
+    new = capture(rt, SCHEDULED, force=True)
+    store.down = False
+    recovered = reconcile(rt)
+    processed = process(rt)
+    row = store.current_rows("ote.idm_continuous", metric="price_vwap")[0]
+    run = store.get_run(T1.target_id, SCHEDULED)
+    assert new.entry.content_changed and not new.ledger_updated
+    assert not recovered and not processed and str(row.value) == "170.13"
+    emit("DC-01 correction outage", bronze_attempts=2, changed=True,
+         ledger_updated=new.ledger_updated, reconciled=len(recovered),
+         processed_after_recovery=len(processed), run_capture=run.capture_id,
+         latest_bronze=new.entry.capture_id, current_price=row.value)
+
+
+def correction_race():
+    state = {"corrected": False}
+
+    def payload():
+        raw = ote_im_price_period_response(DAY)
+        return raw.replace(b"170.13", b"171.99") if state["corrected"] else raw
+
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    rt = runtime(T1, payload=payload, clock=clock)
+    capture(rt, SCHEDULED)
+    run = rt.store.get_run(T1.target_id, SCHEDULED)
+    claim = rt.store.claim(run.id, "slow-worker", rt.lease_ttl, now=clock())
+    state["corrected"] = True
+    clock.advance(timedelta(minutes=1))
+    capture(rt, SCHEDULED, force=True)
+    old = process_one(rt, claim, derivation_for(T1, parser_ref(T1)))
+    run = rt.store.get_run(T1.target_id, SCHEDULED)
+    later = process(rt)
+    row = rt.store.current_rows("ote.idm_continuous", metric="price_vwap")[0]
+    assert old.outcome == "ok" and run.state == "processed" and not later
+    assert str(row.value) == "170.13"
+    emit("DC-02 correction race", old_worker_outcome=old.outcome,
+         old_fence=claim.fence, run_fence=run.fence, run_state=run.state,
+         pending=len(rt.store.pending_runs(T1.target_id)), current_price=row.value)
+
+
+def ownership():
+    store = MemoryStore()
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    t1 = runtime(T1, payload=ote_im_price_period_response(DAY, [(1, "999.00", "1")]),
+                 store=store, clock=clock)
+    capture(t1, SCHEDULED)
+    process(t1)
+    clock.advance(timedelta(minutes=1))
+    t2 = runtime(T2, store=store, clock=clock)
+    capture(t2, SCHEDULED)
+    process(t2)
+    row = store.current_rows("ote.idm_continuous", metric="price_vwap")[0]
+    soap_count = len(store.current_rows("ote.idm_continuous", metric="price_vwap", transport="soap"))
+    assert row.observation.source_transport == "xlsx" and soap_count == 0
+    emit("DC-03 owner displaced", soap_price="999.00", current_price=row.value,
+         current_transport=row.observation.source_transport, soap_current_count=soap_count,
+         reconciliation_events=len(store.quality_events(T2.target_id, kind="reconciliation_mismatch")))
+
+
+def reversion():
+    state = {"version": "A"}
+
+    def payload():
+        raw = ote_im_price_period_response(DAY)
+        return raw if state["version"] == "A" else raw.replace(b"170.13", b"171.99")
+
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    rt = runtime(T1, payload=payload, clock=clock)
+    snapshots = []
+    for index, version in enumerate(("A", "B", "A")):
+        state["version"] = version
+        cap = capture(rt, SCHEDULED, force=index > 0)
+        reports = process(rt)
+        row = rt.store.current_rows("ote.idm_continuous", metric="price_vwap")[0]
+        snapshots.append({"payload": version, "attempt": cap.entry.attempt,
+                          "changed": cap.entry.content_changed,
+                          "process": [(r.outcome, r.inserted) for r in reports],
+                          "current_price": str(row.value)})
+        clock.advance(timedelta(minutes=1))
+    assert snapshots[-1]["current_price"] == "171.99"
+    emit("DC-04 A-B-A provider reversion", sequence=snapshots)
+
+
+def replay_crash():
+    rt = runtime(T1)
+    capture(rt, SCHEDULED)
+    process(rt)
+    replay_range(rt, SCHEDULED, SCHEDULED + timedelta(minutes=1))
+    run = rt.store.get_run(T1.target_id, SCHEDULED)
+    claim = rt.store.claim(run.id, "crashed-replay", rt.lease_ttl, now=rt.clock())
+    rt.clock.advance(rt.lease_ttl + timedelta(seconds=1))
+    pending = rt.store.pending_runs(T1.target_id)
+    reports = process(rt)
+    assert not pending and not reports
+    emit("DC-05 replay crash", claimed_kind=claim.attempt.kind, run_state=run.state,
+         lease_expired=rt.clock() > claim.run.lease_until, pending_runs=len(pending),
+         process_reports=len(reports), unfinished=[(a.kind, a.outcome, a.lease_owner)
+          for a in rt.store.attempts(run.id) if a.outcome is None])
+
+
+def concurrent_bronze():
+    barrier = Barrier(2)
+
+    class ConcurrentLog(MemoryCaptureLog):
+        def entries_for(self, target_id, scheduled_for):
+            snapshot = super().entries_for(target_id, scheduled_for)
+            barrier.wait(timeout=5)  # both legitimate list operations precede either PUT
+            return snapshot
+
+    blobs = MemoryBlobStore()
+    log = ConcurrentLog()
+    bronze = Bronze(blobs, log)
+
+    def one(body):
+        result = FetchResult("https://www.ote-cr.cz/pw-data/services/PublicDataService",
+                             200, {}, body, "text/xml", SCHEDULED, None, None, False, ())
+        return bronze.capture(target_id=T1.target_id, scheduled_for=SCHEDULED,
+                              result=result, transport="soap")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(one, (b"first observation", b"second observation")))
+    assert all(r.created for r in results) and len(log.list(T1.target_id)) == 1
+    assert results[0].entry.capture_id == results[1].entry.capture_id
+    emit("DC-06 concurrent Bronze", successful_created=[r.created for r in results],
+         same_capture_id=results[0].entry.capture_id == results[1].entry.capture_id,
+         distinct_reported_hashes=len({r.entry.payload_sha256 for r in results}),
+         durable_log_entries=len(log.list(T1.target_id)), blobs=len(blobs))
+
+
+def revoked_restore():
+    live = MemoryStore()
+    rt = runtime(T1, store=live)
+    capture(rt, SCHEDULED)
+    process(rt)
+    # Simulate an explicitly reviewed invalidation in a MEMORY store only. This mirrors
+    # docs/07 §4.3's deletion while preserving raw captures; no real database is touched.
+    live._rows.clear()
+    scratch = MemoryStore()
+    report = restore_drill((T1,), scratch=scratch, replica=rt.bronze, live=live, clock=rt.clock)
+    target = report.targets[0]
+    assert report.ok and target.extra_versions == 192
+    assert len(scratch.current_rows("ote.idm_continuous")) == 192
+    emit("DC-07 revoked data restored", drill_ok=report.ok,
+         live_current=len(live.current_rows("ote.idm_continuous")),
+         restored_current=len(scratch.current_rows("ote.idm_continuous")),
+         extra_versions=target.extra_versions, message=target.message)
+
+
+def write_rows(store, target, when, observations):
+    run = store.ensure_run(target, when, state="captured", origin="scheduled",
+                           capture_id=f"{target}:{when}", now=when)
+    claim = store.claim(run.id, "probe", timedelta(minutes=5), now=when)
+    store.commit(claim, state="processed", outcome="ok", derivation=D_A,
+                 observations=observations, now=when)
+
+
+def freshness_scope():
+    store = MemoryStore()
+    first = obs(value="1", sha=SHA_1, fetched_at=FETCH_1)
+    second = obs(value=None, sha=SHA_2, fetched_at=FETCH_2)
+    write_rows(store, T1.target_id, FETCH_1, [first])
+    write_rows(store, T1.target_id, FETCH_2, [second])
+    start = first.delivery_start_utc
+    counted = store.count_periods(first.dataset_id, start, start + timedelta(minutes=15))
+    current_nonnull = sum(r.value is not None for r in store.current_rows(first.dataset_id))
+    assert counted == 1 and current_nonnull == 0
+    emit("DC-08 historical freshness", current_nonnull=current_nonnull,
+         reported_observed_periods=counted)
+
+    store = MemoryStore()
+    now = datetime(2026, 9, 17, 12, tzinfo=UTC)
+    write_rows(store, "ote_imbalance_settlement", now,
+               [obs("system_imbalance", "1", dataset_id="ote.imbalance_settlement",
+                    source_version="0", period=p) for p in range(1, 97)])
+    monthly = load_manifest(Path("targets/ote_imbalance_settlement_monthly/manifest.yaml"))
+    rt = runtime(monthly, store=store, clock=Clock(now))
+    fresh = compute_freshness(rt)
+    assert fresh.status == "complete" and not store.runs(monthly.target_id)
+    emit("DC-08 monthly target freshness", monthly_target_runs=0,
+         monthly_version_rows=0, status=fresh.status,
+         observed_periods=fresh.observed_periods, expected_periods=fresh.expected_periods,
+         partition_start=fresh.partition_start, partition_end=fresh.partition_end)
+
+
+if __name__ == "__main__":
+    for probe in (correction_outage, correction_race, ownership, reversion, replay_crash,
+                  concurrent_bronze, revoked_restore, freshness_scope):
+        probe()

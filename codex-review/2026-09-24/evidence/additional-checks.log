@@ -1,0 +1,23 @@
+uv sync --frozen --group dev
+Checked 56 packages in 21ms
+scripts/with_postgres.sh uv run pytest -m "db" -p no:cacheprovider
+The files belonging to this database system will be owned by user "jalalhussein".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C.UTF-8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/folders/q2/d0wmf_zj2453mvdjcgmk2twr0000gn/T/energy-platform-pg.n91nIs ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... sysv
+selecting default "max_connections" ... 20
+selecting default "shared_buffers" ... 400kB
+selecting default time zone ... Europe/Prague
+creating configuration files ... ok
+running bootstrap script ... 2026-09-24 16:23:26.493 CEST [69977] FATAL:  could not create shared memory segment: Operation not permitted
+2026-09-24 16:23:26.493 CEST [69977] DETAIL:  Failed system call was shmget(key=144268776, size=56, 03600).
+child process exited with exit code 1
+initdb: removing contents of data directory "/var/folders/q2/d0wmf_zj2453mvdjcgmk2twr0000gn/T/energy-platform-pg.n91nIs"
+make: *** [db-test] Error 1

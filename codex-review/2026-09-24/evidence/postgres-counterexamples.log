@@ -1,0 +1,10 @@
+with_postgres: pg_ctl (PostgreSQL) 18.4 (Homebrew) on /tmp/ep-pg.G3RF4X
+ote_idm_soap 2026-09-17 22:15:00+00:00: ledger unavailable, reconcile later: injected post-Bronze outage
+{"bronze_attempts": 2, "changed": true, "current_price": "170.13", "latest_bronze": "ote_idm_soap:2026-09-17T221500Z:2", "ledger_updated": false, "probe": "DC-01 correction outage", "processed_after_recovery": 0, "reconciled": 0, "run_capture": "ote_idm_soap:2026-09-17T221500Z:1"}
+{"current_price": "170.13", "old_fence": 1, "old_worker_outcome": "ok", "pending": 0, "probe": "DC-02 correction race", "run_fence": 1, "run_state": "processed"}
+{"current_price": "170.13", "current_transport": "xlsx", "probe": "DC-03 owner displaced", "reconciliation_events": 2, "soap_current_count": 0, "soap_price": "999.00"}
+{"probe": "DC-04 A-B-A provider reversion", "sequence": [{"attempt": 1, "changed": true, "current_price": "170.13", "payload": "A", "process": [["ok", 192]]}, {"attempt": 2, "changed": true, "current_price": "171.99", "payload": "B", "process": [["ok", 192]]}, {"attempt": 3, "changed": true, "current_price": "171.99", "payload": "A", "process": [["noop", 0]]}]}
+{"claimed_kind": "replay", "lease_expired": true, "pending_runs": 0, "probe": "DC-05 replay crash", "process_reports": 0, "run_state": "processed", "unfinished": [["replay", null, "crashed-replay"]]}
+{"current_nonnull": 0, "probe": "DC-08 historical freshness", "reported_observed_periods": 1}
+{"expected_periods": 96, "monthly_target_runs": 0, "monthly_version_rows": 0, "observed_periods": 96, "partition_end": "2026-09-17 22:00:00+00:00", "partition_start": "2026-09-16 22:00:00+00:00", "probe": "DC-08 monthly target freshness", "status": "complete"}
+Six counterexample groups reproduced against ephemeral PostgreSQL.

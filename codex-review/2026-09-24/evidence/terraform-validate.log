@@ -1,0 +1,22 @@
+== terraform-validate: deployment/own-cluster/terraform/roots/hcloud (terraform)
+[32m[1mSuccess![0m The configuration is valid.
+[0m
+tests/plan.tftest.hcl... [37min progress[0m
+[0m  run "demo_sizing_and_controls"... [32mpass[0m[0m
+  run "admin_only_api"... [32mpass[0m[0m
+  run "cloud_init_is_valid_yaml"... [32mpass[0m[0m
+tests/plan.tftest.hcl... [37mtearing down[0m
+[0mtests/plan.tftest.hcl... [32mpass[0m[0m
+
+[32mSuccess![0m[0m 3 passed, 0 failed.
+== terraform-validate: deployment/own-cluster/terraform/roots/openstack (terraform)
+[32m[1mSuccess![0m The configuration is valid.
+[0m
+tests/plan.tftest.hcl... [37min progress[0m
+[0m  run "reference_sizing_and_controls"... [32mpass[0m[0m
+  run "quota_guard"... [32mpass[0m[0m
+  run "cloud_init_is_valid_yaml"... [32mpass[0m[0m
+tests/plan.tftest.hcl... [37mtearing down[0m
+[0mtests/plan.tftest.hcl... [32mpass[0m[0m
+
+[32mSuccess![0m[0m 3 passed, 0 failed.

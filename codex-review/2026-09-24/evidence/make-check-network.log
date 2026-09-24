@@ -1,0 +1,70 @@
+uv sync --frozen --group dev
+   Building energy-platform @ file:///private/tmp/energy-review-ho5i3iiz
+      Built energy-platform @ file:///private/tmp/energy-review-ho5i3iiz
+Prepared 1 package in 718ms
+Uninstalled 1 package in 1ms
+Installed 1 package in 1ms
+ - energy-platform==0.0.1 (from file:///Users/jalalhussein/Desktop/Desktop%20-%20Jalal%E2%80%99s%20MacBook%20Air/task-cze)
+ + energy-platform==0.0.1 (from file:///private/tmp/energy-review-ho5i3iiz)
+uv run ruff check .
+All checks passed!
+uv run ruff format --check .
+283 files already formatted
+uv run lint-imports
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 102 files, 259 dependencies.
+-------------------------------------
+
+targets may import only energy_platform.contracts KEPT
+energy_platform never imports targets KEPT
+the capture/process path never imports triage (ADR-009: no LLM on the critical 
+path) KEPT
+
+Contracts: 3 kept, 0 broken.
+uv run python -m scripts.check_target_surface targets
+target-surface: OK
+uv lock --check
+Resolved 58 packages in 3ms
+uv run mypy
+Success: no issues found in 194 source files
+uv run pytest -m "not live"
+.......................................s.....ss.s....................... [  7%]
+........................................................................ [ 15%]
+........................................................................ [ 23%]
+........................................................................ [ 31%]
+........................................................................ [ 39%]
+........................................................................ [ 47%]
+........................................................................ [ 55%]
+........................................................................ [ 63%]
+........................................................................ [ 71%]
+........................................................................ [ 78%]
+........................................................................ [ 86%]
+.....................................................ss.s.s.s.s.s.s.s.s. [ 94%]
+s.s.s.s.s.s.s.s.s.s.s...........................                         [100%]
+887 passed, 25 skipped, 8 deselected in 25.72s
+uv run python -m energy_platform.cli validate --all
+{"target_id": "ceps_load", "validation": {"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}, "surface": []}
+{"target_id": "ote_dam", "validation": {"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}, "surface": []}
+{"target_id": "ote_imbalance_settlement", "validation": {"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}, "surface": []}
+{"target_id": "ote_imbalance_settlement_final", "validation": {"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}, "surface": []}
+{"target_id": "ote_imbalance_settlement_monthly", "validation": {"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}, "surface": []}
+{"target_id": "ote_intraday_market", "validation": {"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}, "surface": []}
+{"target_id": "ote_intraday_market_xlsx", "validation": {"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}, "surface": []}
+uv run python -m scripts.check_migrations
+migration-check: OK — every migration has a downgrade; chain is linear
+uv run python -m scripts.check_workloads
+workload-check: OK (action pins, image digests, requests/limits)

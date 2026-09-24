@@ -1,0 +1,2530 @@
+{
+  "head": "1701ac77175113d744abaad0514489711ed2b1d4",
+  "helm": "v4.3.0+gbec5b06",
+  "profiles": {
+    "tenant": {
+      "command": [
+        "helm",
+        "template",
+        "audit",
+        "deployment/helm/energy-platform",
+        "--set",
+        "image.digest=sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "-f",
+        "/tmp/ep-deployment-audit/targets.yaml",
+        "-f",
+        "deployment/tenant/values-tenant.yaml"
+      ],
+      "resource_count": 51,
+      "kinds": {
+        "NetworkPolicy": 7,
+        "ServiceAccount": 1,
+        "ConfigMap": 3,
+        "PersistentVolumeClaim": 1,
+        "Service": 2,
+        "Deployment": 1,
+        "StatefulSet": 1,
+        "CronJob": 33,
+        "Job": 2
+      },
+      "cronjobs": {
+        "audit-energy-platform-gaps": {
+          "schedule": "*/15 * * * *",
+          "roles": "gaps",
+          "container_env_names": {
+            "gaps": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-pg-backup": {
+          "schedule": "15 2 * * *",
+          "roles": "backup",
+          "container_env_names": {
+            "ship": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-pg-wal-ship": {
+          "schedule": "*/10 * * * *",
+          "roles": "backup",
+          "container_env_names": {
+            "ship": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-replicate": {
+          "schedule": "17 * * * *",
+          "roles": "replicate",
+          "container_env_names": {
+            "replicate": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY",
+              "RCLONE_CONFIG_B_TYPE",
+              "RCLONE_CONFIG_B_PROVIDER",
+              "RCLONE_CONFIG_B_ENDPOINT",
+              "RCLONE_CONFIG_B_REGION",
+              "RCLONE_CONFIG_B_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_B_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_B_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-restore-drill": {
+          "schedule": "30 3 * * *",
+          "roles": "drill",
+          "container_env_names": {
+            "drill": [
+              "RESTORE_DRILL_ARGS",
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY",
+              "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT",
+              "ENERGY_PLATFORM_S3_REPLICA_BUCKET",
+              "ENERGY_PLATFORM_S3_REPLICA_REGION",
+              "ENERGY_PLATFORM_S3_REPLICA_ALLOW_INSECURE",
+              "BRONZE_REPLICA_ACCESS_KEY_ID",
+              "BRONZE_REPLICA_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ceps-load": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ceps-load": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ceps-load": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ceps-load": {
+          "schedule": "11 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-dam": {
+          "schedule": "0 12-23 * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-dam": {
+          "schedule": "3 12-23 * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-dam": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-dam": {
+          "schedule": "13 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-imbalance-settleme": {
+          "schedule": "27 7 1 * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-imbalance-settleme": {
+          "schedule": "30 7 1 * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-imbalance-settlem": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-imbalance-settle": {
+          "schedule": "47 7 * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-intraday-market": {
+          "schedule": "9 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market-xl": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market-xl": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market-x": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        }
+      },
+      "database_clusters": [],
+      "backup_objects": [],
+      "network_policies": {
+        "audit-energy-platform-allow-postgres-egress": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "process",
+                  "recapture",
+                  "backfill",
+                  "gaps",
+                  "hook",
+                  "drill",
+                  "backup",
+                  "replicate",
+                  "tier",
+                  "metrics"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "podSelector": {
+                    "matchLabels": {
+                      "app.kubernetes.io/name": "energy-platform",
+                      "app.kubernetes.io/instance": "audit",
+                      "energy-platform.io/role": "postgres"
+                    }
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 5432
+                }
+              ]
+            }
+          ]
+        },
+        "audit-energy-platform-allow-internet-fetch": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "recapture",
+                  "backfill"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "ipBlock": {
+                    "cidr": "0.0.0.0/0",
+                    "except": [
+                      "10.0.0.0/8",
+                      "172.16.0.0/12",
+                      "192.168.0.0/16",
+                      "169.254.0.0/16",
+                      "100.64.0.0/10",
+                      "127.0.0.0/8"
+                    ]
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 443
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "demo": {
+      "command": [
+        "helm",
+        "template",
+        "audit",
+        "deployment/helm/energy-platform",
+        "--set",
+        "image.digest=sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "-f",
+        "/tmp/ep-deployment-audit/targets.yaml",
+        "-f",
+        "deployment/tenant/values-tenant.yaml",
+        "-f",
+        "deployment/tenant/values-demo.yaml",
+        "--set",
+        "bronze.replica.endpoint=https://audit.example.invalid"
+      ],
+      "resource_count": 51,
+      "kinds": {
+        "NetworkPolicy": 7,
+        "ServiceAccount": 1,
+        "ConfigMap": 3,
+        "PersistentVolumeClaim": 1,
+        "Service": 2,
+        "Deployment": 1,
+        "StatefulSet": 1,
+        "CronJob": 33,
+        "Job": 2
+      },
+      "cronjobs": {
+        "audit-energy-platform-gaps": {
+          "schedule": "*/15 * * * *",
+          "roles": "gaps",
+          "container_env_names": {
+            "gaps": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-pg-backup": {
+          "schedule": "15 2 * * *",
+          "roles": "backup",
+          "container_env_names": {
+            "ship": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-pg-wal-ship": {
+          "schedule": "*/10 * * * *",
+          "roles": "backup",
+          "container_env_names": {
+            "ship": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-replicate": {
+          "schedule": "17 * * * *",
+          "roles": "replicate",
+          "container_env_names": {
+            "replicate": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY",
+              "RCLONE_CONFIG_B_TYPE",
+              "RCLONE_CONFIG_B_PROVIDER",
+              "RCLONE_CONFIG_B_ENDPOINT",
+              "RCLONE_CONFIG_B_REGION",
+              "RCLONE_CONFIG_B_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_B_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_B_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-restore-drill": {
+          "schedule": "30 3 * * *",
+          "roles": "drill",
+          "container_env_names": {
+            "drill": [
+              "RESTORE_DRILL_ARGS",
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY",
+              "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT",
+              "ENERGY_PLATFORM_S3_REPLICA_BUCKET",
+              "ENERGY_PLATFORM_S3_REPLICA_REGION",
+              "ENERGY_PLATFORM_S3_REPLICA_ALLOW_INSECURE",
+              "BRONZE_REPLICA_ACCESS_KEY_ID",
+              "BRONZE_REPLICA_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ceps-load": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ceps-load": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ceps-load": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ceps-load": {
+          "schedule": "11 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-dam": {
+          "schedule": "0 12-23 * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-dam": {
+          "schedule": "3 12-23 * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-dam": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-dam": {
+          "schedule": "13 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-imbalance-settleme": {
+          "schedule": "27 7 1 * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-imbalance-settleme": {
+          "schedule": "30 7 1 * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-imbalance-settlem": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-imbalance-settle": {
+          "schedule": "47 7 * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-intraday-market": {
+          "schedule": "9 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market-xl": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market-xl": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market-x": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "POSTGRES_PASSWORD",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        }
+      },
+      "database_clusters": [],
+      "backup_objects": [],
+      "network_policies": {
+        "audit-energy-platform-allow-postgres-egress": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "process",
+                  "recapture",
+                  "backfill",
+                  "gaps",
+                  "hook",
+                  "drill",
+                  "backup",
+                  "replicate",
+                  "tier",
+                  "metrics"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "podSelector": {
+                    "matchLabels": {
+                      "app.kubernetes.io/name": "energy-platform",
+                      "app.kubernetes.io/instance": "audit",
+                      "energy-platform.io/role": "postgres"
+                    }
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 5432
+                }
+              ]
+            }
+          ]
+        },
+        "audit-energy-platform-allow-internet-fetch": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "recapture",
+                  "backfill"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "ipBlock": {
+                    "cidr": "0.0.0.0/0",
+                    "except": [
+                      "10.0.0.0/8",
+                      "172.16.0.0/12",
+                      "192.168.0.0/16",
+                      "169.254.0.0/16",
+                      "100.64.0.0/10",
+                      "127.0.0.0/8",
+                      "10.42.0.0/16",
+                      "10.43.0.0/16"
+                    ]
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 443
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "cnpg": {
+      "command": [
+        "helm",
+        "template",
+        "audit",
+        "deployment/helm/energy-platform",
+        "--set",
+        "image.digest=sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "-f",
+        "/tmp/ep-deployment-audit/targets.yaml",
+        "-f",
+        "deployment/helm/energy-platform/ci/all-flags-values.yaml"
+      ],
+      "resource_count": 50,
+      "kinds": {
+        "NetworkPolicy": 6,
+        "ServiceAccount": 1,
+        "ConfigMap": 2,
+        "Service": 1,
+        "Deployment": 1,
+        "CronJob": 31,
+        "CiliumNetworkPolicy": 1,
+        "Cluster": 1,
+        "ExternalSecret": 1,
+        "PodMonitor": 1,
+        "PrometheusRule": 1,
+        "Job": 3
+      },
+      "cronjobs": {
+        "audit-energy-platform-gaps": {
+          "schedule": "*/15 * * * *",
+          "roles": "gaps",
+          "container_env_names": {
+            "gaps": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-replicate": {
+          "schedule": "17 * * * *",
+          "roles": "replicate",
+          "container_env_names": {
+            "replicate": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY",
+              "RCLONE_CONFIG_B_TYPE",
+              "RCLONE_CONFIG_B_PROVIDER",
+              "RCLONE_CONFIG_B_ENDPOINT",
+              "RCLONE_CONFIG_B_REGION",
+              "RCLONE_CONFIG_B_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_B_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_B_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-restore-drill": {
+          "schedule": "30 3 * * *",
+          "roles": "drill",
+          "container_env_names": {
+            "drill": [
+              "RESTORE_DRILL_ARGS",
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY",
+              "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT",
+              "ENERGY_PLATFORM_S3_REPLICA_BUCKET",
+              "ENERGY_PLATFORM_S3_REPLICA_REGION",
+              "ENERGY_PLATFORM_S3_REPLICA_ALLOW_INSECURE",
+              "BRONZE_REPLICA_ACCESS_KEY_ID",
+              "BRONZE_REPLICA_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ceps-load": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ceps-load": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ceps-load": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ceps-load": {
+          "schedule": "11 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-dam": {
+          "schedule": "0 12-23 * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-dam": {
+          "schedule": "3 12-23 * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-dam": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-dam": {
+          "schedule": "13 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-imbalance-settleme": {
+          "schedule": "27 7 1 * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-imbalance-settleme": {
+          "schedule": "30 7 1 * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-imbalance-settlem": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-imbalance-settle": {
+          "schedule": "47 7 * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-intraday-market": {
+          "schedule": "9 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market-xl": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market-xl": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market-x": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        }
+      },
+      "database_clusters": [
+        {
+          "apiVersion": "postgresql.cnpg.io/v1",
+          "kind": "Cluster",
+          "metadata": {
+            "name": "audit-energy-platform-pg",
+            "labels": {
+              "helm.sh/chart": "energy-platform-0.5.0",
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit",
+              "app.kubernetes.io/version": "0.0.1",
+              "app.kubernetes.io/managed-by": "Helm",
+              "energy-platform.io/residency": "CZ"
+            }
+          },
+          "spec": {
+            "instances": 1,
+            "imageName": "docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6",
+            "bootstrap": {
+              "initdb": {
+                "database": "energy",
+                "owner": "energy"
+              }
+            },
+            "storage": {
+              "size": "5Gi"
+            },
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "1Gi"
+              },
+              "requests": {
+                "cpu": "100m",
+                "memory": "256Mi"
+              }
+            },
+            "postgresql": {
+              "parameters": {
+                "timezone": "UTC"
+              }
+            }
+          }
+        }
+      ],
+      "backup_objects": [],
+      "network_policies": {
+        "audit-energy-platform-allow-postgres-egress": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "process",
+                  "recapture",
+                  "backfill",
+                  "gaps",
+                  "hook",
+                  "drill",
+                  "backup",
+                  "replicate",
+                  "tier",
+                  "metrics"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "podSelector": {
+                    "matchLabels": {
+                      "cnpg.io/cluster": "audit-energy-platform-pg"
+                    }
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 5432
+                }
+              ]
+            }
+          ]
+        },
+        "audit-energy-platform-allow-internet-fetch": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "recapture",
+                  "backfill"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "ipBlock": {
+                    "cidr": "0.0.0.0/0",
+                    "except": [
+                      "10.0.0.0/8",
+                      "172.16.0.0/12",
+                      "192.168.0.0/16",
+                      "169.254.0.0/16",
+                      "100.64.0.0/10",
+                      "127.0.0.0/8",
+                      "10.42.0.0/16",
+                      "10.43.0.0/16"
+                    ]
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 443
+                }
+              ]
+            }
+          ]
+        },
+        "audit-energy-platform-fqdn-fetch": {
+          "endpointSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "recapture",
+                  "backfill"
+                ]
+              }
+            ]
+          },
+          "egress": [
+            {
+              "toFQDNs": [
+                {
+                  "matchName": "www.ceps.cz"
+                },
+                {
+                  "matchName": "www.ote-cr.cz"
+                }
+              ],
+              "toPorts": [
+                {
+                  "ports": [
+                    {
+                      "port": "443",
+                      "protocol": "TCP"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "external": {
+      "command": [
+        "helm",
+        "template",
+        "audit",
+        "deployment/helm/energy-platform",
+        "--set",
+        "image.digest=sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "-f",
+        "/tmp/ep-deployment-audit/targets.yaml",
+        "-f",
+        "deployment/tenant/values-tenant.yaml",
+        "--set",
+        "postgres.mode=external"
+      ],
+      "resource_count": 44,
+      "kinds": {
+        "NetworkPolicy": 6,
+        "ServiceAccount": 1,
+        "ConfigMap": 2,
+        "Service": 1,
+        "Deployment": 1,
+        "CronJob": 31,
+        "Job": 2
+      },
+      "cronjobs": {
+        "audit-energy-platform-gaps": {
+          "schedule": "*/15 * * * *",
+          "roles": "gaps",
+          "container_env_names": {
+            "gaps": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-replicate": {
+          "schedule": "17 * * * *",
+          "roles": "replicate",
+          "container_env_names": {
+            "replicate": [
+              "RCLONE_CONFIG",
+              "HOME",
+              "RCLONE_CONFIG_A_TYPE",
+              "RCLONE_CONFIG_A_PROVIDER",
+              "RCLONE_CONFIG_A_ENDPOINT",
+              "RCLONE_CONFIG_A_REGION",
+              "RCLONE_CONFIG_A_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_A_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_A_SECRET_ACCESS_KEY",
+              "RCLONE_CONFIG_B_TYPE",
+              "RCLONE_CONFIG_B_PROVIDER",
+              "RCLONE_CONFIG_B_ENDPOINT",
+              "RCLONE_CONFIG_B_REGION",
+              "RCLONE_CONFIG_B_FORCE_PATH_STYLE",
+              "RCLONE_CONFIG_B_ACCESS_KEY_ID",
+              "RCLONE_CONFIG_B_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-restore-drill": {
+          "schedule": "30 3 * * *",
+          "roles": "drill",
+          "container_env_names": {
+            "drill": [
+              "RESTORE_DRILL_ARGS",
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY",
+              "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT",
+              "ENERGY_PLATFORM_S3_REPLICA_BUCKET",
+              "ENERGY_PLATFORM_S3_REPLICA_REGION",
+              "ENERGY_PLATFORM_S3_REPLICA_ALLOW_INSECURE",
+              "BRONZE_REPLICA_ACCESS_KEY_ID",
+              "BRONZE_REPLICA_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ceps-load": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ceps-load": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ceps-load": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ceps-load": {
+          "schedule": "11 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-dam": {
+          "schedule": "0 12-23 * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-dam": {
+          "schedule": "3 12-23 * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-dam": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-dam": {
+          "schedule": "13 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-imbalance-settleme": {
+          "schedule": "27 7 1 * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-imbalance-settleme": {
+          "schedule": "30 7 1 * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-imbalance-settlem": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-imbalance-settle": {
+          "schedule": "47 7 * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-recapture-ote-intraday-market": {
+          "schedule": "9 * * * *",
+          "roles": "recapture",
+          "container_env_names": {
+            "recapture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-capture-ote-intraday-market-xl": {
+          "schedule": "*/15 * * * *",
+          "roles": "capture",
+          "container_env_names": {
+            "capture": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-process-ote-intraday-market-xl": {
+          "schedule": "3-59/15 * * * *",
+          "roles": "process",
+          "container_env_names": {
+            "process": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        },
+        "audit-energy-platform-backfill-ote-intraday-market-x": {
+          "schedule": "37 * * * *",
+          "roles": "backfill",
+          "container_env_names": {
+            "backfill": [
+              "ENERGY_PLATFORM_TARGETS",
+              "ENERGY_PLATFORM_BRONZE",
+              "TMPDIR",
+              "ENERGY_PLATFORM_DSN",
+              "ENERGY_PLATFORM_S3_ENDPOINT",
+              "ENERGY_PLATFORM_S3_BUCKET",
+              "ENERGY_PLATFORM_S3_REGION",
+              "ENERGY_PLATFORM_S3_ALLOW_INSECURE",
+              "ENERGY_PLATFORM_S3_RETENTION_MODE",
+              "ENERGY_PLATFORM_S3_RETENTION_DAYS",
+              "BRONZE_ACCESS_KEY_ID",
+              "BRONZE_SECRET_ACCESS_KEY"
+            ]
+          }
+        }
+      },
+      "database_clusters": [],
+      "backup_objects": [],
+      "network_policies": {
+        "audit-energy-platform-allow-postgres-egress": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "process",
+                  "recapture",
+                  "backfill",
+                  "gaps",
+                  "hook",
+                  "drill",
+                  "backup",
+                  "replicate",
+                  "tier",
+                  "metrics"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": null,
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 5432
+                }
+              ]
+            }
+          ]
+        },
+        "audit-energy-platform-allow-internet-fetch": {
+          "podSelector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "energy-platform",
+              "app.kubernetes.io/instance": "audit"
+            },
+            "matchExpressions": [
+              {
+                "key": "energy-platform.io/role",
+                "operator": "In",
+                "values": [
+                  "capture",
+                  "recapture",
+                  "backfill"
+                ]
+              }
+            ]
+          },
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "ipBlock": {
+                    "cidr": "0.0.0.0/0",
+                    "except": [
+                      "10.0.0.0/8",
+                      "172.16.0.0/12",
+                      "192.168.0.0/16",
+                      "169.254.0.0/16",
+                      "100.64.0.0/10",
+                      "127.0.0.0/8"
+                    ]
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 443
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "policy_gate_probe": {
+    "premise": "No CNI readiness is represented; independent metadata refusal only",
+    "returned": {
+      "waited_seconds": 0.25,
+      "attempts": 2
+    }
+  }
+}
