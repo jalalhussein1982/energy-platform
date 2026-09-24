@@ -235,5 +235,5 @@ spec:
 
 {{/* the secret's shape as a comment for operators */}}
 {{- define "energy-platform.secretKeys" -}}
-POSTGRES_PASSWORD (postgres.mode=statefulset) · ENERGY_PLATFORM_DSN (postgres.mode=external) · BRONZE_ACCESS_KEY_ID · BRONZE_SECRET_ACCESS_KEY · BRONZE_REPLICA_ACCESS_KEY_ID · BRONZE_REPLICA_SECRET_ACCESS_KEY (bronze.replica.enabled) · BRONZE_COLD_ACCESS_KEY_ID · BRONZE_COLD_SECRET_ACCESS_KEY (bronze.tiering.mode=move)
+POSTGRES_PASSWORD (postgres.mode=statefulset) · ENERGY_PLATFORM_DSN (postgres.mode=external) · BRONZE_ACCESS_KEY_ID · BRONZE_SECRET_ACCESS_KEY · BRONZE_REPLICA_ACCESS_KEY_ID · BRONZE_REPLICA_SECRET_ACCESS_KEY (bronze.replica.enabled) · BRONZE_COLD_ACCESS_KEY_ID · BRONZE_COLD_SECRET_ACCESS_KEY (bronze.tiering.mode=move) · GRAFANA_ADMIN_PASSWORD · GRAFANA_DB_PASSWORD (grafana.enabled)
 {{- end -}}

@@ -5,6 +5,7 @@ is the gate that runs the same renders through the two checker scripts)."""
 from __future__ import annotations
 
 import ipaddress
+import json
 import shutil
 import subprocess
 from collections import Counter
@@ -561,4 +562,68 @@ def test_cilium_fqdn_mode_drops_the_broad_public_rule_and_carries_dns(tmp_path: 
     assert {f["matchName"] for f in fqdn["toFQDNs"]} >= {"www.ote-cr.cz", "www.ceps.cz"}
     assert "ep-energy-platform-allow-internet-fetch" in named(
         render(tmp_path, TENANT), "NetworkPolicy"
+    )
+
+
+def test_grafana_is_off_by_default_and_private_behind_its_flag(tmp_path: Path) -> None:
+    """ADR-039: a window onto Silver, inside the cluster only — ClusterIP, read-only role, egress
+    to Postgres and DNS, ingress from the namespace; nothing public; digest and PSS clean."""
+    assert "ep-energy-platform-grafana" not in named(render(tmp_path, TENANT), "Deployment")
+    docs = render(tmp_path, TENANT, LOCAL)
+    grafana = named(docs, "Deployment")["ep-energy-platform-grafana"]
+    spec = grafana["spec"]["template"]["spec"]
+    assert spec["securityContext"]["runAsUser"] == 472
+    container = spec["containers"][0]
+    assert container["image"].startswith("docker.io/grafana/grafana@sha256:")
+    env = {e["name"]: e for e in container["env"]}
+    assert env["GF_AUTH_ANONYMOUS_ENABLED"]["value"] == "false"
+    assert env["GF_ANALYTICS_REPORTING_ENABLED"]["value"] == "false"
+    assert (
+        env["GF_SECURITY_ADMIN_PASSWORD"]["valueFrom"]["secretKeyRef"]["key"]
+        == "GRAFANA_ADMIN_PASSWORD"
+    )
+    assert env["GRAFANA_DB_PASSWORD"]["valueFrom"]["secretKeyRef"]["key"] == "GRAFANA_DB_PASSWORD"
+    assert "ENERGY_PLATFORM_DSN" not in env and "POSTGRES_PASSWORD" not in env  # never the app's
+    service = named(docs, "Service")["ep-energy-platform-grafana"]
+    assert service["spec"]["type"] == "ClusterIP" and "Ingress" not in kinds(docs)
+    provisioning = named(docs, "ConfigMap")["ep-energy-platform-grafana-provisioning"]["data"]
+    datasource = yaml.safe_load(provisioning["datasource.yaml"])["datasources"][0]
+    assert datasource["uid"] == "energy-postgres" and datasource["user"] == "grafana"
+    assert datasource["jsonData"]["sslmode"] == "disable"  # statefulset mode, in-namespace
+    secure = json.dumps(datasource["secureJsonData"])
+    assert "$GRAFANA_DB_PASSWORD" in secure  # resolved from the Secret at start
+    dashboards = named(docs, "ConfigMap")["ep-energy-platform-grafana-dashboards"]["data"]
+    for name in ("prices.json", "freshness-sql.json"):
+        board = json.loads(dashboards[name])
+        assert board["editable"] is False and board["panels"]
+        for panel in board["panels"]:
+            assert panel["datasource"]["uid"] == "energy-postgres"
+            for target in panel["targets"]:
+                assert "rawSql" in target and target["rawQuery"] is True
+    # the migrate hook grants the read-only role from the Secret, and nothing else changes
+    migrate = named(docs, "Job")["ep-energy-platform-migrate"]["spec"]["template"]["spec"]
+    hook = migrate["containers"][0]
+    assert hook["args"] == ["migrate", "--reader-user", "grafana"]
+    assert any(e["name"] == "GRAFANA_DB_PASSWORD" for e in hook["env"])
+    tenant_hook = named(render(tmp_path, TENANT), "Job")["ep-energy-platform-migrate"]
+    assert tenant_hook["spec"]["template"]["spec"]["containers"][0]["args"] == ["migrate"]
+    # network: Postgres egress (the verb-role rule) and no internet; ingress from the namespace
+    policies = named(docs, "NetworkPolicy")
+    pg_roles = policies["ep-energy-platform-allow-postgres-egress"]["spec"]["podSelector"][
+        "matchExpressions"
+    ][0]["values"]
+    fetch_roles = policies["ep-energy-platform-allow-internet-fetch"]["spec"]["podSelector"][
+        "matchExpressions"
+    ][0]["values"]
+    assert "grafana" in pg_roles and "grafana" not in fetch_roles
+    ingress = policies["ep-energy-platform-allow-grafana-ingress"]["spec"]["ingress"][0]
+    assert ingress["from"] == [{"podSelector": {}}] and ingress["ports"] == [
+        {"protocol": "TCP", "port": 3000}
+    ]
+    flagged = named(render(tmp_path, ALL_FLAGS), "ConfigMap")[
+        "ep-energy-platform-grafana-provisioning"
+    ]
+    assert (
+        yaml.safe_load(flagged["data"]["datasource.yaml"])["datasources"][0]["jsonData"]["sslmode"]
+        == "require"
     )

@@ -1,0 +1,133 @@
+{
+  "title": "energy-platform — freshness and ledger health (Silver, no Prometheus needed)",
+  "uid": "energy-platform-freshness-sql",
+  "schemaVersion": 39,
+  "editable": false,
+  "timezone": "Europe/Prague",
+  "time": {"from": "now-24h", "to": "now"},
+  "refresh": "5m",
+  "tags": ["energy-platform", "freshness", "ADR-037"],
+  "templating": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Freshness per target (ADR-037 amendment 1: the target's own current rows, every mapped metric)",
+      "description": "pending · partial · late · complete (01 §5). age = now − newest non-NULL delivery start the target itself delivered.",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {}, "overrides": [
+        {"matcher": {"id": "byName", "options": "status"}, "properties": [
+          {"id": "mappings", "value": [{"type": "value", "options": {
+            "complete": {"color": "green", "index": 0},
+            "partial": {"color": "blue", "index": 1},
+            "pending": {"color": "text", "index": 2},
+            "late": {"color": "red", "index": 3}}}]},
+          {"id": "custom.cellOptions", "value": {"type": "color-background"}}
+        ]},
+        {"matcher": {"id": "byName", "options": "age"}, "properties": [{"id": "unit", "value": "dtdurations"}]}
+      ]},
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT target_id, status, observed_periods, expected_periods,\n       partition_start, expected_by, newest_delivery_start,\n       EXTRACT(EPOCH FROM (now() - newest_delivery_start)) AS age,\n       last_capture_outcome, stale_fetch_streak, source_unavailable, pipeline_failed, computed_at\nFROM target_freshness ORDER BY target_id"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "barchart",
+      "title": "Ledger runs by state per target (ADR-024 §3)",
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 9},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "options": {"orientation": "horizontal", "stacking": "normal", "showValue": "auto"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT target_id,\n       count(*) FILTER (WHERE state = 'processed') AS processed,\n       count(*) FILTER (WHERE state = 'captured') AS captured,\n       count(*) FILTER (WHERE state = 'failed') AS failed,\n       count(*) FILTER (WHERE state = 'missing_capture') AS missing_capture,\n       count(*) FILTER (WHERE state = 'unrecoverable') AS unrecoverable\nFROM runs GROUP BY 1 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Capture attempts per hour by outcome (capture + backfill + recapture)",
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 9},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 70, "stacking": {"mode": "normal"}}}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', a.started_at) AS \"time\", coalesce(a.outcome, 'pending') AS metric, count(*)::float8 AS value\nFROM run_attempts a\nWHERE a.kind IN ('capture', 'backfill') AND $__timeFilter(a.started_at)\nGROUP BY 1, 2 ORDER BY 1, 2"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Quality events per hour by kind (reconciliation_mismatch, unknown_field, quarantine, invalidated, …)",
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 18},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "bars", "fillOpacity": 70, "stacking": {"mode": "normal"}}}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT date_trunc('hour', created_at) AS \"time\", kind AS metric, count(*)::float8 AS value\nFROM quality_events\nWHERE kind <> 'partition_status' AND $__timeFilter(created_at)\nGROUP BY 1, 2 ORDER BY 1, 2"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Silver versions · occurrences · invalidation decisions (ADR-023, ADR-038)",
+      "gridPos": {"h": 5, "w": 12, "x": 12, "y": 18},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "options": {"colorMode": "none", "graphMode": "none", "textMode": "value_and_name"},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT (SELECT count(*) FROM observations) AS versions,\n       (SELECT count(*) FROM observation_occurrences) AS occurrences,\n       (SELECT count(*) FROM invalidations) AS invalidations"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Newest attempt per target",
+      "gridPos": {"h": 4, "w": 12, "x": 12, "y": 23},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT DISTINCT ON (r.target_id) r.target_id, a.kind, a.outcome, a.started_at, a.error\nFROM run_attempts a JOIN runs r ON r.id = a.run_id\nORDER BY r.target_id, a.started_at DESC"
+        }
+      ]
+    }
+  ]
+}

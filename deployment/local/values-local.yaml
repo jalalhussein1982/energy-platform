@@ -43,6 +43,8 @@ egress:
   clusterCIDRs: [10.244.0.0/16, 10.96.0.0/12]   # kind-config.yaml podSubnet / serviceSubnet
 schedule:
   startJitterSeconds: 5
+grafana:
+  enabled: true                 # ADR-039: dashboards over the kind deploy (port-forward 3000)
 drills:
   restore:
     enabled: true

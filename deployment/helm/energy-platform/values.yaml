@@ -154,6 +154,17 @@ egress:                                  # ADR-026 layer 1
     # port: pod-to-pod, policed by every CNI; the DNS rule allows 53 only. 0 = off.
     dnsMetricsCanaryPort: 9153
 
+grafana:                                 # ADR-039 (Phase 11): a private window onto Silver
+  enabled: false                         # ClusterIP + NetworkPolicy only; access = kubectl port-forward (docs/07 §7.1)
+  image:
+    repository: docker.io/grafana/grafana
+    digest: sha256:74144189b38447facf737dfd0f3906e42e0776212bf575dc3334c3609183adf7   # 12.2.0, resolved 2026-09-24
+  readerUser: grafana                    # the read-only login role the migrate hook creates (energy_reader member)
+  datasource:                            # outside statefulset mode only: where the reader connects
+    host: ""
+    database: ""
+  # Secret keys (secrets.existingSecret): GRAFANA_ADMIN_PASSWORD, GRAFANA_DB_PASSWORD
+
 smoke:                                   # ADR-025 hook: one fixture capture+process
   manifest: ote_intraday_market/manifest.yaml
   fixture: ote_intraday_market/fixtures/ordinary_day
@@ -181,6 +192,9 @@ resources:
   exporter:
     requests: {cpu: 10m, memory: 32Mi}
     limits: {cpu: 200m, memory: 128Mi}
+  grafana:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}
   rclone:
     requests: {cpu: 50m, memory: 64Mi}
     limits: {cpu: 500m, memory: 256Mi}

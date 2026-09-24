@@ -1,0 +1,128 @@
+{
+  "title": "energy-platform — prices and load (Silver current views)",
+  "uid": "energy-platform-prices",
+  "schemaVersion": 39,
+  "editable": false,
+  "timezone": "Europe/Prague",
+  "time": {"from": "now-7d", "to": "now"},
+  "refresh": "15m",
+  "tags": ["energy-platform", "silver"],
+  "templating": {"list": []},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "OTE continuous intraday — price_vwap per delivery period (T1 SOAP is the system of record; T2 XLSX is the copy)",
+      "description": "One line per transport from observations_current_by_transport (ADR-023 amendment 1): where the two lines diverge the platform raised a reconciliation_mismatch event.",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {"unit": "currencyEUR", "custom": {"drawStyle": "line", "lineWidth": 1, "spanNulls": false}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT lower(delivery_interval) AS \"time\", source_transport AS metric, value::float8 AS value\nFROM observations_current_by_transport\nWHERE dataset_id = 'ote.idm_continuous' AND metric = 'price_vwap'\n  AND $__timeFilter(lower(delivery_interval))\nORDER BY 1, 2"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "OTE continuous intraday — traded volume per period (MWh, canonical row)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {"unit": "MWh", "custom": {"drawStyle": "bars", "fillOpacity": 60}}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT lower(delivery_interval) AS \"time\", 'volume_total' AS metric, value::float8 AS value\nFROM observations_current\nWHERE dataset_id = 'ote.idm_continuous' AND metric = 'volume_total'\n  AND $__timeFilter(lower(delivery_interval))\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "OTE day-ahead — price per delivery period (EUR/MWh)",
+      "description": "Published once a day for the next day (ADR-033 amendment 3); the line runs ahead of now.",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {"unit": "currencyEUR", "custom": {"drawStyle": "line", "lineInterpolation": "stepAfter", "lineWidth": 1}}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT lower(delivery_interval) AS \"time\", resolution AS metric, value::float8 AS value\nFROM observations_current\nWHERE dataset_id = 'ote.dam' AND metric = 'price'\n  AND lower(delivery_interval) >= $__timeFrom()::timestamptz\n  AND lower(delivery_interval) < $__timeTo()::timestamptz + interval '2 days'\nORDER BY 1, 2"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "ČEPS system load (MW, quarter-hour, real time)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {"unit": "megwatt", "custom": {"drawStyle": "line", "lineWidth": 1}}, "overrides": []},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT lower(delivery_interval) AS \"time\", 'load' AS metric, value::float8 AS value\nFROM observations_current\nWHERE dataset_id = 'ceps.load' AND metric = 'load' AND resolution = 'PT15M'\n  AND $__timeFilter(lower(delivery_interval))\nORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "OTE imbalance settlement — prices (CZK/MWh) and system imbalance (MWh), by settlement version",
+      "description": "source_version 0 = daily, 1 = monthly, 2 = final; a later version supersedes the earlier one for the same period.",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "fieldConfig": {"defaults": {"custom": {"drawStyle": "line", "lineWidth": 1}}, "overrides": [
+        {"matcher": {"id": "byRegexp", "options": ".*system_imbalance.*"}, "properties": [{"id": "unit", "value": "MWh"}, {"id": "custom.axisPlacement", "value": "right"}]},
+        {"matcher": {"id": "byRegexp", "options": ".*price.*"}, "properties": [{"id": "unit", "value": "currencyCZK"}]}
+      ]},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT lower(delivery_interval) AS \"time\", metric || ' v' || coalesce(source_version, '?') AS metric, value::float8 AS value\nFROM observations_current\nWHERE dataset_id = 'ote.imbalance_settlement'\n  AND metric IN ('imbalance_price', 'counter_imbalance_price', 'system_imbalance')\n  AND $__timeFilter(lower(delivery_interval))\nORDER BY 1, 2"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Newest current row per dataset and transport (what the platform holds right now)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 26},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+      "options": {"showHeader": true},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "energy-postgres"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT dataset_id, source_transport, count(*) AS current_rows,\n       max(lower(delivery_interval)) AS newest_delivery_start,\n       max(fetched_at) AS newest_fetch\nFROM observations_current_by_transport\nGROUP BY 1, 2 ORDER BY 1, 2"
+        }
+      ]
+    }
+  ]
+}

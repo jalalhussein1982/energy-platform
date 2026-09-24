@@ -39,6 +39,11 @@ egress:
     cidrs: [203.0.113.0/24]
     ports: [443]
   fqdnPolicy: cilium
+grafana:
+  enabled: true
+  datasource:
+    host: pg.example.internal:5432
+    database: energy
 drills:
   restore:
     enabled: false   # ADR-036 amendment 3: the drill needs postgres.mode=statefulset; with cnpg the render refuses it

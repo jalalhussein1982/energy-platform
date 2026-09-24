@@ -18,5 +18,13 @@ metadata:
 spec:
   backoffLimit: 2
   activeDeadlineSeconds: 600
+{{- /* ADR-039: with grafana on, the hook also creates or rotates the read-only login role from
+     the Secret's GRAFANA_DB_PASSWORD (migration 0007 made the group role) */ -}}
+{{- $args := list "migrate" -}}
+{{- $extra := list -}}
+{{- if .Values.grafana.enabled }}
+{{- $args = list "migrate" "--reader-user" .Values.grafana.readerUser -}}
+{{- $extra = list (dict "name" "GRAFANA_DB_PASSWORD" "valueFrom" (dict "secretKeyRef" (dict "name" .Values.secrets.existingSecret "key" "GRAFANA_DB_PASSWORD"))) -}}
+{{- end }}
   template:
-{{ include "energy-platform.podTemplate" (dict "root" . "role" "hook" "container" (include "energy-platform.container" (dict "root" . "name" "migrate" "args" (list "migrate")))) | indent 4 }}
+{{ include "energy-platform.podTemplate" (dict "root" . "role" "hook" "container" (include "energy-platform.container" (dict "root" . "name" "migrate" "args" $args "extraEnv" $extra))) | indent 4 }}

@@ -11,7 +11,8 @@ ADR-026 layer 1, standard NetworkPolicy API (no CRD):
      rejection on resolution) lives in energy_platform.fetch.
 */ -}}
 {{- $fullname := include "energy-platform.fullname" . }}
-{{- $verbRoles := list "capture" "process" "recapture" "backfill" "gaps" "hook" "drill" "backup" "replicate" "tier" "metrics" }}
+{{- /* grafana (ADR-039) reads Postgres and nothing else: it is a verb role for the Postgres egress rule and never a fetching role */ -}}
+{{- $verbRoles := list "capture" "process" "recapture" "backfill" "gaps" "hook" "drill" "backup" "replicate" "tier" "metrics" "grafana" }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

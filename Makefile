@@ -218,7 +218,9 @@ local-secrets: ## Generate the local Secret (random Postgres password and MinIO 
 	  --from-literal=BRONZE_ACCESS_KEY_ID=minioa$$(openssl rand -hex 6) \
 	  --from-literal=BRONZE_SECRET_ACCESS_KEY=$$(openssl rand -hex 20) \
 	  --from-literal=BRONZE_REPLICA_ACCESS_KEY_ID=miniob$$(openssl rand -hex 6) \
-	  --from-literal=BRONZE_REPLICA_SECRET_ACCESS_KEY=$$(openssl rand -hex 20)
+	  --from-literal=BRONZE_REPLICA_SECRET_ACCESS_KEY=$$(openssl rand -hex 20) \
+	  --from-literal=GRAFANA_ADMIN_PASSWORD=$$(openssl rand -hex 12) \
+	  --from-literal=GRAFANA_DB_PASSWORD=$$(openssl rand -hex 20)
 
 deploy-local: target-values ## helm upgrade --install with rollback-on-failure + wait (hooks gate the release, ADR-025)
 	$(HELM_KIND) upgrade --install $(RELEASE) $(CHART_DIR) -n $(NAMESPACE) --create-namespace \
@@ -242,7 +244,7 @@ local-egress-test: ## ADR-026 §4: capture pod reaches 443; metadata/private blo
 # ---------------------------------------------------------------- tenant / demo deploys (ADR-001 amend, ADR-028, ADR-015)
 ENV ?= demo
 OIDC_KUBECONFIG := /tmp/ep-oidc-kubeconfig
-DEMO_SECRET_KEYS := POSTGRES_PASSWORD BRONZE_ACCESS_KEY_ID BRONZE_SECRET_ACCESS_KEY BRONZE_REPLICA_ACCESS_KEY_ID BRONZE_REPLICA_SECRET_ACCESS_KEY
+DEMO_SECRET_KEYS := POSTGRES_PASSWORD BRONZE_ACCESS_KEY_ID BRONZE_SECRET_ACCESS_KEY BRONZE_REPLICA_ACCESS_KEY_ID BRONZE_REPLICA_SECRET_ACCESS_KEY GRAFANA_ADMIN_PASSWORD GRAFANA_DB_PASSWORD
 # Store B's endpoint for ENV=demo: the OCI tenancy namespace (`oci os ns get`) stays out of the
 # repository and comes from DEMO_OCI_NAMESPACE (a repository variable in CI; plan P5-D22).
 DEMO_OCI_NAMESPACE ?=
