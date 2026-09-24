@@ -154,7 +154,10 @@ back to the current one; "Objects have changed outside of Terraform" was the onl
 else drifted: the CLI inventory (2 × cx23 in nbg1, one 10 GB volume, one network, one SSH key
 matching the author's laptop key, one firewall applied to both servers, no floating IPs, load
 balancers or snapshots; about €6.64 per server per month) matches the state file resource for
-resource. `terraform apply <plan>` remains the author's.
+resource. **Applied 2026-09-24 23:59 UTC by the author's approval** (`Apply complete! Resources: 0
+added, 1 changed, 0 destroyed`, 8 s): the live rules carry the current address, a fresh plan with the
+same variables exits 0 (no changes), and SSH from the laptop to the server answers again. The
+Terraform state and the firewall agree for the first time since the hand edit of 01:40 UTC.
 
 ## 4. Tenant and demo deploys
 

@@ -564,7 +564,10 @@ The author said "run these, I approve manually"; the auto-mode classifier refuse
 - **Hetzner inventory** by CLI matches the state (two cx23, one volume, one network, one key,
   one firewall; nothing else in the project; ≈ €14/month with the volume).
 
-**Open / carried.** Author: `terraform apply` of the plan above; the teardown when the demo is
+- **Terraform apply** (23:59 UTC, the author's approval): 1 changed, re-plan clean, SSH from the
+  laptop restored; state and firewall agree again.
+
+**Open / carried.** Author: the teardown when the demo is
 done (`terraform destroy`, then disable `deploy-demo.yml`). ČEPS `value1 = value2` question.
 The invalidation Job `invalidate-23sep-file-under-21-22` stays in the namespace as a record
 (Complete); the gated egress Jobs were deleted.
