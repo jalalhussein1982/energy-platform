@@ -45,6 +45,12 @@ schedule:
   startJitterSeconds: 5
 grafana:
   enabled: true                 # ADR-039: dashboards over the kind deploy (port-forward 3000)
+alerting:
+  enabled: true                 # ADR-040: Prometheus + Alertmanager + kube-state-metrics + the receiver; `make alert-drill`
+  kubeStateMetrics:
+    apiServer:
+      cidrs: [172.18.0.0/16]    # kind's control-plane container on Docker's `kind` network (kubectl get endpoints kubernetes)
+      port: 6443
 drills:
   restore:
     enabled: true

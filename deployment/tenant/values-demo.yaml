@@ -56,6 +56,13 @@ metrics:
     enabled: false
 grafana:
   enabled: true                       # ADR-039: private dashboards; the Secret carries GRAFANA_ADMIN_PASSWORD / GRAFANA_DB_PASSWORD (added 2026-09-24)
+alerting:
+  enabled: true                       # ADR-040 (review 3 R3): the rules evaluated on the demo, delivered to the platform receiver
+  kubeStateMetrics:
+    apiServer:
+      cidrs: [10.10.1.10/32]          # the k3s server on the private network = `kubectl get endpoints kubernetes` (2026-09-25)
+      port: 6443
+  # a real channel is the author's values change: alerting.alertmanager.receivers/routes + egress.cidrs
 egress:
   # k3s kube-router applies a new pod's policy asynchronously (measured 2026-09-23: the
   # metadata service answered a fresh pod, refused it 15 s later): gate every platform pod (05 C-65)

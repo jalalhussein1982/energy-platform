@@ -44,6 +44,21 @@ grafana:
   datasource:
     host: pg.example.internal:5432
     database: energy
+alerting:
+  enabled: true
+  kubeStateMetrics:
+    apiServer:
+      cidrs: [10.0.0.1/32]
+  alertmanager:
+    egress:
+      cidrs: [203.0.113.0/24]
+    receivers:
+      - name: ops-webhook
+        webhook_configs:
+          - url: https://hooks.example.internal/energy-platform
+    routes:
+      - receiver: ops-webhook
+        matchers: ["severity = page"]
 drills:
   restore:
     enabled: false   # ADR-036 amendment 3: the drill needs postgres.mode=statefulset; with cnpg the render refuses it

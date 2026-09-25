@@ -17,6 +17,7 @@ import logging
 import os
 import random
 import secrets
+import sys
 import tempfile
 import time
 from collections.abc import Iterator
@@ -602,6 +603,20 @@ def wait_egress_policy_cmd(
         f"wait-egress-policy: enforced after {result.waited_seconds:.2f} s "
         f"({result.attempts} attempts{dropped})"
     )
+
+
+@app.command("alert-sink")
+def alert_sink_cmd(
+    port: Annotated[int, typer.Option("--port", min=1, max=65535)] = 8080,
+    host: Annotated[str, typer.Option("--host", help="bind address")] = "0.0.0.0",  # noqa: S104
+) -> None:
+    """The platform's alert receiver (ADR-040): answers Alertmanager's webhook on POST /alerts
+    with one JSON line per delivery on stdout — the delivery record — and GET /healthz. No
+    credential, no egress; runs as a Deployment on the platform image."""
+    from energy_platform.fetch.alert_sink import serve
+
+    typer.echo(f"alert-sink: listening on {host}:{port} (POST /alerts, GET /healthz)", err=True)
+    serve(port, sys.stdout, host)
 
 
 @app.command("process")

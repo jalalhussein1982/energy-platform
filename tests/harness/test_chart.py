@@ -679,3 +679,101 @@ def test_r2_the_capture_container_learns_its_job_name_by_the_downward_api(tmp_pa
     for verb in ("process", "backfill", "recapture"):
         for c in by_verb.get(verb, []):
             assert "ENERGY_PLATFORM_JOB_NAME" not in {e["name"] for e in c["env"]}
+
+
+def test_alerting_renders_behind_its_flag_without_cluster_rights(tmp_path: Path) -> None:
+    """ADR-040 (review 3 R3): the evaluator, its metric source and the receiver render only
+    behind `alerting.enabled`; no CRD, no ClusterRole; Prometheus loads the existing rules
+    ConfigMap unchanged; Alertmanager routes to the platform receiver; kube-state-metrics is
+    namespaced with a Role and reaches the API server only by the declared address."""
+    tenant = render(tmp_path, TENANT)
+    roles = {"prometheus", "alertmanager", "kube-state-metrics", "alert-sink"}
+    assert not {d["metadata"]["name"] for d in tenant if d["kind"] == "Deployment"} & {
+        f"ep-energy-platform-{r}" for r in roles
+    }
+    assert "Role" not in kinds(tenant) and "RoleBinding" not in kinds(tenant)
+    demo_endpoint = (
+        "bronze.replica.endpoint=https://ns.compat.objectstorage.eu-frankfurt-1.oraclecloud.com"
+    )
+    for values, extra in ((LOCAL, ()), (DEMO, ("--set", demo_endpoint)), (ALL_FLAGS, ())):
+        docs = render(tmp_path, TENANT, values, extra=extra)
+        deployments = named(docs, "Deployment")
+        for r in roles:
+            assert f"ep-energy-platform-{r}" in deployments, (values.name, r)
+        assert "ClusterRole" not in kinds(docs) and "ClusterRoleBinding" not in kinds(docs)
+        role = named(docs, "Role")["ep-energy-platform-kube-state-metrics"]
+        assert role["rules"] == [
+            {"apiGroups": ["batch"], "resources": ["jobs", "cronjobs"], "verbs": ["list", "watch"]}
+        ]
+        ksm = deployments["ep-energy-platform-kube-state-metrics"]["spec"]["template"]["spec"]
+        assert ksm["serviceAccountName"] == "ep-energy-platform-kube-state-metrics"
+        assert "--namespaces=" in " ".join(ksm["containers"][0]["args"])
+        assert "--resources=cronjobs,jobs" in ksm["containers"][0]["args"]
+        # Prometheus mounts the SAME rules ConfigMap the tenant render already ships
+        prom = deployments["ep-energy-platform-prometheus"]["spec"]["template"]["spec"]
+        mounted = {v["configMap"]["name"] for v in prom["volumes"] if "configMap" in v}
+        assert "ep-energy-platform-alert-rules" in mounted
+        prom_cfg = yaml.safe_load(
+            named(docs, "ConfigMap")["ep-energy-platform-prometheus"]["data"]["prometheus.yml"]
+        )
+        assert prom_cfg["rule_files"] == ["/etc/prometheus/rules/*.yaml"]
+        targets = {
+            t
+            for sc in prom_cfg["scrape_configs"]
+            for s in sc["static_configs"]
+            for t in s["targets"]
+        }
+        assert targets == {
+            "ep-energy-platform-metrics:9187",
+            "ep-energy-platform-kube-state-metrics:8080",
+        }
+        assert prom_cfg["alerting"]["alertmanagers"][0]["static_configs"][0]["targets"] == [
+            "ep-energy-platform-alertmanager:9093"
+        ]
+        # Alertmanager: the platform receiver first, the operator's receivers appended
+        am_cfg = yaml.safe_load(
+            named(docs, "ConfigMap")["ep-energy-platform-alertmanager"]["data"]["alertmanager.yml"]
+        )
+        assert am_cfg["route"]["receiver"] == "platform-sink"
+        sink = next(r for r in am_cfg["receivers"] if r["name"] == "platform-sink")
+        assert (
+            sink["webhook_configs"][0]["url"] == "http://ep-energy-platform-alert-sink:8080/alerts"
+        )
+        assert sink["webhook_configs"][0]["send_resolved"] is True
+        # the receiver: the platform image, the verb, no platform environment (no DSN, no keys)
+        sink_pod = deployments["ep-energy-platform-alert-sink"]["spec"]["template"]["spec"]
+        assert sink_pod["containers"][0]["args"] == ["alert-sink", "--port", "8080"]
+        assert {e["name"] for e in sink_pod["containers"][0]["env"]} == {"TMPDIR"}
+        # default-deny stays: kube-state-metrics reaches the API server by the declared CIDRs only
+        policies = named(docs, "NetworkPolicy")
+        egress = policies["ep-energy-platform-allow-kube-state-metrics-egress"]["spec"]["egress"]
+        assert [b["ipBlock"]["cidr"] for b in egress[0]["to"]] and egress[0]["ports"][0][
+            "port"
+        ] == 6443
+        am_egress = policies["ep-energy-platform-allow-alertmanager-egress"]["spec"]["egress"]
+        assert (
+            am_egress[0]["to"][0]["podSelector"]["matchLabels"]["energy-platform.io/role"]
+            == "alert-sink"
+        )
+        if values is ALL_FLAGS:
+            assert am_egress[1]["to"][0]["ipBlock"]["cidr"] == "203.0.113.0/24"
+            assert {r["name"] for r in am_cfg["receivers"]} == {"platform-sink", "ops-webhook"}
+            assert am_cfg["route"]["routes"][0]["receiver"] == "ops-webhook"
+        else:
+            assert len(am_egress) == 1  # no internet for Alertmanager unless declared
+        # Grafana gets the Prometheus datasource and the ADR-037 dashboard
+        ds = yaml.safe_load(
+            named(docs, "ConfigMap")["ep-energy-platform-grafana-provisioning"]["data"][
+                "datasource.yaml"
+            ]
+        )
+        assert {d["uid"] for d in ds["datasources"]} == {"energy-postgres", "energy-prometheus"}
+        assert (
+            "freshness.json"
+            in named(docs, "ConfigMap")["ep-energy-platform-grafana-dashboards"]["data"]
+        )
+        assert "ep-energy-platform-allow-grafana-prometheus-egress" in policies
+    # the address of the control plane is not optional
+    with pytest.raises(subprocess.CalledProcessError) as refused:
+        render(tmp_path, TENANT, extra=("--set", "alerting.enabled=true"))
+    assert "alerting.kubeStateMetrics.apiServer.cidrs is required" in refused.value.stderr

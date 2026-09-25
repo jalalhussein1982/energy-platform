@@ -119,6 +119,35 @@ metrics:                                 # ADR-037 / D-6 (Task 5.12 renders the 
   scrapeFrom:
     namespaceSelector: {}                # {} = this namespace only
 
+alerting:                                # ADR-040 (review 3 R3): the ADR-037 rules evaluated and delivered
+  enabled: false                         # off in the tenant default; on in local, on the demo, in the all-flags render
+  prometheus:                            # loads the <release>-alert-rules ConfigMap unchanged; scrapes the exporter + kube-state-metrics
+    image:
+      repository: docker.io/prom/prometheus
+      digest: sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0   # v3.14.0, resolved 2026-09-25
+    scrapeInterval: 60s
+    retention: 2d                        # an emptyDir TSDB: the alerts are evaluated live, the history is not the point
+    storageSizeLimit: 512Mi
+  alertmanager:                          # routes every alert to the platform receiver (+ the operator's own)
+    image:
+      repository: docker.io/prom/alertmanager
+      digest: sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a   # v0.34.1, resolved 2026-09-25
+    groupWait: 10s
+    groupInterval: 1m
+    repeatInterval: 4h
+    receivers: []                        # raw Alertmanager receivers (email_configs, webhook_configs, …), the operator's channel
+    routes: []                           # raw child routes naming those receivers
+    egress:                              # where an external receiver lives; empty = no internet for Alertmanager
+      cidrs: []
+      ports: [443]
+  kubeStateMetrics:                      # namespaced (--namespaces, jobs + cronjobs), a Role, no cluster right
+    image:
+      repository: registry.k8s.io/kube-state-metrics/kube-state-metrics
+      digest: sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b   # v2.20.0, resolved 2026-09-25
+    apiServer:                           # REQUIRED when enabled: `kubectl get endpoints kubernetes` (default-deny needs the address)
+      cidrs: []
+      port: 6443
+
 egress:                                  # ADR-026 layer 1
   privateCIDRs:
     - 10.0.0.0/8
@@ -195,5 +224,14 @@ resources:
   rclone:
     requests: {cpu: 50m, memory: 64Mi}
     limits: {cpu: 500m, memory: 256Mi}
+  prometheus:                            # ADR-040
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  alertmanager:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
+  kubeStateMetrics:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
 
 podAnnotations: {}

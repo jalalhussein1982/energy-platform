@@ -1,0 +1,612 @@
+{{- /*
+ADR-040 (review 3 R3): the ADR-037 rules evaluated and delivered, behind `alerting.enabled`.
+Off in the tenant default; on in local, on the demo and in the all-flags render. Four
+Deployments, no CRD, no cluster right:
+  - Prometheus loads the existing `<release>-alert-rules` ConfigMap UNCHANGED as its rule file
+    and scrapes the exporter and kube-state-metrics every minute; an emptyDir TSDB (the alerts
+    are evaluated live; two days of history);
+  - kube-state-metrics, namespaced (`--namespaces`, `--resources=cronjobs,jobs`), its own
+    ServiceAccount, a Role with list/watch on jobs and cronjobs, a RoleBinding — the metric
+    source the staleness rules named since ADR-036 amendment 2;
+  - Alertmanager routes every alert to the platform receiver and to the operator's own
+    receivers/routes (values, raw Alertmanager objects); send_resolved on;
+  - the platform receiver: `energyctl alert-sink` on the platform image, one JSON line per
+    delivery in its log — the delivery record (no credential, no platform environment).
+Network (ADR-026, default-deny stays): Prometheus → exporter, kube-state-metrics, Alertmanager;
+kube-state-metrics → the API server (alerting.kubeStateMetrics.apiServer, REQUIRED: a tenant
+knows its control plane's address — `kubectl get endpoints kubernetes`); Alertmanager → the
+receiver and, only when declared, external receivers; Grafana → Prometheus; ingress to
+Prometheus and Alertmanager from the namespace only (port-forward enters from the node).
+*/ -}}
+{{- if .Values.alerting.enabled }}
+{{- $fullname := include "energy-platform.fullname" . }}
+{{- $a := .Values.alerting }}
+{{- if not $a.kubeStateMetrics.apiServer.cidrs }}
+{{- fail "alerting.kubeStateMetrics.apiServer.cidrs is required when alerting.enabled is true (ADR-040: kube-state-metrics reads Jobs and CronJobs through the API server, and default-deny needs its address — `kubectl get endpoints kubernetes`)" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-prometheus
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: {{ $a.prometheus.scrapeInterval }}
+      evaluation_interval: {{ $a.prometheus.scrapeInterval }}
+    rule_files:
+      - /etc/prometheus/rules/*.yaml
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: [{{ printf "%s-alertmanager:9093" $fullname | quote }}]
+    scrape_configs:
+      - job_name: energy-platform
+        static_configs:
+          - targets: [{{ printf "%s-metrics:9187" $fullname | quote }}]
+      - job_name: kube-state-metrics
+        static_configs:
+          - targets: [{{ printf "%s-kube-state-metrics:8080" $fullname | quote }}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-prometheus
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: prometheus
+spec:
+  type: ClusterIP
+  selector:
+{{ include "energy-platform.selectorLabels" . | indent 4 }}
+    energy-platform.io/role: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-prometheus
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: prometheus
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: prometheus
+  template:
+    metadata:
+      labels:
+{{ include "energy-platform.selectorLabels" . | indent 8 }}
+        energy-platform.io/role: prometheus
+      annotations:
+        checksum/config: {{ print (include "energy-platform.alertRules" .) $a.prometheus.scrapeInterval | sha256sum | trunc 16 }}
+    spec:
+      serviceAccountName: {{ $fullname }}
+      automountServiceAccountToken: false
+      securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 65534) | indent 8 }}
+      containers:
+        - name: prometheus
+          image: {{ include "energy-platform.thirdPartyImage" $a.prometheus.image }}
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time={{ $a.prometheus.retention }}
+            - --web.listen-address=:9090
+            - --web.enable-lifecycle=false
+          ports:
+            - name: http
+              containerPort: 9090
+          securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 12 }}
+          resources:
+{{ toYaml .Values.resources.prometheus | indent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+              readOnly: true
+            - name: rules
+              mountPath: /etc/prometheus/rules
+              readOnly: true
+            - name: data
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $fullname }}-prometheus
+        - name: rules
+          configMap:
+            name: {{ $fullname }}-alert-rules
+        - name: data
+          emptyDir:
+            sizeLimit: {{ $a.prometheus.storageSizeLimit }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $fullname }}-kube-state-metrics
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $fullname }}-kube-state-metrics
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $fullname }}-kube-state-metrics
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $fullname }}-kube-state-metrics
+subjects:
+  - kind: ServiceAccount
+    name: {{ $fullname }}-kube-state-metrics
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-kube-state-metrics
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: kube-state-metrics
+spec:
+  type: ClusterIP
+  selector:
+{{ include "energy-platform.selectorLabels" . | indent 4 }}
+    energy-platform.io/role: kube-state-metrics
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-kube-state-metrics
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: kube-state-metrics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: kube-state-metrics
+  template:
+    metadata:
+      labels:
+{{ include "energy-platform.selectorLabels" . | indent 8 }}
+        energy-platform.io/role: kube-state-metrics
+    spec:
+      serviceAccountName: {{ $fullname }}-kube-state-metrics
+      automountServiceAccountToken: true
+      securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 65534) | indent 8 }}
+      containers:
+        - name: kube-state-metrics
+          image: {{ include "energy-platform.thirdPartyImage" $a.kubeStateMetrics.image }}
+          args:
+            - --namespaces={{ .Release.Namespace }}
+            - --resources=cronjobs,jobs
+            - --port=8080
+            - --telemetry-port=8081
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 12 }}
+          resources:
+{{ toYaml .Values.resources.kubeStateMetrics | indent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-alertmanager
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+data:
+  alertmanager.yml: |
+    route:
+      receiver: platform-sink
+      group_by: [alertname, target]
+      group_wait: {{ $a.alertmanager.groupWait }}
+      group_interval: {{ $a.alertmanager.groupInterval }}
+      repeat_interval: {{ $a.alertmanager.repeatInterval }}
+{{- if $a.alertmanager.routes }}
+      routes:
+{{ toYaml $a.alertmanager.routes | indent 8 }}
+{{- end }}
+    receivers:
+      - name: platform-sink
+        webhook_configs:
+          - url: {{ printf "http://%s-alert-sink:8080/alerts" $fullname | quote }}
+            send_resolved: true
+{{- if $a.alertmanager.receivers }}
+{{ toYaml $a.alertmanager.receivers | indent 6 }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-alertmanager
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: alertmanager
+spec:
+  type: ClusterIP
+  selector:
+{{ include "energy-platform.selectorLabels" . | indent 4 }}
+    energy-platform.io/role: alertmanager
+  ports:
+    - name: http
+      port: 9093
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-alertmanager
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: alertmanager
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: alertmanager
+  template:
+    metadata:
+      labels:
+{{ include "energy-platform.selectorLabels" . | indent 8 }}
+        energy-platform.io/role: alertmanager
+      annotations:
+        checksum/config: {{ print (toYaml $a.alertmanager) | sha256sum | trunc 16 }}
+    spec:
+      serviceAccountName: {{ $fullname }}
+      automountServiceAccountToken: false
+      securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 65534) | indent 8 }}
+      containers:
+        - name: alertmanager
+          image: {{ include "energy-platform.thirdPartyImage" $a.alertmanager.image }}
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+            - --storage.path=/alertmanager
+            - --web.listen-address=:9093
+          ports:
+            - name: http
+              containerPort: 9093
+          securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 12 }}
+          resources:
+{{ toYaml .Values.resources.alertmanager | indent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+              readOnly: true
+            - name: data
+              mountPath: /alertmanager
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $fullname }}-alertmanager
+        - name: data
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-alert-sink
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: alert-sink
+spec:
+  type: ClusterIP
+  selector:
+{{ include "energy-platform.selectorLabels" . | indent 4 }}
+    energy-platform.io/role: alert-sink
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-alert-sink
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+    energy-platform.io/role: alert-sink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: alert-sink
+  template:
+    metadata:
+      labels:
+{{ include "energy-platform.selectorLabels" . | indent 8 }}
+        energy-platform.io/role: alert-sink
+    spec:
+      serviceAccountName: {{ $fullname }}
+      automountServiceAccountToken: false
+{{- with include "energy-platform.imagePullSecrets" . }}
+{{ . | indent 6 }}
+{{- end }}
+      securityContext:
+{{ include "energy-platform.podSecurity" (dict "uid" 10001) | indent 8 }}
+      containers:
+        - name: alert-sink
+          image: {{ include "energy-platform.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # the receiver only: no DSN, no store credential, no platform environment
+          args: ["alert-sink", "--port", "8080"]
+          env:
+            - name: TMPDIR
+              value: /tmp
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+{{ include "energy-platform.containerSecurity" . | indent 12 }}
+          resources:
+{{ toYaml .Values.resources.job | indent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-prometheus-egress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: prometheus
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: metrics
+      ports:
+        - protocol: TCP
+          port: 9187
+    - to:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: kube-state-metrics
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9093
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-prometheus-ingress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: prometheus
+  policyTypes: [Ingress]
+  ingress:
+    # the namespace only (Grafana, a port-forward entering from the node); nothing from outside
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-kube-state-metrics-egress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: kube-state-metrics
+  policyTypes: [Egress]
+  egress:
+    - to:
+{{- range $a.kubeStateMetrics.apiServer.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+{{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $a.kubeStateMetrics.apiServer.port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-kube-state-metrics-ingress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: kube-state-metrics
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: prometheus
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-alertmanager-egress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: alertmanager
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: alert-sink
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- if $a.alertmanager.egress.cidrs }}
+    # an external receiver (SMTP, a webhook) declared by the operator: these addresses only
+    - to:
+{{- range $a.alertmanager.egress.cidrs }}
+        - ipBlock:
+            cidr: {{ . }}
+{{- end }}
+      ports:
+{{- range $a.alertmanager.egress.ports }}
+        - protocol: TCP
+          port: {{ . }}
+{{- end }}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-alertmanager-ingress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: alertmanager
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9093
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-alert-sink-ingress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: alert-sink
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: alertmanager
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- if .Values.grafana.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-allow-grafana-prometheus-egress
+  labels:
+{{ include "energy-platform.labels" . | indent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 6 }}
+      energy-platform.io/role: grafana
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+{{ include "energy-platform.selectorLabels" . | indent 14 }}
+              energy-platform.io/role: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+{{- end }}
+{{- end }}

@@ -329,6 +329,9 @@ print-demo-secret-template: ## The kubectl command shape for the demo Secret (va
 rollback-drill: ## ADR-016 §6 / ADR-025 §5: two failing upgrades (smoke, storage probe) must roll back with schema and production data untouched
 	KIND_CONTEXT=$(KIND_CONTEXT) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) HELM=$(HELM) KUBECTL=$(KUBECTL) deployment/local/drills/rollback.sh
 
+alert-drill: ## ADR-040: a failed restore-drill Job must be delivered `firing` to the platform receiver, and `resolved` once deleted (after make local-up)
+	KIND_CONTEXT=$(KIND_CONTEXT) NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) KUBECTL=$(KUBECTL) deployment/local/drills/alert.sh
+
 KIND_VERSION ?= v0.33.0
 HELM_VERSION ?= v4.3.0
 # Terraform for the terraform-validate CI job: GitHub's ubuntu-latest ships neither terraform nor

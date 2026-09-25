@@ -50,6 +50,15 @@ data:
         secureJsonData:
           password: $GRAFANA_DB_PASSWORD
 {{- end }}
+{{- if .Values.alerting.enabled }}
+      # ADR-040: the evaluator's metrics, for the ADR-037 freshness dashboard
+      - name: energy-platform Prometheus
+        uid: energy-prometheus
+        type: prometheus
+        access: proxy
+        editable: false
+        url: {{ printf "http://%s-prometheus:9090" $fullname | quote }}
+{{- end }}
   dashboards.yaml: |
     apiVersion: 1
     providers:
@@ -72,6 +81,10 @@ data:
 {{ .Files.Get "dashboards/prices.json" | indent 4 }}
   freshness-sql.json: |
 {{ .Files.Get "dashboards/freshness-sql.json" | indent 4 }}
+{{- if .Values.alerting.enabled }}
+  freshness.json: |
+{{ .Files.Get "dashboards/freshness.json" | indent 4 }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -111,7 +124,7 @@ spec:
 {{ include "energy-platform.selectorLabels" . | indent 8 }}
         energy-platform.io/role: grafana
       annotations:
-        checksum/dashboards: {{ print (.Files.Get "dashboards/prices.json") (.Files.Get "dashboards/freshness-sql.json") .Values.postgres.mode .Values.grafana.readerUser | sha256sum | trunc 16 }}
+        checksum/dashboards: {{ print (.Files.Get "dashboards/prices.json") (.Files.Get "dashboards/freshness-sql.json") (.Files.Get "dashboards/freshness.json") .Values.postgres.mode .Values.grafana.readerUser .Values.alerting.enabled | sha256sum | trunc 16 }}
     spec:
       serviceAccountName: {{ $fullname }}
       automountServiceAccountToken: false
