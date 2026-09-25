@@ -75,6 +75,14 @@ platform's Python package owns every socket (ADR-027 §3) and adds no dependency
    (`docs/07` §7.2) and is the author's on the demo (Level 3).
 4. **What is not decided here:** which real channel an operator wires (values), and the
    operator's on-call process. The receiver proves delivery; it does not page a person.
+5. **The first live evaluation corrected two rules (2026-09-25).** On the demo the drill and
+   replication failure rules read `kube_job_status_failed{…} > 0` — "any failed Job of the
+   kind" — and paged at once for the two restore-drill Jobs of 2026-09-24 that failed and were
+   kept in the namespace as records (`failedJobsHistoryLimit`, a manual retry), although the
+   third run that night had succeeded. Both rules now fire only when the **newest** Job of the
+   kind is a failed one (`max(kube_job_created … and on (job_name) (kube_job_status_failed > 0))
+   == max(kube_job_created …)`) and resolve on the next success; the delivery drill's Job is
+   the newest while it exists, so the drill is unchanged.
 
 ## Rationale
 

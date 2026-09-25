@@ -49,20 +49,24 @@ groups:
           severity: page
         annotations:
           summary: "{{ "{{" }} $labels.target {{ "}}" }}: the two OTE transports disagree on a shared metric — one of them holds wrong data (01 §3; 2026-09-23 a backfill stored another day's file and 9 544 of these went unseen)"
+      # ADR-040, first live evaluation (2026-09-25): a failed Job stays in the namespace as history
+      # (failedJobsHistoryLimit, a manual retry kept as a record), so "any failed Job" paged for a
+      # day-old failure that a later run had already superseded — these two fire only when the
+      # NEWEST Job of the kind is a failed one, and resolve on the next success
       - alert: EnergyPlatformRestoreDrillFailed
-        expr: kube_job_status_failed{job_name=~".*restore-drill.*"} > 0
+        expr: max(kube_job_created{job_name=~".*restore-drill.*"} and on (job_name) (kube_job_status_failed{job_name=~".*restore-drill.*"} > 0)) == max(kube_job_created{job_name=~".*restore-drill.*"})
         for: 1m
         labels:
           severity: page
         annotations:
-          summary: "a backup could not be restored or the rebuild from Bronze differs from live (ADR-002; needs kube-state-metrics)"
+          summary: "the newest restore drill failed: a backup could not be restored or the rebuild from Bronze differs from live (ADR-002; needs kube-state-metrics)"
       - alert: EnergyPlatformReplicationFailed
-        expr: kube_job_status_failed{job_name=~".*replicate.*"} > 0
+        expr: max(kube_job_created{job_name=~".*replicate.*"} and on (job_name) (kube_job_status_failed{job_name=~".*replicate.*"} > 0)) == max(kube_job_created{job_name=~".*replicate.*"})
         for: 1m
         labels:
           severity: page
         annotations:
-          summary: "Bronze A → B replication reported differences or failed (ADR-036 §3; needs kube-state-metrics)"
+          summary: "the newest Bronze A → B replication reported differences or failed (ADR-036 §3; needs kube-state-metrics)"
       # ADR-036 amendment 2: the RPO for a store-A loss is the replication interval — a job that
       # never runs has no failed-Job metric, so the age of the last success is watched too
       - alert: EnergyPlatformReplicationStale

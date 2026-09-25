@@ -625,7 +625,13 @@ stayed at revision 24. Fix: `alerting.kubeStateMetrics.rbac.create` (default tru
 the demo), the admin manifest `deployment/tenant/demo-kube-state-metrics-rbac.yaml` applied
 once by the author (`07` §4.4), the deploy identity unchanged.
 
-**Open / carried.** Author: the second push (the demo receives R2–R6, the alerting stack and
-its API-server addresses `10.43.0.1/32` + `10.10.1.10/32` — three new images by digest);
+**Second push 068ed8e (01:03 UTC): `ci` and `deploy-demo` success — revision 25**, the
+alerting stack ready on the demo, the delivery drill there PASS (`07` §4.4). The first live
+evaluation found `EnergyPlatformRestoreDrillFailed` paging for the two failed drill Jobs of
+2026-09-24 kept as records after a later success: both Job-failure rules now fire on the newest
+Job of their kind only (ADR-040 §5; third push).
+
+**Open / carried.** Author: a real receiver by values (SMTP or a webhook, `alerting.alertmanager.receivers/routes`
++ `egress.cidrs`); whether the three `EnergyPlatformTargetLate` pendings of 01:09 UTC page;
 run the delivery drill on the demo and wire a real receiver by values; decide on the failover
 demonstration (R1); the teardown when the demo is done; the ČEPS `value1 = value2` question.

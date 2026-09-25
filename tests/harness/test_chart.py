@@ -433,6 +433,11 @@ def test_observability_renders_per_adr_037(tmp_path: Path) -> None:
     } <= names
     stale = {r["alert"]: r["expr"] for g in rules["groups"] for r in g["rules"]}
     assert "kube_cronjob_status_last_successful_time" in stale["EnergyPlatformReplicationStale"]
+    # ADR-040 first live evaluation: a failed Job kept as history must not page forever — the
+    # rule compares the newest Job's creation instant with the newest failed one's
+    for name in ("EnergyPlatformRestoreDrillFailed", "EnergyPlatformReplicationFailed"):
+        assert "max(kube_job_created" in stale[name] and "kube_job_status_failed" in stale[name]
+        assert stale[name].count("kube_job_created") == 2
     assert stale["EnergyPlatformReplicationStale"].endswith("> 7200")  # 2 x the hourly default
     exporter = named(docs, "Deployment")["ep-energy-platform-metrics"]
     annotations = exporter["spec"]["template"]["metadata"]["annotations"]

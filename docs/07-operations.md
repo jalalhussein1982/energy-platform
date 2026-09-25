@@ -248,7 +248,19 @@ widen it, the chart gates those two objects behind `alerting.kubeStateMetrics.rb
 the demo sets it `false`, and the author applied `deployment/tenant/demo-kube-state-metrics-rbac.yaml`
 once with the admin kubeconfig (Level 3, 2026-09-25 01:05 UTC: `role … created`,
 `rolebinding … created`; `kubectl auth can-i list jobs.batch --as=system:serviceaccount:energy-platform:energy-platform-kube-state-metrics`
-→ `yes`). The next push deploys the stack; the delivery drill on the demo is the author's.
+→ `yes`). The second push (068ed8e) deployed the stack: **revision 25**, 33 CronJobs, the
+four Deployments ready within minutes (kube-state-metrics reached the API server through the
+declared rule under kube-router at the first attempt). The delivery drill on the demo, 01:06 UTC:
+**PASS** — `firing` delivered at 01:08:24 (the Job created 01:06, the alert active 01:08:14),
+`resolved` at 01:09:24 after the deletion. What the first live evaluation showed besides:
+`EnergyPlatformRestoreDrillFailed` was **already firing** for the two failed restore-drill Jobs
+of 2026-09-24 (`energy-platform-restore-drill-29836890`, `restore-drill-manual-2`) kept in the
+namespace as records although `restore-drill-manual-3` had succeeded after them — "any failed
+Job" is the wrong rule for a namespace that keeps failed Jobs as history; the rule now fires
+when the newest Job of the kind failed (ADR-040 §5; the same for `EnergyPlatformReplicationFailed`).
+`EnergyPlatformTargetLate` was `pending` for `ote_dam`, `ote_imbalance_settlement` and
+`ote_intraday_market_xlsx` at 01:09 UTC — the 30-minute `for` window decides whether those
+page; the author reads them with `kubectl … port-forward svc/energy-platform-prometheus 9090:9090`.
 
 ### 4.3 Incident, 2026-09-23: T2 backfills and corrections stored today's file (ADR-033 amendment 2)
 
@@ -405,8 +417,10 @@ ConfigMap `<release>-alert-rules` for any scraper. Dashboard:
 Alerts (`_alerts.tpl`): `EnergyPlatformTargetLate` (page, 30 min), `EnergyPlatformPipelineFailed`
 (page, 15 min), `EnergyPlatformSourceUnavailable` (warning, 1 h), `EnergyPlatformFreshnessStale`
 (page, row older than 45 min), `EnergyPlatformExporterDown`, `EnergyPlatformReconciliationMismatch`,
-and — over kube-state-metrics — `EnergyPlatformRestoreDrillFailed`, `EnergyPlatformReplicationFailed`,
-`EnergyPlatformReplicationStale`, `EnergyPlatformWalShipmentStale`, `EnergyPlatformBaseBackupStale`.
+and — over kube-state-metrics — `EnergyPlatformRestoreDrillFailed` and
+`EnergyPlatformReplicationFailed` (the **newest** Job of the kind failed; a failed Job kept as
+history does not page once a later run succeeded — ADR-040 §5), `EnergyPlatformReplicationStale`,
+`EnergyPlatformWalShipmentStale`, `EnergyPlatformBaseBackupStale`.
 
 **Evaluated and delivered (ADR-040, 2026-09-25; review 3 R3).** Until then the rules were a
 ConfigMap "for any scraper" and no profile ran one. `alerting.enabled` (on in `local`, on the
