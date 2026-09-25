@@ -1,35 +1,17 @@
-# Review verdict
+# Review of the completed energy platform — 25 September 2026
 
-Reviewed on **19 September 2026**, against the original assignment supplied in this conversation. Snapshot: `7d872eaa6e3b1f891bf199b803ae310b1ac6fa99`, branch `main`, **41 tracked files**. All existing tracked files were preserved. This directory contains review material only; no suggested change was implemented, committed, deployed, or submitted to anyone.
+**Verdict: the core assignment is substantially delivered, but I cannot endorse the final report's unqualified claim of complete high availability and recovery.** The ingestion platform, constrained contributor workflow, deployments and infrastructure code are real and working. The remaining concerns below affect operation, correction or recovery; they are not cosmetic recommendations.
 
-**Verdict: a promising design and repository bootstrap, but not a completed answer to the assignment.** The README accurately says Phase 0 and “No platform code yet.” If this is a design checkpoint, continue after resolving the contract contradictions below. If submitted as the finished take-home, I would mark the functional and reproducibility requirements as unmet.
+Reviewed source: `bc87c585ce8a61be2995d0b0b1b283f87c2032a6`, plus the existing untracked `docs/overview/final-report.md`. Live observations were read-only snapshots during the night of 24–25 September, Prague time.
 
-The strongest evidence is the source-specific data design and the decision to give agents and humans one constrained contribution path. The weakest evidence is executable enforcement: the present gates do not establish that a junior or an agent can safely add even one target. There is no running ingestion path, deployment, IaC profile, or HA demonstration to evaluate.
+- [Deep review and material findings](01-deep-review.md) — assignment assessment, six findings, evidence and closure criteria.
+- [Assessment of the final report](02-final-report-assessment.md) — which claims I agree with and which need qualification.
+- [Verification record](03-verification.md) — fresh tests, live observations, reproducible probes and limits.
 
-| Evaluation order from the brief | Design assessment | What the supplied repository proves today |
-|---|---|---|
-| 1. Agentic engineering | Good separation of responsibilities and explicit authority; several contradictory instructions | Basic lint/type/import checks exist. No scaffold, manifest validator, negative harness, sandbox, protected remote, or blind addition test |
-| 2. Data engineering | Strong attention to provenance, UTC/DST, decimals and source revisions; replay and recovery contracts need correction | Empty library and one version assertion; no capture, parser, database, migration, replay, or real target |
-| 3. DevOps | Sensible portability and recovery intentions; excessive breadth before an executable slice | CI skeleton only. Reproduction commands are explicit failing stubs; deployment checks skip because inputs do not exist |
-| 4. Energy domain | The most developed part; appropriately bounded Czech intraday monitoring scope | Detailed contracts and selected official-source corroboration, but missing original research evidence and no implemented domain tests |
+Fresh checks passed: **928 offline tests, 33 PostgreSQL tests, the fixture demo, Helm/security/dependency checks, and six Terraform mock tests.** An independent fixture checker also passed across all seven targets. Additional probes reproduced four uncovered failure cases, including on temporary PostgreSQL.
 
-This is an assessment of the delivered artifacts, not a judgment that the candidate cannot build the proposed system. Planned Phase 1–8 work is not being misreported as a regression in Phase 0.
+The material gaps are a single database/control-plane failure domain, false missing-capture detection, unconnected operational alerting, and three related but distinct correction/recovery defects. The detailed report distinguishes current live evidence from synthetic scenarios; it does not claim that the synthetic prices or future settlement failures occurred in production.
 
-The highest-value findings are:
+Before starting, all **71 existing review files** were moved into [the preserved archive](archive/before-2026-09-24T23-21-51Z/) and checked by SHA-256. The archive is historical evidence, not this review's verdict. Application source and the original final report were not edited. No fixes, commits, deployments or live mutations were made.
 
-- **F02–F03:** In an isolated copy, the check suite stayed green with direct target HTTP code and a deliberately failing target test. The test was not collected.
-- **F04:** Adding an unseen source requires central admission/contract work, but the blind test forbids all changes outside the target directory and treats architectural guidance as failure.
-- **F05:** The version/upsert key excludes parser or derivation identity, while replay is required to append corrected results from the same raw payload.
-- **F06:** The design does not close the raw-write/ledger crash window or distinguish a missing capture from data that can actually be replayed.
-- **F07–F08:** The Helm rollback and domain-based Kubernetes egress promises need different mechanisms from the ones currently specified.
-
-Read the full material in this order:
-
-1. [codex-review/01-assignment-assessment.md](</Users/jalalhussein/Desktop/Desktop - Jalal’s MacBook Air/task-cze/codex-review/01-assignment-assessment.md>) — what the original task requires, strengths, and readiness.
-2. [codex-review/02-findings.md](</Users/jalalhussein/Desktop/Desktop - Jalal’s MacBook Air/task-cze/codex-review/02-findings.md>) — 14 prioritized findings with evidence and acceptance checks.
-3. [codex-review/03-file-by-file.md](</Users/jalalhussein/Desktop/Desktop - Jalal’s MacBook Air/task-cze/codex-review/03-file-by-file.md>) — disposition of every tracked file.
-4. [codex-review/04-validation.md](</Users/jalalhussein/Desktop/Desktop - Jalal’s MacBook Air/task-cze/codex-review/04-validation.md>) — commands, results, negative probes, and verification limits.
-5. [codex-review/05-recommendations.md](</Users/jalalhussein/Desktop/Desktop - Jalal’s MacBook Air/task-cze/codex-review/05-recommendations.md>) — proposed sequence and demonstrations needed for submission.
-6. [codex-review/06-primary-source-checks.md](</Users/jalalhussein/Desktop/Desktop - Jalal’s MacBook Air/task-cze/codex-review/06-primary-source-checks.md>) — external technical checks and remaining domain uncertainty.
-
-**Verification qualification:** lint, formatting, import rules, mypy and the existing test passed using a copied installed environment, with dependency synchronization explicitly skipped. The unmodified `make check` path could not complete an offline isolated bootstrap because `hatchling` was not cached. No clean-machine installation, cluster deployment, live SOAP ingestion, outage drill, or production acceptance is claimed.
+Independent challenges of the findings are retained in [the data review](agent-data-challenge.md) and [the delivery review](agent-delivery-challenge.md). The conclusions above and in the main report are the reconciled verdict, not an automatic union of every reviewer suggestion.

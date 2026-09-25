@@ -1,0 +1,14 @@
+{
+  "schema_valid": true,
+  "contract_validation": {
+    "status": "OK",
+    "errors": [],
+    "missing": {
+      "datasets": [],
+      "metrics": [],
+      "hosts": [],
+      "insecure_hosts": []
+    }
+  },
+  "change": "add unused DisplayNote to mapping.ignore_fields"
+}

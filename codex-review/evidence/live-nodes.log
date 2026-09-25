@@ -1,0 +1,3 @@
+NAME                           STATUS   ROLES           AGE   VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION              CONTAINER-RUNTIME
+energy-platform-demo-agent-1   Ready    <none>          40h   v1.36.4+k3s1   10.10.1.20    <none>        Ubuntu 24.04.4 LTS   6.8.0-138-generic (amd64)   containerd://2.3.4-k3s1.36
+energy-platform-demo-server    Ready    control-plane   40h   v1.36.4+k3s1   10.10.1.10    <none>        Ubuntu 24.04.4 LTS   6.8.0-138-generic (amd64)   containerd://2.3.4-k3s1.36

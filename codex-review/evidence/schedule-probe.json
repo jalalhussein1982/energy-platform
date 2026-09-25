@@ -1,0 +1,58 @@
+{
+  "actual_successful_capture": "2026-09-17 22:15:25.693263+00:00",
+  "expected_slot": "2026-09-17 22:15:00+00:00",
+  "gaps": [
+    {
+      "scheduled_for": "2026-09-17 22:15:00+00:00",
+      "kind": "missing_capture",
+      "action": "backfill: inside history.max_age"
+    },
+    {
+      "scheduled_for": "2026-09-17 22:30:00+00:00",
+      "kind": "pending",
+      "action": "inside tolerance; nothing to do"
+    },
+    {
+      "scheduled_for": "2026-09-17 22:45:00+00:00",
+      "kind": "pending",
+      "action": "inside tolerance; nothing to do"
+    }
+  ],
+  "ledger_before_backfill": [
+    {
+      "id": 2,
+      "target_id": "ote_idm_soap",
+      "scheduled_for": "2026-09-17 22:15:00+00:00",
+      "state": "missing_capture",
+      "fence": 0,
+      "origin": "backfill",
+      "lease_owner": null,
+      "lease_until": null,
+      "capture_id": null,
+      "created_at": "2026-09-17 22:46:00+00:00",
+      "updated_at": "2026-09-17 22:46:00+00:00"
+    },
+    {
+      "id": 1,
+      "target_id": "ote_idm_soap",
+      "scheduled_for": "2026-09-17 22:15:25.693263+00:00",
+      "state": "processed",
+      "fence": 1,
+      "origin": "scheduled",
+      "lease_owner": null,
+      "lease_until": null,
+      "capture_id": "ote_idm_soap:2026-09-17T221525Z:1",
+      "created_at": "2026-09-17 22:15:25.693263+00:00",
+      "updated_at": "2026-09-17 22:15:25.693263+00:00"
+    }
+  ],
+  "unnecessary_backfill": {
+    "scheduled_for": "2026-09-17 22:15:00+00:00",
+    "outcome": "ok",
+    "entry": "capture_id='ote_idm_soap:2026-09-17T221500Z:1' target_id='ote_idm_soap' scheduled_for=datetime.datetime(2026, 9, 17, 22, 15, tzinfo=datetime.timezone.utc) attempt=1 fetched_at=datetime.datetime(2026, 9, 17, 22, 46, tzinfo=datetime.timezone.utc) source_url='https://www.ote-cr.cz/pw-data/services/PublicDataService' http_status=200 content_type='application/octet-stream' payload_sha256='d11fa402533377381b9705f83af1054c388a9e5883c3f1b38eb953079cc27f4a' raw_ref='bronze/blobs/d1/d11fa402533377381b9705f83af1054c388a9e5883c3f1b38eb953079cc27f4a' size=20561 content_changed=False source_transport='soap' source_published_at=None tier='hot' etag=None last_modified=None hops=('https://www.ote-cr.cz/pw-data/services/PublicDataService',)",
+    "created": true,
+    "error": null,
+    "ledger_updated": true
+  },
+  "bronze_capture_count_after": 2
+}

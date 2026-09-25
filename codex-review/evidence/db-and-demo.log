@@ -1,0 +1,56 @@
+uv sync --frozen --group dev
+Checked 56 packages in 13ms
+scripts/with_postgres.sh uv run pytest -m "db" -p no:cacheprovider
+with_postgres: pg_ctl (PostgreSQL) 18.4 (Homebrew) on /tmp/ep-pg.AbrOZN
+.................................                                        [100%]
+33 passed, 935 deselected in 3.41s
+scripts/with_postgres.sh uv run python -m energy_platform.cli demo
+with_postgres: pg_ctl (PostgreSQL) 18.4 (Homebrew) on /tmp/ep-pg.EWVhUV
+== migrate (every migration has a downgrade, ADR-016 §3)
+
+== ote_idm_soap: validate
+{"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}
+== ote_idm_soap: capture (fixture through the real fetch path, offline)
+{"scheduled_for": "2026-09-17 22:15:00+00:00", "outcome": "ok", "entry": {"capture_id": "ote_idm_soap:2026-09-17T221500Z:1", "target_id": "ote_idm_soap", "scheduled_for": "2026-09-17T22:15:00Z", "attempt": 1, "fetched_at": "2026-09-24T23:24:11.678771Z", "source_url": "https://www.ote-cr.cz/pw-data/services/PublicDataService", "http_status": 200, "content_type": "text/xml; charset=utf-8", "payload_sha256": "d11fa402533377381b9705f83af1054c388a9e5883c3f1b38eb953079cc27f4a", "raw_ref": "bronze/blobs/d1/d11fa402533377381b9705f83af1054c388a9e5883c3f1b38eb953079cc27f4a", "size": 20561, "content_changed": true, "source_transport": "soap", "source_published_at": null, "tier": "hot", "etag": null, "last_modified": null, "hops": ["https://www.ote-cr.cz/pw-data/services/PublicDataService"]}, "created": true, "error": null, "ledger_updated": true}
+== ote_idm_soap: process (reconcile → claim → decode → map → fenced commit)
+{"run_id": 1, "scheduled_for": "2026-09-17 22:15:00+00:00", "attempt_kind": "process", "outcome": "ok", "inserted": 192, "events": 1, "error": null}
+== ote_idm_soap: replay of the same capture is a no-op (ADR-023 proof 1)
+{"run_id": 1, "scheduled_for": "2026-09-17 22:15:00+00:00", "attempt_kind": "replay", "outcome": "noop", "inserted": 0, "events": 1, "error": null}
+
+== ote_idm_xlsx: validate
+{"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}
+== ote_idm_xlsx: capture (fixture through the real fetch path, offline)
+{"scheduled_for": "2026-09-17 22:15:00+00:00", "outcome": "ok", "entry": {"capture_id": "ote_idm_xlsx:2026-09-17T221500Z:1", "target_id": "ote_idm_xlsx", "scheduled_for": "2026-09-17T22:15:00Z", "attempt": 1, "fetched_at": "2026-09-24T23:24:11.812779Z", "source_url": "https://www.ote-cr.cz/pubweb/attachments/27/2026/month09/day18/IM_15MIN_18_09_2026_EN.xlsx", "http_status": 200, "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "payload_sha256": "f63b805fec09d1770faee1f49aa87e5cb25e75696786022eb43c2817ff6cbffb", "raw_ref": "bronze/blobs/f6/f63b805fec09d1770faee1f49aa87e5cb25e75696786022eb43c2817ff6cbffb", "size": 10302, "content_changed": true, "source_transport": "xlsx", "source_published_at": null, "tier": "hot", "etag": null, "last_modified": null, "hops": ["https://www.ote-cr.cz/pubweb/attachments/27/2026/month09/day18/IM_15MIN_18_09_2026_EN.xlsx"]}, "created": true, "error": null, "ledger_updated": true}
+== ote_idm_xlsx: process (reconcile → claim → decode → map → fenced commit)
+{"run_id": 3, "scheduled_for": "2026-09-17 22:15:00+00:00", "attempt_kind": "process", "outcome": "ok", "inserted": 672, "events": 1, "error": null}
+== ote_idm_xlsx: replay of the same capture is a no-op (ADR-023 proof 1)
+{"run_id": 3, "scheduled_for": "2026-09-17 22:15:00+00:00", "attempt_kind": "replay", "outcome": "noop", "inserted": 0, "events": 1, "error": null}
+
+== ceps_load_soap: validate
+{"status": "OK", "errors": [], "missing": {"datasets": [], "metrics": [], "hosts": [], "insecure_hosts": []}}
+== ceps_load_soap: capture (fixture through the real fetch path, offline)
+{"scheduled_for": "2026-09-17 22:15:00+00:00", "outcome": "ok", "entry": {"capture_id": "ceps_load_soap:2026-09-17T221500Z:1", "target_id": "ceps_load_soap", "scheduled_for": "2026-09-17T22:15:00Z", "attempt": 1, "fetched_at": "2026-09-24T23:24:12.174907Z", "source_url": "https://www.ceps.cz/_layouts/CepsData.asmx", "http_status": 200, "content_type": "text/xml; charset=utf-8", "payload_sha256": "26f6ad9bc24f322a50cf5ae0f30e8b769ed930af5eade9052284d12b92cf2a3f", "raw_ref": "bronze/blobs/26/26f6ad9bc24f322a50cf5ae0f30e8b769ed930af5eade9052284d12b92cf2a3f", "size": 9091, "content_changed": true, "source_transport": "soap", "source_published_at": null, "tier": "hot", "etag": null, "last_modified": null, "hops": ["https://www.ceps.cz/_layouts/CepsData.asmx"]}, "created": true, "error": null, "ledger_updated": true}
+== ceps_load_soap: process (reconcile → claim → decode → map → fenced commit)
+{"run_id": 5, "scheduled_for": "2026-09-17 22:15:00+00:00", "attempt_kind": "process", "outcome": "ok", "inserted": 192, "events": 1, "error": null}
+== ceps_load_soap: replay of the same capture is a no-op (ADR-023 proof 1)
+{"run_id": 5, "scheduled_for": "2026-09-17 22:15:00+00:00", "attempt_kind": "replay", "outcome": "noop", "inserted": 0, "events": 1, "error": null}
+
+== query: observations_current per dataset
+ote.idm_continuous: 672 current rows, metrics ['price_last', 'price_max', 'price_min', 'price_vwap', 'volume_buy', 'volume_sell', 'volume_total']
+  2026-09-17T22:00Z price_last=171.13 EUR/MWh via xlsx (basis fetched_at, derivation d4420e0b24a75a44)
+  2026-09-17T22:00Z price_max=175.13 EUR/MWh via xlsx (basis fetched_at, derivation d4420e0b24a75a44)
+  2026-09-17T22:00Z price_min=165.13 EUR/MWh via xlsx (basis fetched_at, derivation d4420e0b24a75a44)
+ceps.load: 192 current rows, metrics ['load', 'load_incl_pumping']
+  2026-09-17T22:00Z load=6279.867 MW via soap (basis fetched_at, derivation 9ea9e3216d672e26)
+  2026-09-17T22:00Z load_incl_pumping=6382.400 MW via soap (basis fetched_at, derivation 9ea9e3216d672e26)
+  2026-09-17T22:15Z load=6281.117 MW via soap (basis fetched_at, derivation 9ea9e3216d672e26)
+
+== quality events
+  ote_idm_soap partition_status [info] 2026-09-18: complete 96/96
+  ote_idm_soap partition_status [info] 2026-09-18: complete 96/96
+  ote_idm_xlsx partition_status [info] 2026-09-18: complete 96/96
+  ote_idm_xlsx partition_status [info] 2026-09-18: complete 96/96
+  ceps_load_soap partition_status [info] 2026-09-18: complete 96/96
+  ceps_load_soap partition_status [info] 2026-09-18: complete 96/96
+
+demo: OK

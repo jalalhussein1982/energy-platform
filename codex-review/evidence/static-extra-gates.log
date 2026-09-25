@@ -1,0 +1,27 @@
+uv sync --frozen --group dev
+Checked 56 packages in 11ms
+== helm-lint: deployment/tenant/values-tenant.yaml
+==> Linting deployment/helm/energy-platform
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+workload-check: OK (action pins, image digests, requests/limits)
+restricted-pss: OK (every pod is restricted-profile clean)
+== helm-lint: deployment/local/values-local.yaml
+==> Linting deployment/helm/energy-platform
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+workload-check: OK (action pins, image digests, requests/limits)
+restricted-pss: OK (every pod is restricted-profile clean)
+== helm-lint: deployment/helm/energy-platform/ci/all-flags-values.yaml
+==> Linting deployment/helm/energy-platform
+[INFO] Chart.yaml: icon is recommended
+
+1 chart(s) linted, 0 chart(s) failed
+workload-check: OK (action pins, image digests, requests/limits)
+restricted-pss: OK (every pod is restricted-profile clean)
+uv run python scripts/check_deps_allowlist.py uv.lock deps-allowlist.txt
+deps-allowlist: OK — 57 locked packages all allowlisted
+uv run python scripts/secret_scan.py
+secret-scan: OK

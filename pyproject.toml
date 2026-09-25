@@ -50,6 +50,9 @@ energyctl = "energy_platform.cli:app"   # ADR-000: a thin client of the library
 target-version = "py312"
 line-length = 100
 src = ["energy_platform", "targets", "tests", "scripts"]
+# review material is not source: the reviewer's probe scripts stay as written and runnable
+# (codex-review/03-verification.md); ruff never reads them
+extend-exclude = ["codex-review"]
 
 [tool.ruff.lint]
 select = [

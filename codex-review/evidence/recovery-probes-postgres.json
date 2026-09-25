@@ -1,0 +1,125 @@
+{
+  "shared_dataset_first_drill": {
+    "ok": false,
+    "dry_run": false,
+    "started_at": "2026-09-22 12:00:00+00:00",
+    "finished_at": "2026-09-22 12:00:00+00:00",
+    "targets": [
+      {
+        "target_id": "ote_imbalance_settlement",
+        "replica_entries": 1,
+        "scratch_processed": 1,
+        "live_processed": 1,
+        "scratch": {
+          "rows": 288,
+          "checksum": "c4da5c4d95c6b72e8868b0e98dcbbb4c96521247d7fa3766ee201f0c79a90e13"
+        },
+        "live": {
+          "rows": 9204,
+          "checksum": "2de59db7aaa06ca5746e0bc432d670bffa2a9bcb7aa0e7cd5e8acc440a089297"
+        },
+        "ok": false,
+        "message": "8916 Silver version(s) live holds are missing from the rebuild",
+        "missing_versions": 8916,
+        "extra_versions": 0,
+        "lagging_runs": 0
+      },
+      {
+        "target_id": "ote_imbalance_settlement_monthly",
+        "replica_entries": 1,
+        "scratch_processed": 1,
+        "live_processed": 1,
+        "scratch": {
+          "rows": 9204,
+          "checksum": "2de59db7aaa06ca5746e0bc432d670bffa2a9bcb7aa0e7cd5e8acc440a089297"
+        },
+        "live": {
+          "rows": 8916,
+          "checksum": "2553a7cadc3a43ad31800c13511e0eb8e0fa82a685edc32046a01d7f791e3e0f"
+        },
+        "ok": true,
+        "message": "live \u2286 rebuild: 8916 versions reproduced; the rebuild is ahead by 288 (live has captures it has not processed yet)",
+        "missing_versions": 0,
+        "extra_versions": 288,
+        "lagging_runs": 0
+      }
+    ]
+  },
+  "shared_dataset_second_drill": {
+    "ok": true,
+    "dry_run": false,
+    "started_at": "2026-09-22 12:00:00+00:00",
+    "finished_at": "2026-09-22 12:00:00+00:00",
+    "targets": [
+      {
+        "target_id": "ote_imbalance_settlement",
+        "replica_entries": 1,
+        "scratch_processed": 1,
+        "live_processed": 1,
+        "scratch": {
+          "rows": 9204,
+          "checksum": "2de59db7aaa06ca5746e0bc432d670bffa2a9bcb7aa0e7cd5e8acc440a089297"
+        },
+        "live": {
+          "rows": 9204,
+          "checksum": "2de59db7aaa06ca5746e0bc432d670bffa2a9bcb7aa0e7cd5e8acc440a089297"
+        },
+        "ok": true,
+        "message": "identical: 9204 Silver versions",
+        "missing_versions": 0,
+        "extra_versions": 0,
+        "lagging_runs": 0
+      },
+      {
+        "target_id": "ote_imbalance_settlement_monthly",
+        "replica_entries": 1,
+        "scratch_processed": 1,
+        "live_processed": 1,
+        "scratch": {
+          "rows": 9204,
+          "checksum": "2de59db7aaa06ca5746e0bc432d670bffa2a9bcb7aa0e7cd5e8acc440a089297"
+        },
+        "live": {
+          "rows": 8916,
+          "checksum": "2553a7cadc3a43ad31800c13511e0eb8e0fa82a685edc32046a01d7f791e3e0f"
+        },
+        "ok": true,
+        "message": "live \u2286 rebuild: 8916 versions reproduced; the rebuild is ahead by 288 (live has captures it has not processed yet)",
+        "missing_versions": 0,
+        "extra_versions": 288,
+        "lagging_runs": 0
+      }
+    ]
+  },
+  "mapping_revision_drill": {
+    "ok": false,
+    "dry_run": false,
+    "started_at": "2026-09-17 22:16:00+00:00",
+    "finished_at": "2026-09-17 22:16:00+00:00",
+    "targets": [
+      {
+        "target_id": "ote_idm_soap",
+        "replica_entries": 1,
+        "scratch_processed": 1,
+        "live_processed": 1,
+        "scratch": {
+          "rows": 192,
+          "checksum": "b6761eaa23c93ca732c17aa6a1518c4ee319aabc80c88ab2b2cbe78e59ac4015"
+        },
+        "live": {
+          "rows": 384,
+          "checksum": "643e5de086d7864728aa0aab866340e1e387d1da18af6c57cf6722a497ccd2b8"
+        },
+        "ok": false,
+        "message": "192 Silver version(s) live holds are missing from the rebuild",
+        "missing_versions": 192,
+        "extra_versions": 0,
+        "lagging_runs": 0
+      }
+    ]
+  },
+  "mapping_revision_derivations": {
+    "old": "744622420669ce10",
+    "new": "92a0ba24970d530f"
+  }
+}

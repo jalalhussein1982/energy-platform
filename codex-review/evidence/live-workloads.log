@@ -1,0 +1,9 @@
+NAMESPACE         NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE
+energy-platform   deployment.apps/energy-platform-grafana   1/1     1            1           5h34m
+energy-platform   deployment.apps/energy-platform-metrics   1/1     1            1           35h
+kube-system       deployment.apps/coredns                   1/1     1            1           40h
+kube-system       deployment.apps/local-path-provisioner    1/1     1            1           40h
+kube-system       deployment.apps/metrics-server            1/1     1            1           40h
+
+NAMESPACE         NAME                                        READY   AGE
+energy-platform   statefulset.apps/energy-platform-postgres   1/1     35h

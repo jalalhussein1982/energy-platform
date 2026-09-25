@@ -1,9 +1,21 @@
 {
-  "tracked_files_checked": 41,
-  "modified_tracked_files": [],
-  "missing_tracked_files": [],
-  "git_diff_exit_code": 0,
-  "git_status": "?? codex-review/\n",
-  "pre_commit_hook_file_present": false,
-  "only_repository_addition_is_codex_review": true
+  "checked_at_utc": "2026-09-24T23:43:06.998133+00:00",
+  "head": "bc87c585ce8a61be2995d0b0b1b283f87c2032a6",
+  "head_unchanged": true,
+  "source_files_checked": 566,
+  "source_changed_or_missing": [],
+  "archive_files_checked": 71,
+  "archive_changed_or_missing": [],
+  "unexpected_files_outside_review": [],
+  "reports_checked": [
+    "01-deep-review.md",
+    "02-final-report-assessment.md",
+    "03-verification.md",
+    "README.md",
+    "agent-data-challenge.md",
+    "agent-delivery-challenge.md"
+  ],
+  "local_links_checked": 70,
+  "broken_local_links": [],
+  "ok": true
 }

@@ -1,0 +1,34 @@
+{
+  "same_version": {
+    "derivation_before": "744622420669ce10",
+    "derivation_after": "744622420669ce10",
+    "price_before": "170.13",
+    "price_after": "170.13",
+    "process": [
+      {
+        "run_id": 1,
+        "scheduled_for": "2026-09-17 22:15:00+00:00",
+        "attempt_kind": "replay",
+        "outcome": "noop",
+        "inserted": 0,
+        "events": 1,
+        "error": null
+      }
+    ]
+  },
+  "bumped_version_control": {
+    "derivation": "4b70dfc662fd8140",
+    "price_after": "171.13",
+    "process": [
+      {
+        "run_id": 1,
+        "scheduled_for": "2026-09-17 22:15:00+00:00",
+        "attempt_kind": "replay",
+        "outcome": "ok",
+        "inserted": 192,
+        "events": 1,
+        "error": null
+      }
+    ]
+  }
+}
