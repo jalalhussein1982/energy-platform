@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -405,6 +405,12 @@ def test_r2_live_capture_without_an_instant_is_keyed_by_the_schedule(
         )
 
     monkeypatch.setattr(cli, "_live_fetcher", offline)
+    # a tick of the */15 cadence six hours ago: within the day the name is honoured for, and
+    # not the newest firing instant, so the fallback would answer differently — the test
+    # holds on any day (a fixed tick expired one day after it was written, 2026-09-25 23:15Z)
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
+    tick = now - timedelta(hours=6)
+    tick = tick.replace(minute=tick.minute // 15 * 15)
     result = runner.invoke(
         app,
         [
@@ -417,16 +423,14 @@ def test_r2_live_capture_without_an_instant_is_keyed_by_the_schedule(
         ],
         env={
             "ENERGY_PLATFORM_DSN": "",
-            "ENERGY_PLATFORM_JOB_NAME": "ep-capture-ote-idm-soap-29838195",
+            "ENERGY_PLATFORM_JOB_NAME": f"ep-capture-ote-idm-soap-{int(tick.timestamp()) // 60}",
         },
     )
     assert result.exit_code == 0, result.output
     report = json.loads(result.stdout)
-    assert report["scheduled_for"].startswith("2026-09-24 23:15:00")  # the tick, not now()
+    assert datetime.fromisoformat(report["scheduled_for"]) == tick  # the tick, not now()
     entries = FileCaptureLog(tmp_path).list("ote_idm_soap")
-    assert len(entries) == 1 and entries[0].scheduled_for == datetime(
-        2026, 9, 24, 23, 15, tzinfo=UTC
-    )
+    assert len(entries) == 1 and entries[0].scheduled_for == tick
     # no Job name: the newest firing instant of the */15 cadence, minute-exact
     again = runner.invoke(
         app,
