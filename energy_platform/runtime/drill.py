@@ -22,10 +22,13 @@ named, not compared, because old code is not in the replica; the physical backup
 the drill's first phase (against the restored database) proves that backup. The rebuild may be
 ahead (live still has pending captures).
 
-The comparison is bounded by the **replica's newest capture instant** for the target: a live
-capture fetched after it cannot be in the replica yet (replication runs on its own cadence), so
-its versions and its run are not compared and are reported as lagging; a live capture fetched
-before it existed when the replica was last synced, so its absence is loss.
+The comparison is bounded by the **replica's newest capture instant** for the target, read
+from a snapshot of the replica's log taken **before** the target's rebuild and kept for its
+comparison: a live capture fetched after it cannot be in the replica yet (replication runs on
+its own cadence), so its versions and its run are not compared and are reported as lagging; a
+live capture fetched before it existed when the replica was last synced, so its absence is
+loss. A capture replication lands between the rebuild and the comparison is beyond the
+snapshot — lag, never loss.
 ``dry_run`` only lists what the full drill would touch and checks both stores answer. Wall clock
 is reported: that number is the RTO figure the runbook quotes, never an assumption.
 """
@@ -251,12 +254,11 @@ class _LiveSide:
     lagging: int
 
 
-def _within(replica: Bronze, target: str) -> tuple[set[str], datetime | None]:
-    entries = replica.log.list(target)
-    return {e.capture_id for e in entries}, max((e.fetched_at for e in entries), default=None)
+def _within(snapshot: tuple[CaptureEntry, ...]) -> tuple[set[str], datetime | None]:
+    return {e.capture_id for e in snapshot}, max((e.fetched_at for e in snapshot), default=None)
 
 
-def _live_side(live: Store, manifest: Manifest, replica: Bronze) -> _LiveSide:
+def _live_side(live: Store, manifest: Manifest, snapshot: tuple[CaptureEntry, ...]) -> _LiveSide:
     """What live holds that the replica must reproduce. ``bound`` is the replica's newest
     capture instant for the target. A live version or processed run whose capture is in the
     replica, or was fetched before ``bound``, is compared; one whose capture is newer than
@@ -268,9 +270,10 @@ def _live_side(live: Store, manifest: Manifest, replica: Bronze) -> _LiveSide:
     Two streamed passes: the first collects the derivation ids (a handful), whose registration
     instants are then read **outside** any open cursor — on PostgreSQL every store read ends
     the transaction, which would destroy the named cursor of a pass in progress; the second
-    pass decides the newest derivation per pair with those ranks in hand."""
+    pass decides the newest derivation per pair with those ranks in hand. ``snapshot`` is
+    the replica's log as the rebuild saw it (``_Rebuilt.snapshot``)."""
     target = manifest.target_id
-    replica_ids, bound = _within(replica, target)
+    replica_ids, bound = _within(snapshot)
     ids: set[str] = set()
     for row in _own_rows(live, manifest):
         if bound is None or row.observation.fetched_at <= bound:
@@ -327,10 +330,21 @@ def _live_side(live: Store, manifest: Manifest, replica: Bronze) -> _LiveSide:
 @dataclass(frozen=True, slots=True)
 class _Rebuilt:
     manifest: Manifest
-    entries: int
+    snapshot: tuple[CaptureEntry, ...]
+    """The replica's capture log for the target as it was **before** the rebuild: the
+    comparison uses this snapshot, never a fresh listing — replication runs on its own cadence,
+    and a capture that lands in the replica between a target's rebuild and its comparison
+    (minutes apart since every target is rebuilt first) would otherwise move the bound forward
+    and read as loss (the demo's first scheduled drill under this rule, 2026-09-25 01:30 UTC:
+    28 versions of one ceps_load capture replicated at 01:37, rebuilt at 01:31, compared at
+    01:48)."""
     reconciled: int
     reports: tuple[ProcessReport, ...]
     failure: str | None = None
+
+    @property
+    def entries(self) -> int:
+        return len(self.snapshot)
 
 
 def _rebuild_target(
@@ -341,7 +355,7 @@ def _rebuild_target(
     clock: Callable[[], datetime],
     owner: str,
 ) -> _Rebuilt:
-    entries = len(replica.log.list(manifest.target_id))
+    snapshot = tuple(replica.log.list(manifest.target_id))
     rt = Runtime(
         manifest=manifest,
         bronze=replica,
@@ -353,8 +367,8 @@ def _rebuild_target(
     try:
         reconciled, reports = _rebuild(rt, scratch, replica, clock)
     except StoreUnavailable as exc:
-        return _Rebuilt(manifest, entries, 0, (), f"store: {exc}")
-    return _Rebuilt(manifest, entries, reconciled, reports)
+        return _Rebuilt(manifest, snapshot, 0, (), f"store: {exc}")
+    return _Rebuilt(manifest, snapshot, reconciled, reports)
 
 
 def _dry_run_target(
@@ -380,9 +394,7 @@ def _dry_run_target(
     )
 
 
-def _compare_target(
-    rebuilt: _Rebuilt, *, live: Store | None, scratch: Store, replica: Bronze
-) -> TargetDrillReport:
+def _compare_target(rebuilt: _Rebuilt, *, live: Store | None, scratch: Store) -> TargetDrillReport:
     manifest = rebuilt.manifest
     target = manifest.target_id
     entries = rebuilt.entries
@@ -406,7 +418,7 @@ def _compare_target(
             f"rebuilt {rebuilt.reconciled} runs, {len(reports)} processed, {len(failed)} failed "
             f"(no live store to compare)",
         )
-    side = _live_side(live, manifest, replica)
+    side = _live_side(live, manifest, rebuilt.snapshot)
     live_digest = _digest(side.expected)
     group_fp, group_pairs = _group_fingerprints(scratch, manifest)
     # a live pair absent from the whole rebuilt group is loss; a pair present with another value
@@ -417,7 +429,7 @@ def _compare_target(
     unmatched -= sibling
     missing = 0
     diverging = 0
-    for _, key in _expected_with_pairs(live, manifest, replica, side, unmatched):
+    for _, key in _expected_with_pairs(live, manifest, rebuilt.snapshot, unmatched):
         if key in group_pairs:
             diverging += 1
         else:
@@ -478,15 +490,14 @@ def _compare_target(
 def _expected_with_pairs(
     live: Store,
     manifest: Manifest,
-    replica: Bronze,
-    side: _LiveSide,
+    snapshot: tuple[CaptureEntry, ...],
     unmatched: set[Fingerprint],
 ) -> Iterator[tuple[Fingerprint, PairKey]]:
     """The pair key of each unmatched expected fingerprint, by one more streamed pass over the
     target's own rows (only when something is unmatched; nothing is materialised)."""
     if not unmatched:
         return
-    _, bound = _within(replica, manifest.target_id)
+    _, bound = _within(snapshot)
     seen: set[Fingerprint] = set()
     for row in _own_rows(live, manifest):
         o = row.observation
@@ -519,8 +530,6 @@ def restore_drill(
             _rebuild_target(m, scratch=scratch, replica=replica, clock=clock, owner=owner)
             for m in manifests
         ]
-        targets = tuple(
-            _compare_target(r, live=live, scratch=scratch, replica=replica) for r in rebuilt
-        )
+        targets = tuple(_compare_target(r, live=live, scratch=scratch) for r in rebuilt)
     finished = clock()
     return DrillReport(all(t.ok for t in targets), dry_run, started, finished, targets)

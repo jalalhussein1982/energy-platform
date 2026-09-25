@@ -505,6 +505,39 @@ on every target).
 Demo projection (not a measurement): one base a day plus about 12 closed segments an hour at
 16–150 KB each — tens of MB a day into A and B instead of ≈ 4.5 GiB of WAL plus 96 bases.
 
+### 5.4 The first scheduled drill under ADR-036 amendment 5 (2026-09-25 01:30 UTC) — failed, and why
+
+`energy-platform-restore-drill-29838330` (the nightly run, deployed code of revision 26) fetched
+base `20260925T001527Z` and 12 WAL files from store B and ran phase 1 against the restored
+database for 1 111 s: five targets identical (`ote_dam` 1 536 versions, `ote_imbalance_settlement`
+864, `ote_intraday_market_xlsx` 98 112, the two monthly targets 0 — their own rows only now),
+two not: `ceps_load` "28 Silver version(s) live holds are missing from the rebuild" (live
+17 574, scratch 17 546) and `ote_intraday_market` "processed runs 516 < live 517; 192
+version(s) under 1 retired derivation(s) not compared". Phase 2 did not run.
+
+The 28 versions are one capture: 14 quarter-hours × 2 metrics = the ČEPS file at 03:30 Prague,
+the **01:30 UTC capture** — fetched as the drill started, replicated to store B by the 01:37
+replication, **after** `ceps_load` had been rebuilt (01:31) and **before** it was compared
+(01:48). The comparison re-listed the replica, took the newer capture as its bound and expected
+rows the rebuild had never seen; the same run is the one processed run `ote_intraday_market`
+was short by. Rebuilding every target before comparing any (amendment 5 decision 1) had widened
+that window from seconds to minutes. Not loss: the replica held everything live held.
+
+Fixed the same night (amendment 5 decision 5): the replica's log is read once per target,
+before its rebuild, and the comparison uses that snapshot — a capture replication lands later is
+lag or ahead, never missing. `tests/runtime/test_review3.py::test_r5_a_capture_replicated_between_rebuild_and_comparison_is_lag_not_loss`
+reproduces the night's sequence. The 192 historical versions of `ote_intraday_market` are the
+expected trace of ADR-031 amendment 1 meeting ADR-023 amendment 3: a tick's payload processed
+under the old code by its wall-clock run and again under the new code by its backfilled
+exact-tick run — the same value twice, named as history.
+
+What the alert path did with the failure: `EnergyPlatformRestoreDrillFailed` became active at
+01:51:14 UTC (the Job failed 01:49:37, `for: 1m`) and was **delivered at 01:51:24** — the first
+real page of ADR-040, under the newest-Job rule. Two `EnergyPlatformTargetLate` alerts
+(`ote_dam`, `ote_imbalance_settlement`) fired at 01:45:14 after their 30-minute window; whether
+a day-ahead and a settlement target should count as late at 03:45 Prague is the calibration
+question §7 names, now with a delivery to look at.
+
 ### 5.3 The drill's memory does not grow with the table (2026-09-24)
 
 The first **scheduled** drill on the demo (01:30 UTC; the manual drill of 23 September had

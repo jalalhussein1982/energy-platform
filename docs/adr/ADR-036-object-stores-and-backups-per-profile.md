@@ -318,6 +318,18 @@ output from a current-code rebuild is a guarantee nobody can keep.
    `lagging` (newer than the replica), `historical` and `sibling` counts in every target's
    report.
 
+5. **The comparison reads the replica as the rebuild saw it.** The replica's capture log for
+   a target is read once, before the target's rebuild, and that snapshot supplies the
+   comparison's bound and capture-id set. The first scheduled drill under decisions 1–4
+   (2026-09-25 01:30 UTC) failed on exactly this: `ceps_load` was rebuilt at 01:31, its 01:30
+   capture reached store B with the 01:37 replication, and the comparison at 01:48 re-listed
+   the replica, moved the bound forward and read that capture's 28 versions as missing (and one
+   `ote_intraday_market` run as a processed-run shortfall). Rebuilding every target first
+   (decision 1) had widened that window from seconds to minutes. A capture replication lands
+   after the snapshot is lag (its run) or ahead (its rows), never loss. The alert path
+   delivered that failure (`EnergyPlatformRestoreDrillFailed`, 01:51:24 UTC) — the first real
+   page of ADR-040.
+
 **Consequences.** After a value-changing release the nightly drill fails with `diverging` until
 the affected derivation is replayed (`energyctl replay --derivation`, ADR-016 §4) or the
 captures invalidated (ADR-038) — that is the signal wanted, not noise: production disagrees
@@ -325,7 +337,8 @@ with the code it runs. A value-preserving release, and any manifest revision tha
 passes with its old versions reported as historical. `docs/07` §5 and the final report state
 the guarantee in these words.
 
-**Proof (memory and PostgreSQL):** `tests/runtime/test_review3.py::test_r5_…`,
+**Proof (memory and PostgreSQL):** `tests/runtime/test_review3.py::test_r5_…` (including
+`test_r5_a_capture_replicated_between_rebuild_and_comparison_is_lag_not_loss` for decision 5),
 `test_r6_…`, `tests/store/test_review3_drill.py` (the reviewer's daily+monthly fixtures on an
 empty scratch schema in either order; a target with no captures reports none of its siblings'
 rows; the `ignore_fields` revision passes with 192 historical versions; a value-changing

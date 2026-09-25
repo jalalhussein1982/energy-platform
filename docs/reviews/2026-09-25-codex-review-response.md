@@ -227,5 +227,9 @@ deploy identity may not manage Roles (`docs/07` §4.4; the kube-state-metrics Ro
 and the chart no longer renders it for the demo); the second deployed the stack (revision 25)
 and **the delivery drill on the demo passed** (firing 01:08:24Z, resolved 01:09:24Z). The first
 live evaluation also corrected the two Job-failure rules to "the newest Job failed" (ADR-040
-§5). Left for the author: a real receiver by values, and the decision on the failover
-demonstration (R1).
+§5). The first scheduled restore drill under the new comparison rule (01:30 UTC) failed on a
+timing defect of the change itself — a capture replicated between a target's rebuild and its
+comparison read as loss — fixed the same night by comparing against a snapshot of the replica
+taken before the rebuild (ADR-036 amendment 5 decision 5; `docs/07` §5.4); the failure was
+delivered as a real alert. Left for the author: a real receiver by values, the night-time
+`EnergyPlatformTargetLate` calibration, and the decision on the failover demonstration (R1).

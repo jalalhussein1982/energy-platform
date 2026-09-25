@@ -351,3 +351,47 @@ def test_r6_a_value_changing_implementation_diverges_until_replayed(
     assert after.ok, t.message
     assert t.diverging_versions == 0 and t.historical_versions == 192
     assert t.historical_derivations == 1
+
+
+# --------------------------------- the first scheduled drill under the new rule (2026-09-25)
+
+
+def test_r5_a_capture_replicated_between_rebuild_and_comparison_is_lag_not_loss() -> None:
+    """The demo's first nightly drill under ADR-036 amendment 5 failed: ceps_load was rebuilt
+    at 01:31, the 01:30 capture reached the replica at 01:37, and the comparison at 01:48
+    re-listed the replica, moved the bound forward and read that capture's 28 versions as
+    missing. The comparison must use the replica as the rebuild saw it: what lands later is
+    lag (its run) and never loss."""
+    from energy_platform.runtime import drill as d
+
+    live, replica, clock = _live_two_runs()
+    scratch = MemoryStore()
+    rebuilt = d._rebuild_target(T1, scratch=scratch, replica=replica, clock=clock, owner="w")
+    assert rebuilt.entries == 2 and rebuilt.failure is None
+    # replication lands a third capture, which live has already processed
+    rt = runtime(T1, store=live, bronze=replica, clock=clock)
+    clock.advance(timedelta(minutes=15))
+    third = SCHEDULED + timedelta(minutes=30)
+    assert capture(rt, third).outcome == "ok"
+    assert process(rt)[0].outcome == "ok"
+    report = d._compare_target(rebuilt, live=live, scratch=scratch)
+    assert report.ok, report.message
+    assert report.missing_versions == 0 and report.replica_entries == 2
+    assert report.lagging_runs == 1 and report.live_processed == 2 and report.scratch_processed == 2
+    # and through the public verb, a fresh scratch sees all three: identical
+    again = restore_drill([T1], scratch=MemoryStore(), replica=replica, live=live, clock=clock)
+    assert again.ok and again.targets[0].replica_entries == 3
+    assert again.targets[0].message.startswith("identical")
+
+
+def _live_two_runs() -> tuple[MemoryStore, Bronze, Clock]:
+    clock = Clock(SCHEDULED + timedelta(minutes=1))
+    store = MemoryStore()
+    bronze = Bronze(MemoryBlobStore(), MemoryCaptureLog())
+    rt = runtime(T1, store=store, bronze=bronze, clock=clock)
+    for k in range(2):
+        when = SCHEDULED + timedelta(minutes=15 * k)
+        clock.now = when + timedelta(minutes=1)
+        assert capture(rt, when).outcome == "ok"
+    process(rt)
+    return store, bronze, clock

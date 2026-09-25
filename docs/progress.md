@@ -631,7 +631,14 @@ evaluation found `EnergyPlatformRestoreDrillFailed` paging for the two failed dr
 2026-09-24 kept as records after a later success: both Job-failure rules now fire on the newest
 Job of their kind only (ADR-040 §5; third push).
 
+**The first scheduled drill under the new rule (01:30 UTC) failed** on a timing defect of the
+Phase 13 change itself: a capture replicated between a target's rebuild and its comparison read
+as 28 missing versions (`07` §5.4). Fixed the same night: the comparison uses a snapshot of the
+replica taken before the rebuild (ADR-036 amendment 5 decision 5, regression test). The
+failure was delivered as `EnergyPlatformRestoreDrillFailed` at 01:51:24 — ADR-040's first real
+page. `EnergyPlatformTargetLate` fired for `ote_dam` and `ote_imbalance_settlement` at 01:45.
+
 **Open / carried.** Author: a real receiver by values (SMTP or a webhook, `alerting.alertmanager.receivers/routes`
-+ `egress.cidrs`); whether the three `EnergyPlatformTargetLate` pendings of 01:09 UTC page;
++ `egress.cidrs`); whether `EnergyPlatformTargetLate` should page for a day-ahead and a settlement target at night;
 run the delivery drill on the demo and wire a real receiver by values; decide on the failover
 demonstration (R1); the teardown when the demo is done; the ČEPS `value1 = value2` question.
