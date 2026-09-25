@@ -44,6 +44,7 @@ A contributor session — adding a target or requesting an admission — follows
 | 11 | Grafana dashboards over Silver (private) | — | 1 | the two dashboards render on the demo through a port-forward, through the read-only role — **done 2026-09-24** (`docs/plans/phase-11.md`) |
 | 12 | The local profile's object stores after MinIO | — | 1 | the clean-clone gate green again on RustFS chosen by probe — **done 2026-09-24** (`docs/plans/phase-12.md`) |
 | 13 | Review 3 (codex-astra, 2026-09-25) | — | 1 | the four runtime probes no longer reproduce (negative tests on PostgreSQL), the alert path evaluates and delivers on kind, the availability boundary is stated, the final report matches the evidence — **done 2026-09-25** (`docs/plans/phase-13.md`) |
+| 14 | The operator's alert channel; the report committed | — | 1 | a receiver's credential comes from a Secret and a credential in values is refused at render, a route to an undeclared receiver is refused at render, the interim night-time routing is a tested values example, the runbook for the demo is written, the final report is tracked and pinned to its commit — **done 2026-09-25** (`docs/plans/phase-14.md`) |
 
 ---
 
@@ -290,6 +291,17 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 - [x] 13.5 R3: `alerting.enabled` — Prometheus over the existing rules, namespaced kube-state-metrics, Alertmanager, `energyctl alert-sink`, Grafana datasource; ADR-040; chart and sink tests; `make alert-drill`
 - [x] 13.6 the delivery drill on a fresh kind cluster (`07` §7.2)
 - [x] 13.7 ADR-028 amendment 1 (R1), `05` C-72…C-75, `07` §5 and §7, README, chart and tenant READMEs, `02` pointer, the final report rewritten to the assessment, roadmap, progress
+
+## Phase 14 — the operator's alert channel, its credential in a Secret; the report committed — done 2026-09-25
+
+**Goal.** Close the first two operational items of the post-review advice (2026-09-25): a real channel can be wired without a credential in values, its routing keeps the two uncalibrated night-time freshness alerts in the log while the failures that matter page, the runbook for the demo exists; the final report gets its accuracy pass and a commit. Plan: `docs/plans/phase-14.md`. Not in this phase: the manifest-level publication expectation (Phase 15), the failover demonstration (the author's decision), the teardown, the ČEPS follow-up.
+
+- [x] 14.0 the plan
+- [x] 14.1 `alerting.alertmanager.existingSecret` (read-only, optional, `/etc/alertmanager/secrets/<key>` for the receivers' `*_file` fields; the demo names it), a credential in values and a route to an undeclared receiver refused at render (`05` C-76, C-77), `ci/receiver-values.yaml` walked as Alertmanager walks it, ADR-040 amendment 1, `07` §7.3 (the runbook), the chart, tenant and root READMEs, the ADR index
+- [x] 14.2 `docs/overview/final-report.md` tracked after its accuracy pass, pinned to `6bc8021`
+- [x] 14.3 roadmap, progress
+
+**Left for the author (Level 3):** the Secret, the mailbox and the receiver values on the demo, then the drill of `07` §7.2 ending in the mailbox (§7.3); the failover decision (ADR-028 amendment 1); the teardown when the demo is done (own-cluster README §6); the ČEPS follow-up around 2026-10-02.
 
 ---
 

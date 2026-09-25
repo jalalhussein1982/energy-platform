@@ -655,3 +655,51 @@ deploys today (revisions 24 → 28), CI green on every push.
 + `egress.cidrs`); whether `EnergyPlatformTargetLate` should page for a day-ahead and a settlement target at night;
 run the delivery drill on the demo and wire a real receiver by values; decide on the failover
 demonstration (R1); the teardown when the demo is done; the ČEPS `value1 = value2` question.
+
+## 2026-09-25 (later) — Phase 14: the operator's alert channel with its credential in a Secret; the final report committed
+
+The author's advisor answered the six open items (2026-09-25); every factual claim was verified
+against the repository before this phase took items 2, 3 (its interim) and 4. Plan:
+`docs/plans/phase-14.md`. Commits: `2b7c45c` (plan), `6bc8021` (chart), the report, this entry.
+
+- **The channel's credential is a Secret (6bc8021, ADR-040 amendment 1).** The receivers
+  render into a ConfigMap by `toYaml`, and the Alertmanager Deployment mounted nothing else —
+  an SMTP password or a webhook token had nowhere to go but values. Now
+  `alerting.alertmanager.existingSecret` is mounted read-only and optional at
+  `/etc/alertmanager/secrets/`, the receivers use Alertmanager's `*_file` fields, and the demo
+  names `energy-platform-alertmanager` before the Secret exists (the pod starts; the file
+  appears when the author creates it). Two refusals at render: a credential-bearing key in the
+  receivers (`05` C-76, the `*_file` alternative named, the value never echoed) and a route at
+  any depth naming an undeclared receiver (`05` C-77). One thing the RED run taught: Helm's
+  `toYaml` sorts keys, so a key that sorts first in a list item renders as `- auth_password:`
+  — the anchored regexes had to allow the list marker.
+- **The interim night-time routing is a tested example, not a rule change.**
+  `ci/receiver-values.yaml`: `EnergyPlatformTargetLate` for `ote_dam` and
+  `ote_imbalance_settlement` (the two targets whose publication expectation the freshness code
+  documents as uncalibrated) → the log only; `severity = page` → the channel with
+  `continue: true`; a catch-all → the log, so the receiver's log stays the delivery record. The
+  chart test walks the rendered tree the way Alertmanager walks it (first matching child,
+  `continue`, the parent only without a matching child) and asserts the receivers of four
+  representative alerts. The calibration itself — a publication expectation in the manifest —
+  is Phase 15.
+- **The runbook** (`07` §7.3): a read mailbox on the authenticated submission port (Hetzner
+  Cloud blocks outbound 25 by default), the provider's published netblocks as the egress rule
+  (the `dig` commands), the Secret, the values, a render before the push, the §7.2 drill ending
+  in the mailbox; the same shape for a token-bearing webhook (`url_file`).
+- **The final report is tracked** after its accuracy pass, pinned to `6bc8021` (the demo runs
+  revision 28 of `d5fa9ce`): the failover demonstration is engineering plus cost (one server in
+  the Terraform module, embedded etcd needs three, the CNPG mode has no backup chain so the
+  drill refuses it, a node loss to drill and time), not "a cost decision rather than an
+  engineering one"; delivery to a log is distinguished from notification of a person; the ČEPS
+  series question is stated as `06` §4.2 records it; the teardown separates the workflow, the
+  servers and the locked buckets; 14 phases, 77 constraints, 960 offline tests.
+
+`make check` green on every commit (960 passed, 35 skipped offline; `helm-lint` green). Nothing
+deployed: the pushes are the author's; the demo receives an empty optional mount and nothing
+else until the Secret and the receiver values exist.
+
+**Open / carried.** Author (Level 3): create the Secret, choose the mailbox, set the receiver
+values and run the drill of `07` §7.3 on the demo; the failover decision (ADR-028 amendment 1;
+a phase of its own if funded); the teardown when the demo is done (own-cluster README §6); the
+ČEPS follow-up around 2026-10-02. Maintainer: Phase 15 — the manifest-level publication
+expectation read by freshness (ADR-037 amendment), which retires the interim routes.
