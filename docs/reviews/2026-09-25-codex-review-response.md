@@ -199,3 +199,29 @@ closes.
   values with the author's next push; the delivery drill on the demo and the wiring of a real
   receiver (SMTP or a webhook, by values) are the author's.
 - `codex-review/` is verbatim, including the archive the reviewer made.
+
+## Closure — Phase 13, 2026-09-25 (`docs/plans/phase-13.md`)
+
+Every runtime finding was closed the same day, one commit each, with the reviewer's
+counterexample as a negative test on both stores; the design findings by ADR amendments; the
+alert path by ADR-040 and a delivery drill. The probe scripts were rerun afterwards:
+
+| Finding | Closed by | Probe now |
+|---|---|---|
+| R2 | b89f7b5 — `runtime/schedule.py`, `capture --live` keyed by the schedule's instant, the Job name by the downward API, ADR-031 amendment 1 | **still asserts by construction**: the probe calls `capture(rt, actual_start)` with the wall clock as the identity — the very default the verb no longer has; the fixed path is the CLI, proved by `tests/cli/test_cli.py::test_r2_…` and the six `test_r2_…` tests |
+| R4 | 5b28896 — `implementation_version()` in the derivation identity, ADR-023 amendment 3 | **still asserts by construction**: it patches `map_payload` in memory, which changes no file, so the digest cannot move; `test_r4_…` changes bytes and drives the replay through a moved digest |
+| R5, R6 | 28538b7 — the drill rebuilds the cohort first, lineage-scoped value fingerprints, `missing` / `diverging` / `historical`, ADR-036 amendment 5 | **assertion fails** (both defects gone): the first shared-dataset rebuild passes on an empty scratch, the harmless mapping revision passes with 192 historical versions |
+| R3 | 8e9fb66 + the gate fixes — `alerting.enabled` (Prometheus over the same rules ConfigMap, namespaced kube-state-metrics, Alertmanager, `energyctl alert-sink`), ADR-040; `make alert-drill` on a fresh kind cluster **PASS** 2026-09-25 (firing delivered 00:48:15Z, resolved 00:51:15Z; `docs/07` §7.2) | — |
+| R1 | ADR-028 amendment 1 — the availability boundary stated; README and the final report say "recoverable, not failover-capable"; the demonstration is the author's decision | — |
+| 02 — the final report | `docs/overview/final-report.md` rewritten row by row (untracked, as the author keeps it) | — |
+
+Two things the gate taught on kind, both recorded in ADR-040 and `docs/07` §7: Prometheus
+3 rejects `--web.enable-lifecycle=false` as a boolean flag (dropped; lifecycle is off by
+default), and kube-state-metrics addresses the API server by the `kubernetes` Service IP on
+443, which a CNI evaluates before or after translation to the node's endpoint on 6443 — so
+`alerting.kubeStateMetrics.apiServer` declares both, and Cilium needs `policyCIDRMatchMode:
+[nodes]` for a rule that names a node.
+
+Left for the author (Level 3): push (the demo receives R2–R6, the alerting stack and the
+demo's API-server addresses with the next deploy), run the delivery drill on the demo, wire a
+real receiver by values, and decide on the failover demonstration (R1).

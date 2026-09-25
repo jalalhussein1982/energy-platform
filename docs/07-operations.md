@@ -341,7 +341,21 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
 (WAL shipped to A); store A or its provider = the replication interval + copy time (demo: 15 min,
 `7,22,37,52 * * * *`); the whole environment = as store A plus the rebuild. Three alert rules watch
 the *age* of the last successful replication, WAL shipment and base backup (kube-state-metrics),
-because a job that never runs has no failed-Job metric.
+because a job that never runs has no failed-Job metric — evaluated and delivered since ADR-040 (§7).
+
+**What the drill guarantees (ADR-036 amendment 5, 2026-09-25).** Phase 1 (against the restored
+database) proves the physical backup: base + WAL restore to a server that answers and holds
+live's history. Phase 2 (the Bronze-only rebuild into a fresh schema) proves that **the code in
+production reproduces the data in production**: every target is rebuilt first, then each is
+compared within its own lineage; per (observation identity, payload) live holds within the
+replica bound, the rebuild must reproduce the value of live's newest derivation — a pair the
+rebuild lacks is `missing` (loss), one with another value is `diverging` (the running code no
+longer produces live's value: an un-replayed correction or a regression; the drill fails and
+names it; the repair is `energyctl replay --derivation` or an invalidation), and versions under
+retired derivations are `historical` — counted, named, not compared, because old code is not in
+the replica. A value-changing release therefore fails the nightly drill until its derivation is
+replayed; that is the signal, not noise. The availability boundary the drill sits inside is
+ADR-028 amendment 1: the demo is recoverable, not failover-capable.
 
 Measured on the local profile, 2026-09-22 (MinIO A → MinIO B on one kind node; the numbers are
 mechanics, not the demo's cross-provider figures, which the replication CronJob measures on
@@ -378,8 +392,33 @@ ConfigMap `<release>-alert-rules` for any scraper. Dashboard:
 
 Alerts (`_alerts.tpl`): `EnergyPlatformTargetLate` (page, 30 min), `EnergyPlatformPipelineFailed`
 (page, 15 min), `EnergyPlatformSourceUnavailable` (warning, 1 h), `EnergyPlatformFreshnessStale`
-(page, row older than 45 min), `EnergyPlatformExporterDown`, and — needing kube-state-metrics —
-`EnergyPlatformRestoreDrillFailed`, `EnergyPlatformReplicationFailed`.
+(page, row older than 45 min), `EnergyPlatformExporterDown`, `EnergyPlatformReconciliationMismatch`,
+and — over kube-state-metrics — `EnergyPlatformRestoreDrillFailed`, `EnergyPlatformReplicationFailed`,
+`EnergyPlatformReplicationStale`, `EnergyPlatformWalShipmentStale`, `EnergyPlatformBaseBackupStale`.
+
+**Evaluated and delivered (ADR-040, 2026-09-25; review 3 R3).** Until then the rules were a
+ConfigMap "for any scraper" and no profile ran one. `alerting.enabled` (on in `local`, on the
+demo, in the all-flags render; off in the tenant default) renders, in the namespace and without a
+CRD or a cluster right: **Prometheus** (v3.14.0 by digest, an `emptyDir` TSDB, two days) loading
+`<release>-alert-rules` unchanged and scraping the exporter and **kube-state-metrics** (v2.20.0,
+`--namespaces=<ns> --resources=cronjobs,jobs`, a `Role` with list/watch on jobs and cronjobs);
+**Alertmanager** (v0.34.1) routing every alert, grouped by alert name and target, to the
+**platform receiver** — `energyctl alert-sink`, a Deployment on the platform image that writes one
+JSON line per delivery to its log (`firing` / `resolved`, alert names, labels, instants) — and to
+whatever the operator adds by values (`alerting.alertmanager.receivers` / `routes`, raw
+Alertmanager objects; an external receiver needs `alerting.alertmanager.egress.cidrs`). Grafana
+gets the Prometheus datasource and the ADR-037 `freshness.json` dashboard. Default-deny stays:
+kube-state-metrics reaches the API server through `alerting.kubeStateMetrics.apiServer.cidrs`
+and `ports` (required): the `kubernetes` Service IP on 443 as the pod addresses it and the
+endpoint on 6443 as the node serves it — the demo `10.43.0.1/32` + `10.10.1.10/32`, kind
+`10.96.0.1/32` + `172.16.0.0/12` (with Cilium's `policyCIDRMatchMode: [nodes]`, since the
+endpoint is the control-plane node — and `rollOutCiliumPods: true`, because the agent that was
+running before the setting kept dropping the connection until restarted). To read a delivery:
+
+```bash
+kubectl -n energy-platform logs deploy/energy-platform-alert-sink | tail
+kubectl -n energy-platform port-forward svc/energy-platform-prometheus 9090:9090   # /alerts, /rules
+```
 
 Two things the first live cycle taught, both fixed the same day: `postgres_exporter`'s driver
 defaults to `sslmode=require` (the statefulset-mode DSN gets `?sslmode=disable`, in-namespace
@@ -515,6 +554,56 @@ the restored-database phase 777 s (≈ 13 min); the Bronze-only rebuild into a f
 1 216 s (≈ 20 min); the whole two-phase Job 02:52–03:26 UTC (≈ 34 min). Each is a replay
 duration on warm infrastructure; none is a measured infrastructure-loss RTO (replacement
 nodes, identities and secrets, resumed schedules are not included — review 2 DEP-01/04-topology).
+
+### 7.2 The alert delivery drill (ADR-040, Phase 13, 2026-09-25)
+
+`make alert-drill` (`deployment/local/drills/alert.sh`, after `make local-up`): a Job named
+`energy-platform-restore-drill-manual-fail` whose one container exits 1 — the controlled failure
+the review asked for — then a wait for a `firing` delivery of `EnergyPlatformRestoreDrillFailed`
+in the receiver's log (kube-state-metrics → Prometheus `for: 1m` → Alertmanager `group_wait 10s`
+→ the webhook), the Job deleted, a wait for the `resolved` delivery. Nothing else is touched.
+
+Run on a fresh kind cluster, 2026-09-25 (`make local-up` at 00:40–00:44 UTC, then the drill):
+
+```text
+== alert-drill: receiver pod energy-platform-alert-sink-787c956554-2r5z9, evaluator chain
+   kube-state-metrics → Prometheus → Alertmanager → webhook; since 2026-09-25T00:44:38Z
+PASS prometheus available · PASS alertmanager available · PASS kube-state-metrics available · PASS alert-sink available
+== alert-drill: Job energy-platform-restore-drill-manual-fail created (exits 1); waiting up to 420s for a firing delivery
+PASS firing delivered: {"alerts": [{"alertname": "EnergyPlatformRestoreDrillFailed", …
+== alert-drill: Job deleted; waiting up to 420s for a resolved delivery
+PASS resolved delivered: {"alerts": [{"alertname": "EnergyPlatformRestoreDrillFailed", "endsAt": "2026-09-25T00:50:14.272Z", …
+== alert-drill: PASS (firing and resolved both delivered to the platform receiver)
+```
+
+The receiver's two lines, reduced to their fields:
+
+| received_at (UTC) | status | alert | job_name | startsAt | endsAt |
+|---|---|---|---|---|---|
+| 00:48:15 | `firing` | `EnergyPlatformRestoreDrillFailed` | `energy-platform-restore-drill-manual-fail` | 00:47:14 | — |
+| 00:51:15 | `resolved` | `EnergyPlatformRestoreDrillFailed` | the same | 00:47:14 | 00:50:14 |
+
+Timing, for the runbook: the Job failed within seconds of 00:44:40; kube-state-metrics exported
+`kube_job_status_failed = 1` at its next scrape, the rule's `for: 1m` made the alert active at
+00:47:14, Alertmanager's `group_wait: 10s` delivered it at 00:48:15 — **about 3.5 minutes from
+failure to delivery** at the chart's 60-second scrape and evaluation interval. The Job's
+deletion at 00:48:20 made the series stale; Prometheus resolved the alert at 00:50:14 and the
+`resolved` delivery arrived at 00:51:15. Nothing else was touched: no capture, no schedule,
+no data.
+
+Two lessons the first bring-up taught, both in ADR-040 and the values files: Prometheus 3
+rejects `--web.enable-lifecycle=false` (a boolean flag; dropped), and kube-state-metrics dials
+the API server by the `kubernetes` Service IP on 443 while Cilium evaluates the policy against
+the node's endpoint on 6443 — the rule declares both addresses and both ports, and Cilium needs
+`policyCIDRMatchMode: [nodes]` loaded by a restarted agent (`rollOutCiliumPods: true`). The
+first install failed on both and was rolled back by `--rollback-on-failure`; the second passed
+`make local-up` (smoke, egress tests) and this drill. Grafana through the port-forward showed
+both datasources healthy (`Database Connection OK`, `Successfully queried the Prometheus API`)
+and three dashboards, the ADR-037 freshness dashboard now among them. `make local-down`
+afterwards.
+
+The same steps on the demo are the author's (Level 3): `kubectl -n energy-platform apply` of
+the same Job from the drill script, `kubectl logs deploy/energy-platform-alert-sink`, delete.
 
 ### 7.1 Dashboards — Grafana, private (ADR-039, Phase 11, 2026-09-24)
 

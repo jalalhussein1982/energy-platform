@@ -79,3 +79,40 @@ If the assumption "the evaluator wants a live instance" is false, the cost is a 
 ## Verification refs
 
 `00-assumptions.md` §5: 2026-09-19 · V-6 · CONFIRMED (store A/B pattern and Object-Lock probe reused as the V-12/V-13 template); 2026-09-19 · V-8 · CONFIRMED (federation branch of ADR-015 now taken). V-12, V-13, V-14: **pending**, to be run by the author before Phase 5 Terraform work starts.
+
+## Amendment 1 (2026-09-25) — the availability boundary of the demo, stated
+
+**Finding (review 3 R1, `codex-review/01-deep-review.md`).** The consequences above accepted
+that "a node loss is a demo outage" and left it there; the final report then described the
+delivery as fulfilling the brief's high-availability requirement in full, with "the data
+survives and the pipeline recovers" as the definition. Two readings of one topology. The
+reviewer asks for either a demonstrated failover or an explicit boundary. This amendment is the
+boundary; the demonstration is the author's decision.
+
+**Decision.**
+
+1. The demo is a **recoverable single-primary** deployment: one k3s server that is also the
+   only PostgreSQL host (`values-demo.yaml` pins the StatefulSet to it), one agent, one
+   PostgreSQL instance. What it delivers: durable capture in two failure domains (store A with
+   Object Lock, store B at another provider), WAL and base backups shipped and replicated,
+   physical restore and the Bronze-only rebuild drilled (ADR-036 §5, amendment 5), fenced
+   workers, reconcile/backfill/replay/invalidation with no manual step. What it does **not**
+   deliver: automatic failover of the database or of the control plane. The loss of the server
+   is an outage that ends when an operator runs the restore procedure of `docs/07` §5 on
+   replacement infrastructure; only its warm phases are measured (777 s and 1 216 s on
+   2026-09-24), the whole-environment recovery is not (ADR-036 amendment 2 §4).
+2. A-6's "recovery has **no manual step**" is true of the data path — a missed tick, a
+   correction captured during a ledger outage, a wrong release, a known-wrong capture — and
+   not of node loss on the demo. The assumption register is frozen; this amendment is where
+   the qualification lives.
+3. The production path is the own-cluster README's: three k3s servers with embedded etcd and
+   CNPG with replicas (`postgres.mode=cnpg`), a values and Terraform change. It is **not
+   exercised**: no node-loss drill, no failover measurement, and the CNPG backup chain refuses
+   the restore drill until it exists (ADR-036 amendment 3). The README and the final report
+   say "recoverable, not highly available in the failover sense" until one of the two is
+   done; a green deploy and a ticked roadmap do not change that sentence.
+4. Whether to fund and run a failover demonstration on the demo (a third server and a second
+   PostgreSQL, roughly doubling the monthly cost of §5) is the author's decision and the one
+   open acceptance item of review 3.
+
+**Proof:** none — a boundary statement. `docs/07` §5 and the README's status line carry it.

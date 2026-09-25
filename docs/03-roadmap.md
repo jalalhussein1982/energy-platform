@@ -42,6 +42,8 @@ A contributor session — adding a target or requesting an admission — follows
 | 9 | Gap closure | — | 1 | every gap closed or listed in the README with a reason; final clean clone — **done 2026-09-23**; the strictly blind re-run (G10) run and passed 2026-09-24 (`docs/09` run 4) |
 | 10 | Correctness and recovery (review 2) | — | 3–4 | the eight P1 counterexamples of `codex-review/2026-09-24/` pass as negative tests on PostgreSQL; RPO stated per failure domain — **done 2026-09-24** (`docs/plans/phase-10.md`; 11 commits, 923 tests, 32 on PostgreSQL) |
 | 11 | Grafana dashboards over Silver (private) | — | 1 | the two dashboards render on the demo through a port-forward, through the read-only role — **done 2026-09-24** (`docs/plans/phase-11.md`) |
+| 12 | The local profile's object stores after MinIO | — | 1 | the clean-clone gate green again on RustFS chosen by probe — **done 2026-09-24** (`docs/plans/phase-12.md`) |
+| 13 | Review 3 (codex-astra, 2026-09-25) | — | 1 | the four runtime probes no longer reproduce (negative tests on PostgreSQL), the alert path evaluates and delivers on kind, the availability boundary is stated, the final report matches the evidence — **done 2026-09-25** (`docs/plans/phase-13.md`) |
 
 ---
 
@@ -275,6 +277,19 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 - [x] 12.3 chart: `objectstore.yaml` (RustFS by digest), `hook-bucket-init.yaml` on the platform image, values, `local-secrets`, chart test
 - [x] 12.4 ADR-036 amendment 4, ADR-032 pointer, `07` §2 and §8.4, local README, README, `05` C-71
 - [x] 12.5 the gate: `make local-down && make local-up && make smoke-test`, `make rollback-drill`, a live capture COMPLIANCE-locked in RustFS A, Grafana on kind — all PASS (`07` §8.4)
+
+## Phase 13 — review 3 (codex-astra, 2026-09-25) — done 2026-09-25
+
+**Goal.** Answer the six findings of `codex-review/` the way review 2 was answered: rerun the probes (all four reproduce on memory and PostgreSQL), close each runtime defect with the reviewer's counterexample as a negative test, each design gap by an ADR amendment, wire the alert path the rules assumed, state the availability boundary, revise the final report. Plan: `docs/plans/phase-13.md`; response: `docs/reviews/2026-09-25-codex-review-response.md`.
+
+- [x] 13.0 the review verbatim (the earlier rounds archived by the reviewer), ruff scoped to the source tree, the plan, the response
+- [x] 13.1 the four probes rerun on the temporary PostgreSQL: every one reproduces (exit 0)
+- [x] 13.2 R2: `runtime/schedule.py`, `capture --live` keyed by the schedule's instant (the CronJob's tick by the downward API), ADR-031 amendment 1, six negative tests
+- [x] 13.3 R4: `implementation_version()` in the derivation identity, ADR-023 amendment 3, negative tests on both stores
+- [x] 13.4 R5 + R6: the drill rebuilds the cohort first, lineage-scoped value fingerprints, `missing` / `diverging` / `historical`, ADR-036 amendment 5, negative tests on both stores (a cursor defect only PostgreSQL showed, fixed)
+- [x] 13.5 R3: `alerting.enabled` — Prometheus over the existing rules, namespaced kube-state-metrics, Alertmanager, `energyctl alert-sink`, Grafana datasource; ADR-040; chart and sink tests; `make alert-drill`
+- [x] 13.6 the delivery drill on a fresh kind cluster (`07` §7.2)
+- [x] 13.7 ADR-028 amendment 1 (R1), `05` C-72…C-75, `07` §5 and §7, README, chart and tenant READMEs, `02` pointer, the final report rewritten to the assessment, roadmap, progress
 
 ---
 

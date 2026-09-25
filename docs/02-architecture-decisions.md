@@ -178,6 +178,8 @@ Blob store and capture log are separate: an unchanged page produces a new captur
 
 **Restore drill.** A scheduled CI job restores Bronze and Postgres into a scratch environment and asserts row counts and checksums. A backup that has never been restored is a hypothesis.
 
+*(2026-09-25: what the Bronze-only rebuild guarantees — values per (identity, payload) at live's newest derivation, the cohort rebuilt first, `missing` / `diverging` / `historical` named — is ADR-036 amendment 5; the availability boundary of the demo (recoverable single-primary, no automatic failover) is ADR-028 amendment 1; the alert rules of ADR-037 are evaluated and delivered by ADR-040.)*
+
 **Rejected.** Parquet and Postgres as dual authoritative Silver (dual-write inconsistency). A single-failure-domain object store described as "backup".
 
 *(2026-09-19, `00` §5 V-6: versioning and object lock verified on the reference S3 store; the second independent endpoint is Swift on a different site. The reference gateway implements only the STANDARD class and its lifecycle API accepts non-existent class names without error, so "lifecycle to cold tier" was replaced by **ADR-021**: a platform `rclone` tiering job with `bronze.tiering.mode = none|move|lifecycle` and a deploy-time probe. Bronze replication is an `rclone` job, not native bucket replication. Superseded wording: "lifecycle to cold tier".)*

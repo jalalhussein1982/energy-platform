@@ -571,3 +571,54 @@ The author said "run these, I approve manually"; the auto-mode classifier refuse
 done (`terraform destroy`, then disable `deploy-demo.yml`). ČEPS `value1 = value2` question.
 The invalidation Job `invalidate-23sep-file-under-21-22` stays in the namespace as a record
 (Complete); the gated egress Jobs were deleted.
+
+## 2026-09-25 — Phase 13: review 3 (codex-astra) answered and closed
+
+The reviewer archived the two earlier rounds under `codex-review/archive/` and wrote a review of
+the completed platform at `bc87c58`: six findings (R1–R6) and a row-by-row assessment of the
+final report. All four probe scripts reproduced here on memory and on the temporary PostgreSQL.
+Response: `docs/reviews/2026-09-25-codex-review-response.md`; plan: `docs/plans/phase-13.md`.
+Nothing declined.
+
+- **R2 (fixed, b89f7b5):** `capture --live` keyed runs by `now()`; the gap detector expects the
+  cron instant, so every scheduled capture on the demo since 2026-09-23 was a phantom gap that
+  the hourly backfill fetched again — twice the source reads, no wrong value. Now the run is
+  the schedule's instant: the CronJob controller's tick from the Job name
+  (`<cronjob>-<minutes since the epoch>`, passed by the downward API), else the newest firing
+  instant (ADR-031 amendment 1). A missed tick is still missing.
+- **R4 (fixed, 5b28896):** the derivation identity named a package version nobody bumps, so a
+  parser or mapping fix replayed as a no-op. `implementation_version()` = package version + a
+  digest of the package's sources, in every derivation and generic parser ref (ADR-023
+  amendment 3). The reviewer's probe patches a function in memory and therefore keeps
+  "reproducing" by construction; the tests change bytes.
+- **R5, R6 (fixed, 28538b7):** the drill now rebuilds every target before comparing, compares
+  within each target's own lineage, and guarantees **values**: per (identity, payload) the
+  newest derivation's value; `missing` = loss, `diverging` = the running code disagrees with
+  live (an un-replayed correction), `historical` = retired derivations, named and not compared
+  (ADR-036 amendment 5). PostgreSQL found what memory could not: a store read inside an open
+  server-side cursor destroyed the cursor — fixed by resolving derivation ranks in a first pass.
+- **R3 (built, 8e9fb66 + the gate fixes):** `alerting.enabled` renders Prometheus over the
+  existing rules ConfigMap, a namespaced kube-state-metrics (a Role, no CRD), Alertmanager and
+  `energyctl alert-sink`, the platform's receiver (ADR-040). The delivery drill on a fresh kind
+  cluster PASSED: a failing drill Job delivered `firing` in about 3.5 minutes and `resolved`
+  three minutes after its deletion (`07` §7.2). Two bring-up lessons: Prometheus 3 rejects
+  `--web.enable-lifecycle=false`; Cilium evaluates the API-server rule against the node's
+  endpoint (declare the Service IP and the endpoint, `policyCIDRMatchMode: [nodes]`, restart the
+  agent). The first install rolled back on both; the second passed the whole gate.
+- **R1 (stated, ADR-028 amendment 1):** the demo is a recoverable single-primary deployment with
+  no automatic failover; A-6's "no manual step" holds for the data path, not for node loss; the
+  failover demonstration is the author's decision and the one open acceptance item.
+- **The final report** (`docs/overview/final-report.md`, untracked as the author keeps it)
+  rewritten to the assessment: the availability boundary, the drill's real rule, RPO with its
+  assumptions, what Helm rollback does not undo, alerting as built, the four contribution runs
+  as `docs/09` records them, guardrails versus the sandbox, seven targets with four cadences,
+  the owner's bootstrap, the review dispositions.
+
+Numbers: 953 offline tests, 36 on PostgreSQL, 75 constraint rows, 41 ADRs. Ruff is scoped to
+the source tree (`extend-exclude = ["codex-review"]`) so the reviewer's `.py` probes stay as
+written. kind cluster torn down after the gate.
+
+**Open / carried.** Author: push (the demo receives R2–R6, the alerting stack and its API-server
+addresses `10.43.0.1/32` + `10.10.1.10/32` with the next deploy — three new images by digest);
+run the delivery drill on the demo and wire a real receiver by values; decide on the failover
+demonstration (R1); the teardown when the demo is done; the ČEPS `value1 = value2` question.

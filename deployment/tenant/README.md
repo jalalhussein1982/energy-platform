@@ -75,3 +75,17 @@ The image build needs nothing from you: the workflow pushes it. A deploy from th
 the admin kubeconfig is `make deploy-tenant ENV=demo KUBECONFIG=… DEMO_OCI_NAMESPACE=…
 IMAGE_REPO=ghcr.io/<owner>/<repo> IMAGE_DIGEST=sha256:…` (the digest of an image the workflow
 pushed; a laptop build would be arm64).
+
+## Alerting on the demo (ADR-040, 2026-09-25)
+
+`values-demo.yaml` sets `alerting.enabled: true` with `alerting.kubeStateMetrics.apiServer.cidrs:
+[10.43.0.1/32, 10.10.1.10/32]` and `ports: [443, 6443]` (the `kubernetes` Service IP as the pod
+addresses it and the k3s server's endpoint on the private network — `kubectl get endpoints
+kubernetes`; kube-router evaluates after the Service translation, so the second is the one that
+matters there, and both are harmless).
+The next push renders Prometheus, kube-state-metrics, Alertmanager and the platform receiver in
+the namespace (three new images pulled by digest). The author then runs the delivery drill there
+(the Job in `deployment/local/drills/alert.sh`, `kubectl logs deploy/energy-platform-alert-sink`)
+and wires a real channel by values: `alerting.alertmanager.receivers` / `routes` (raw Alertmanager
+objects) plus `alerting.alertmanager.egress.cidrs` for an external receiver. The receiver's log is
+the delivery record until then.

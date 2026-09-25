@@ -5,23 +5,23 @@ market (SOAP and daily XLSX), OTE day-ahead results and imbalance settlement, Č
 with a **constrained extension path**: a junior engineer or a coding agent adds a new data source
 by declaring it, and cannot change the platform while doing so.
 
-Status: **delivered 2026-09-24, with known open defects.** Phases 0–9 are done
-([`docs/plans/phase-9.md`](docs/plans/phase-9.md)). Seven targets are configured as CronJobs from one Helm chart on a live demo
-cluster and on a laptop; five have produced data, the two monthly settlement targets first run on 2026-10-01. The fifth and the
-seventh were added by blind agent runs through the contributor path ([`docs/09-acceptance-report.md`](docs/09-acceptance-report.md)).
-An external review on 2026-09-24 ([`codex-review/2026-09-24/`](codex-review/2026-09-24/README.md), answered in
-[`docs/reviews/2026-09-24-codex-review-response.md`](docs/reviews/2026-09-24-codex-review-response.md)) found **eight P1
-defects**, all reproduced and accepted, and **all fixed the same day in Phase 10** ([`docs/plans/phase-10.md`](docs/plans/phase-10.md)),
-each with the reviewer's counterexample as a negative test on PostgreSQL: the canonical view now honours metric
-ownership (ADR-023 amendment 1), a returning payload is current again (amendment 2), a correction survives a ledger
-outage and an in-flight worker (ADR-024 amendment 1), an abandoned replay is reclaimed (amendment 2), capture-log
-entries are created and never overwritten (amendment 3), a known-wrong capture is recorded as a durable invalidation
-that no rebuild restores (ADR-038), freshness is a target's own rows (ADR-037 amendment 1), and the RPO is stated per
-failure domain with the demo replicating every 15 minutes (ADR-036 amendment 2). What the review counted against the
-brief and is **not** changed: the demo runs one k3s server with one PostgreSQL on it, an accepted cost choice (ADR-028),
-so control-plane and database failover are not demonstrated; the CNPG and external database modes refuse the restore
-drill until their backup chains exist. Left to the author: recording the nine wrong 22 September captures as
-invalidations and rerunning the first-packet egress test with the node block on ([`docs/07-operations.md`](docs/07-operations.md) §2.1, §4.3).
+Status: **delivered 2026-09-24; reviewed a third time 2026-09-25, every finding closed except the one that is a
+decision.** Phases 0–13 are done ([`docs/plans/phase-13.md`](docs/plans/phase-13.md)). Seven targets are configured as CronJobs from
+one Helm chart on a live demo cluster and on a laptop; five have produced data, the two monthly settlement targets first
+run on 2026-10-01. The fifth and the seventh were added by blind agent runs through the contributor path
+([`docs/09-acceptance-report.md`](docs/09-acceptance-report.md)). Two external reviews, 2026-09-24
+([`docs/reviews/2026-09-24-codex-review-response.md`](docs/reviews/2026-09-24-codex-review-response.md), 17 findings, closed in
+Phase 10) and 2026-09-25 ([`codex-review/`](codex-review/README.md), answered in
+[`docs/reviews/2026-09-25-codex-review-response.md`](docs/reviews/2026-09-25-codex-review-response.md), six findings, closed in Phase
+13): a scheduled capture is now keyed by the schedule's instant, not the pod's start time — every capture on the demo had
+been read as a phantom gap and fetched twice (ADR-031 amendment 1); the derivation identity carries the implementation, so
+a code fix replays as a new derivation (ADR-023 amendment 3); the restore drill rebuilds every target before comparing,
+within each target's own lineage, and guarantees **values** — a retired derivation is history the physical backup keeps
+(ADR-036 amendment 5); the alert rules are **evaluated and delivered** — Prometheus, a namespaced kube-state-metrics,
+Alertmanager and a receiver on the platform image, with a delivery drill (ADR-040). What is stated rather than changed:
+the demo is a **recoverable single-primary** deployment — durable capture in two failure domains and drilled recovery, and
+**no automatic failover** of the database or the control plane (ADR-028 amendment 1); a failover demonstration is the
+author's decision. The 113 wrong captures of 21–22 September are recorded as invalidations (ADR-038, 2026-09-24).
 
 ## Reproduce it
 
@@ -102,13 +102,15 @@ decisions: [`docs/adr/README.md`](docs/adr/README.md).
 - **Egress:** NetworkPolicy is enforced by k3s. Every platform pod first waits in an init
   container until its policy is in force, because k3s applies a new pod's policy only after the
   pod starts ([ADR-026](docs/adr/ADR-026-egress-boundary.md) amendment 2).
-- **Known data defect:** until 2026-09-23 18:15 UTC, backfills of the XLSX target stored the
-  newest file under earlier days. That is fixed (ADR-033 amendment 2). 21 September is repaired.
-  For 22 September the source has no file (404), so nothing could replace the next day's XLSX
-  values held under it. **Removed on 2026-09-24** (6 048 versions deleted from Silver by the
-  author; Bronze and the fetch log keep the wrong blobs as evidence). Do not `replay` those runs, and note
-  that a Bronze-only rebuild brings the deleted versions back — the durable invalidation record that
-  would stop that is Phase 10 work ([`docs/07-operations.md`](docs/07-operations.md) §4.3; review 2 DC-07).
+- **Known data defect, repaired:** until 2026-09-23 18:15 UTC, backfills of the XLSX target stored the
+  newest file under earlier days. Fixed (ADR-033 amendment 2). The 113 captures holding a 23 September file under 21 and
+  22 September are recorded as **invalidations** (ADR-038, 2026-09-24): never current, never replayed, never restored;
+  the raw blobs stay as evidence. OTE republished 22 September's own file on the 24th and the pipeline captured it
+  ([`docs/07-operations.md`](docs/07-operations.md) §4.3).
+- **Alerting:** the ADR-037 rules are evaluated by a Prometheus in the namespace (no CRD, no cluster right) and delivered
+  by Alertmanager to a receiver on the platform image whose log is the delivery record; a real channel (SMTP, a webhook) is
+  a values change ([ADR-040](docs/adr/ADR-040-alert-evaluation-and-delivery.md)). The delivery drill (`make alert-drill`)
+  runs on kind in the gate and is the author's on the demo.
 - **Storage:** Bronze store A is Hetzner Object Storage (COMPLIANCE Object Lock). Store B is OCI
   Object Storage in Frankfurt (a retention rule): another provider, another country.
 - **Checked live on 2026-09-23:** the backup chain (WAL shipping, base backup, replication) and a
@@ -165,6 +167,7 @@ One of them refused a source whose free API is for non-commercial use only
 | The OpenAI-compatible LLM client (triage runs on a deterministic stub) (G12) | "pipeline built, LLM step stubbed" (D-10). A real client needs an admitted host whose terms fit a commercial deliverable (the reference environment's inference is academic, ADR-028), and its egress must live in `fetch/` with the host registered. No such host is admitted | `02` D-10, ADR-009, plan P6-D4, `docs/plans/phase-9.md` |
 | A loader for a target's own `parser.py` (G13) — `ep validate` and the PR gate refuse a target that ships one (2026-09-24) | every committed target, including the settlement versions, is served by the generic parsers; dynamic import is banned outside `fetch/` and `scripts/` (ADR-027 §3), so a loader needs an ADR amending ADR-027 first | `05` §5 |
 | `bronze.tiering.mode=move` exercised on kind (G14) | the chart renders the tier CronJob and the unit tests cover the move, but no cluster has run it against a real cold store. The demo runs `mode: none` because its object storage has one class (V-12) | ADR-021, `07` §5 |
+| Automatic failover of the database or the control plane on the demo | one k3s server hosts the only PostgreSQL (ADR-028): the demo is **recoverable** — durable capture in two failure domains, physical and Bronze-only recovery drilled — and a server loss is an outage ended by the restore procedure (`07` §5), not a failover. The production path (three servers with embedded etcd, CNPG with replicas) is a values and Terraform change that is not exercised; running it is the author's decision | ADR-028 amendment 1 |
 | ENTSO-E adapters | a registration token and an admission row first | `01` §4, §10 |
 | Gas intraday, a canary target group | out of v1 | `02` D-11, D-13 |
 | TimescaleDB | plain PostgreSQL is enough at this volume | ADR-030 |
