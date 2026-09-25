@@ -115,8 +115,11 @@ def test_a_diverging_value_in_live_is_detected_by_the_checksum() -> None:
     tampered = row.observation.model_copy(update={"value": None})
     live._rows[row.id] = type(row)(row.id, row.run_attempt_id, tampered)
     again = restore_drill((T1,), scratch=MemoryStore(), replica=replica, live=live, clock=clock)
-    assert not again.ok and again.targets[0].missing_versions == 1
-    assert "missing from the rebuild" in again.targets[0].message
+    # ADR-036 amendment 5: the pair exists in the rebuild with another value — divergence,
+    # the drill fails on it as it did on "missing"
+    assert not again.ok and again.targets[0].diverging_versions == 1
+    assert again.targets[0].missing_versions == 0
+    assert "another value under the running implementation" in again.targets[0].message
 
 
 def test_dry_run_reports_and_writes_nothing() -> None:

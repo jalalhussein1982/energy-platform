@@ -278,3 +278,57 @@ probe (ADR-021 §3) treats an absent class as STANDARD.
 `00-assumptions.md` §5: 2026-09-22 · V-12 · CONFIRMED; 2026-09-22 · V-13 · CONFIRMED;
 2026-09-19 · V-6 · CONFIRMED (reference record); 2026-09-19 · V-10 · CONFIRMED (no managed
 Postgres; `statefulset` is the mode the drill exercises first).
+
+## Amendment 5 (2026-09-25) — what the Bronze-only rebuild guarantees, and how the drill compares
+
+**Findings (review 3 R5 and R6, `codex-review/01-deep-review.md`).** §5 promised "an
+order-independent checksum over (observation identity, value)"; the implementation compared
+every stored version *with its derivation id*, selected by dataset and transport, and compared
+each target right after its own rebuild. Two consequences, both reproduced on PostgreSQL: (R5)
+three committed targets share `ote.imbalance_settlement`/SOAP, so the first target's comparison
+read its siblings' rows as 8 916 missing versions on an empty scratch store and passed on a
+warm one — the drill's verdict depended on order and on what the scratch already held; (R6) an
+ordinary mapping revision (an unused `ignore_fields` name) is a new derivation by design
+(ADR-023), and the current-manifest rebuild could not produce the 192 versions under the old
+one, so a value-preserving change failed the drill. No replica holds old code; demanding its
+output from a current-code rebuild is a guarantee nobody can keep.
+
+**Decision.**
+
+1. **The cohort is rebuilt first.** `restore_drill` rebuilds every committed target in the
+   scratch store (reconcile over the full replica history, every distinct capture of a run
+   oldest first, amendment 2 of ADR-023) and only then compares, target by target.
+2. **Comparison is scoped to the target's own lineage**: the rows the target's own attempts
+   produced, streamed; a version live attributes to this target and the rebuild to a sibling
+   sharing the dataset and transport is reproduced, counted as such, never missing. A target
+   that never captured reports no versions, not its siblings'.
+3. **The rebuild guarantees values, not derivation ids.** Fingerprints are (observation
+   identity, payload sha256, value). Per (identity, payload) live holds within the replica
+   bound, the rebuild must reproduce the value of live's **newest derivation** for that pair
+   (by `derivations.registered_at`). A pair the rebuild lacks entirely is `missing` — loss; a
+   pair the rebuild holds with another value is `diverging` — the running implementation no
+   longer produces live's value from that payload, an un-replayed correction or a regression;
+   both fail the drill and are named separately. Versions under retired derivations are
+   `historical`: counted, named in the report, not compared. The physical backup keeps them,
+   and the drill's first phase (against the restored database) is what proves that backup;
+   the Bronze-only phase proves that the code in production reproduces the data in production.
+4. §5's sentence "run counts by state, current Silver row count, an order-independent checksum
+   over (observation identity, value)" reads: processed-run counts; the lineage-scoped value
+   fingerprints of decision 3, with `missing`, `diverging`, `extra` (the rebuild ahead of live),
+   `lagging` (newer than the replica), `historical` and `sibling` counts in every target's
+   report.
+
+**Consequences.** After a value-changing release the nightly drill fails with `diverging` until
+the affected derivation is replayed (`energyctl replay --derivation`, ADR-016 §4) or the
+captures invalidated (ADR-038) — that is the signal wanted, not noise: production disagrees
+with the code it runs. A value-preserving release, and any manifest revision that keeps values,
+passes with its old versions reported as historical. `docs/07` §5 and the final report state
+the guarantee in these words.
+
+**Proof (memory and PostgreSQL):** `tests/runtime/test_review3.py::test_r5_…`,
+`test_r6_…`, `tests/store/test_review3_drill.py` (the reviewer's daily+monthly fixtures on an
+empty scratch schema in either order; a target with no captures reports none of its siblings'
+rows; the `ignore_fields` revision passes with 192 historical versions; a value-changing
+implementation without a replay is `diverging` and fails, after the replay passes with the old
+versions historical); `tests/runtime/test_drill.py` (loss and a tampered value still fail). The
+reviewer's `recovery_probes.py` no longer reproduces either defect.

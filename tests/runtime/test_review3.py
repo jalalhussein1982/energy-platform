@@ -19,7 +19,9 @@ import pytest
 
 import energy_platform
 from energy_platform import implementation_version, source_digest
-from energy_platform.contracts.manifest import Manifest
+from energy_platform.bronze import Bronze, MemoryBlobStore, MemoryCaptureLog
+from energy_platform.bronze.fixtures import load_fixture
+from energy_platform.contracts.manifest import Manifest, load_manifest
 from energy_platform.mapping import MappingContext, MappingResult
 from energy_platform.parse import parser_ref
 from energy_platform.runtime import (
@@ -32,9 +34,10 @@ from energy_platform.runtime import (
     latest_instant,
     process,
     replay_range,
+    restore_drill,
 )
 from energy_platform.runtime.process import map_payload
-from energy_platform.store import derivation_for
+from energy_platform.store import MemoryStore, derivation_for
 from tests.runtime.harness import SCHEDULED, T1, Clock, runtime
 
 PRAGUE = "Europe/Prague"
@@ -201,3 +204,150 @@ def test_r4_a_corrected_implementation_replays_as_a_new_derivation_and_the_same_
     again = process(rt)
     assert again[0].outcome == "noop" and again[0].inserted == 0
     assert _first_price(rt) == before + Decimal("1")
+
+
+# ------------------------------------------------- R5 / R6: the drill's cohort and its guarantee
+
+
+def _settlement_live() -> tuple[MemoryStore, Bronze, tuple[Manifest, ...], Clock]:
+    """The reviewer's ``recovery_probes.py`` setting: two committed targets sharing
+    ``ote.imbalance_settlement`` over SOAP, each processed from its committed fixture."""
+    store = MemoryStore()
+    bronze = Bronze(MemoryBlobStore(), MemoryCaptureLog())
+    manifests = []
+    for target, fixture in (
+        ("ote_imbalance_settlement", "ordinary_day"),
+        ("ote_imbalance_settlement_monthly", "march_2026_month"),
+    ):
+        m = load_manifest(Path("targets") / target / "manifest.yaml")
+        entry, payload = load_fixture(Path("targets") / target / "fixtures" / fixture)
+        bronze.ingest(entry, payload)
+        rt = runtime(
+            m,
+            store=store,
+            bronze=bronze,
+            clock=Clock(entry.fetched_at + timedelta(minutes=1)),
+            payload=payload,
+        )
+        reports = process(rt)
+        assert reports and all(r.outcome in {"ok", "noop"} for r in reports), reports
+        manifests.append(m)
+    newest = max(e.fetched_at for m in manifests for e in bronze.log.list(m.target_id))
+    return store, bronze, tuple(manifests), Clock(newest + timedelta(days=1))
+
+
+def test_r5_targets_sharing_a_dataset_pass_a_fresh_rebuild_in_either_order() -> None:
+    """The reviewer's shared-dataset probe inverted: on an EMPTY scratch store the first drill
+    passes, whichever target comes first, and each target's counts are its own — the daily
+    target's 288 versions, the monthly's 8 916 — never the sibling's rows read as loss or as
+    pending work."""
+    live, replica, manifests, clock = _settlement_live()
+    for order in (manifests, tuple(reversed(manifests))):
+        report = restore_drill(
+            order, scratch=MemoryStore(), replica=replica, live=live, clock=clock
+        )
+        assert report.ok, [t.message for t in report.targets]
+        by_id = {t.target_id: t for t in report.targets}
+        daily, monthly = (
+            by_id["ote_imbalance_settlement"],
+            by_id["ote_imbalance_settlement_monthly"],
+        )
+        assert daily.live is not None and daily.live.rows == 288 and daily.scratch == daily.live
+        assert monthly.live is not None and monthly.live.rows == 8916
+        assert monthly.scratch == monthly.live
+        for t in (daily, monthly):
+            assert t.missing_versions == t.extra_versions == t.diverging_versions == 0
+            assert t.sibling_versions == 0 and t.message.startswith("identical")
+
+
+def test_r5_a_target_with_no_captures_reports_no_versions_of_its_siblings() -> None:
+    """The saved live drill claimed 576 versions for two monthly targets with zero captures:
+    a target that never captured reports nothing, not its siblings' rows."""
+    live, replica, manifests, clock = _settlement_live()
+    final = load_manifest(Path("targets/ote_imbalance_settlement_final/manifest.yaml"))
+    report = restore_drill(
+        (*manifests, final), scratch=MemoryStore(), replica=replica, live=live, clock=clock
+    )
+    assert report.ok
+    t = report.targets[-1]
+    assert t.target_id == final.target_id and t.replica_entries == 0
+    assert t.live is not None and t.live.rows == 0 and t.scratch is not None
+    assert t.scratch.rows == 0 and t.message == "identical: 0 Silver versions"
+
+
+def test_r6_a_value_preserving_mapping_revision_is_history_not_loss() -> None:
+    """The reviewer's mapping-revision probe inverted: ``ignore_fields`` gains an unused name,
+    the derivation changes as designed, live holds 384 versions across two derivations, and a
+    fresh current-manifest rebuild PASSES — the 192 versions under the retired derivation are
+    history the physical backup keeps, named as such, not loss."""
+    rt = runtime(T1)
+    assert capture(rt, SCHEDULED).outcome == "ok"
+    assert process(rt)[0].outcome == "ok"
+    changed = T1.model_copy(
+        update={
+            "mapping": T1.mapping.model_copy(
+                update={"ignore_fields": (*T1.mapping.ignore_fields, "DisplayNote")}
+            )
+        }
+    )
+    rt2 = runtime(changed, store=rt.store, bronze=rt.bronze, clock=rt.clock)  # type: ignore[arg-type]
+    old_d = derivation_for(T1, parser_ref(T1)).derivation_id
+    new_d = derivation_for(changed, parser_ref(changed)).derivation_id
+    assert old_d != new_d
+    rt.clock.advance(timedelta(seconds=1))  # type: ignore[attr-defined]
+    replay_range(rt2, SCHEDULED, SCHEDULED + timedelta(minutes=1))
+    process(rt2)
+    assert len(rt.store.all_rows(T1.contract.dataset_id)) == 384
+    report = restore_drill(
+        [changed], scratch=MemoryStore(), replica=rt.bronze, live=rt.store, clock=rt.clock
+    )
+    t = report.targets[0]
+    assert report.ok, t.message
+    assert t.live is not None and t.live.rows == 192 and t.scratch is not None
+    assert t.scratch.rows == 192 and t.missing_versions == 0 and t.diverging_versions == 0
+    assert t.historical_versions == 192 and t.historical_derivations == 1
+    assert "192 version(s) under 1 retired derivation(s) not compared" in t.message
+
+
+def test_r6_a_value_changing_implementation_diverges_until_replayed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other half of the guarantee: when the running implementation produces another value
+    from the same payload than live's newest derivation, the drill FAILS and names it as
+    divergence (not loss); once the correction is replayed, the drill passes and the old
+    values are history."""
+    rt = runtime(T1)
+    assert capture(rt, SCHEDULED).outcome == "ok"
+    assert process(rt)[0].inserted == 192
+
+    def corrected(manifest: Manifest, payload: bytes, ctx: MappingContext) -> MappingResult:
+        r = map_payload(manifest, payload, ctx)
+        fixed = tuple(
+            o.model_copy(update={"value": o.value + Decimal("1")})
+            if o.metric == "price_vwap" and o.value is not None
+            else o
+            for o in r.observations
+        )
+        return MappingResult(fixed, r.events)
+
+    monkeypatch.setattr(energy_platform, "implementation_version", lambda: "0.0.1+f1x3d000000")
+    monkeypatch.setattr(sys.modules["energy_platform.runtime.process"], "map_payload", corrected)
+    rt.clock.advance(timedelta(seconds=1))  # type: ignore[attr-defined]
+    before = restore_drill(
+        [T1], scratch=MemoryStore(), replica=rt.bronze, live=rt.store, clock=rt.clock
+    )
+    t = before.targets[0]
+    assert not before.ok and t.diverging_versions == 96 and t.missing_versions == 0
+    assert "have another value under the running implementation" in t.message
+    # the ADR-016 §4 repair: replay; the corrected versions outrank the old ones
+    replay_range(rt, SCHEDULED, SCHEDULED + timedelta(minutes=1))
+    # every row is a new version under the new derivation (the key carries it, ADR-023 §2),
+    # 96 with the corrected price and 96 with the unchanged volume
+    assert process(rt)[0].inserted == 192
+    after = restore_drill(
+        [T1], scratch=MemoryStore(), replica=rt.bronze, live=rt.store, clock=rt.clock
+    )
+    t = after.targets[0]
+    assert after.ok, t.message
+    assert t.diverging_versions == 0 and t.historical_versions == 192
+    assert t.historical_derivations == 1
