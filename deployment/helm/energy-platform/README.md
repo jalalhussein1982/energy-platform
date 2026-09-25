@@ -16,7 +16,7 @@ anything cluster-level sits behind a values flag that is off by default.
 | `Secret` by name, or an `ExternalSecret` behind `secrets.eso.enabled` | `templates/externalsecret.yaml` | D-7 |
 | freshness exporter, `PodMonitor` / `PrometheusRule` behind `metrics.operator.enabled` | `templates/metrics-*.yaml` (Phase 5 Task 5.12) | D-6, ADR-037 |
 | Postgres backup shipping, Bronze replication A → B, `move` tiering, restore drill | `templates/cronjob-*.yaml` (Phase 5 Task 5.10) | ADR-002, ADR-021, ADR-036 |
-| alert evaluation and delivery behind `alerting.enabled`: Prometheus over the same rules ConfigMap, a namespaced kube-state-metrics (a `Role`, no ClusterRole), Alertmanager to the platform receiver (`energyctl alert-sink`) and the operator's receivers; `alerting.kubeStateMetrics.apiServer.cidrs` required | `templates/alerting.yaml`; `make alert-drill` | ADR-040 |
+| alert evaluation and delivery behind `alerting.enabled`: Prometheus over the same rules ConfigMap, a namespaced kube-state-metrics (a `Role`, no ClusterRole), Alertmanager to the platform receiver (`energyctl alert-sink`) and the operator's receivers; `alerting.kubeStateMetrics.apiServer.cidrs` required; the operator's credential from `alerting.alertmanager.existingSecret` (read-only, optional, `/etc/alertmanager/secrets/<key>` for the receiver's `*_file` fields) — a credential typed into values or a route to an undeclared receiver fails the render; the example with the interim night-time routing is `ci/receiver-values.yaml` | `templates/alerting.yaml`; `make alert-drill` | ADR-040, amendment 1 |
 
 ## Deploying
 

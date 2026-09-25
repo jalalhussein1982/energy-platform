@@ -237,6 +237,25 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
 ---
+{{- /* ADR-040 amendment 1: the operator's receivers render into this ConfigMap — world-readable in
+the namespace and in Git — so a credential typed into values is refused here, before anything is
+rendered; Alertmanager reads the `*_file` fields from the Secret mounted below instead (05 C-76). */}}
+{{- $receiversYaml := toYaml $a.alertmanager.receivers }}
+{{- range $key := list "auth_password" "auth_secret" "password" "credentials" "bearer_token" "api_key" "api_secret" "api_url" "webhook_url" "routing_key" "service_key" "token" "user_key" }}
+{{- if regexMatch (printf "(?m)^\\s*(?:-\\s+)?%s:" $key) $receiversYaml }}
+{{- fail (printf "alerting.alertmanager.receivers carries an inline credential (`%s`): the receivers render into a ConfigMap. Put the value into the Secret named by alerting.alertmanager.existingSecret and reference it as `%s_file: /etc/alertmanager/secrets/<key>` (ADR-040 amendment 1; 05 C-76; docs/07 §7.3)" $key $key) }}
+{{- end }}
+{{- end }}
+{{- /* A route (at any depth) naming a receiver that is not declared: Alertmanager refuses the
+configuration at load and the pod never becomes ready — refused at render, by name (05 C-77). */}}
+{{- $known := list "platform-sink" }}
+{{- range $a.alertmanager.receivers }}{{ $known = append $known (toString .name) }}{{ end }}
+{{- range $line := regexFindAll "(?m)^\\s*(?:-\\s+)?receiver:\\s*\\S+" (toYaml $a.alertmanager.routes) -1 }}
+{{- $name := regexReplaceAll "(?m)^\\s*(?:-\\s+)?receiver:\\s*" $line "" | trimAll "\"'" }}
+{{- if not (has $name $known) }}
+{{- fail (printf "alerting.alertmanager.routes names the receiver `%s`, which is neither platform-sink nor one of alerting.alertmanager.receivers (%s): Alertmanager would refuse the configuration at load and the pod would never become ready (ADR-040 amendment 1; 05 C-77)" $name (join ", " $known)) }}
+{{- end }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -334,6 +353,13 @@ spec:
               readOnly: true
             - name: data
               mountPath: /alertmanager
+{{- if $a.alertmanager.existingSecret }}
+            # ADR-040 amendment 1: the operator's credentials, one file per key, read by the
+            # receivers' `*_file` fields at send time — never rendered into the ConfigMap above
+            - name: secrets
+              mountPath: /etc/alertmanager/secrets
+              readOnly: true
+{{- end }}
       volumes:
         - name: config
           configMap:
@@ -341,6 +367,12 @@ spec:
         - name: data
           emptyDir:
             sizeLimit: 64Mi
+{{- if $a.alertmanager.existingSecret }}
+        - name: secrets
+          secret:
+            secretName: {{ $a.alertmanager.existingSecret }}
+            optional: true            # the pod starts before the operator has created it; the files appear when it exists
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

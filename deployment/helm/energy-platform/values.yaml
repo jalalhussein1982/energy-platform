@@ -136,7 +136,14 @@ alerting:                                # ADR-040 (review 3 R3): the ADR-037 ru
     groupInterval: 1m
     repeatInterval: 4h
     receivers: []                        # raw Alertmanager receivers (email_configs, webhook_configs, …), the operator's channel
-    routes: []                           # raw child routes naming those receivers
+    routes: []                           # raw child routes naming those receivers (a receiver that is not declared fails the render)
+    # ADR-040 amendment 1: the receivers render into a ConfigMap, so a credential never goes here —
+    # a key such as auth_password, api_key, routing_key or bearer_token fails the render. The operator
+    # creates a Secret in the namespace and names it; every key is a file under
+    # /etc/alertmanager/secrets/ that the receiver's `*_file` field points at (auth_password_file,
+    # url_file, api_url_file, http_config.basic_auth.password_file, …). Optional: the pod starts
+    # before the Secret exists. Example: ci/receiver-values.yaml; runbook: docs/07 §7.3.
+    existingSecret: ""
     egress:                              # where an external receiver lives; empty = no internet for Alertmanager
       cidrs: []
       ports: [443]

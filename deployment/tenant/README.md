@@ -96,3 +96,19 @@ platform receiver in the namespace (three new images pulled by digest). The auth
 and wires a real channel by values: `alerting.alertmanager.receivers` / `routes` (raw Alertmanager
 objects) plus `alerting.alertmanager.egress.cidrs` for an external receiver. The receiver's log is
 the delivery record until then.
+
+**The channel's credential is a Secret, never a value (ADR-040 amendment 1, Phase 14).**
+`values-demo.yaml` names `alerting.alertmanager.existingSecret: energy-platform-alertmanager`, mounted
+read-only and optional at `/etc/alertmanager/secrets/` — the release runs before the Secret exists. The
+author creates it once (Level 3):
+
+```bash
+kubectl -n energy-platform create secret generic energy-platform-alertmanager --from-literal=smtp-password='…'
+```
+
+then adds the receiver (`auth_password_file: /etc/alertmanager/secrets/smtp-password`), the routes and
+the egress netblocks on port 587 as `deployment/helm/energy-platform/ci/receiver-values.yaml` shows —
+its routes keep the two uncalibrated night-time freshness alerts (`ote_dam`, `ote_imbalance_settlement`)
+in the log only and send every page to the channel *and* the log. A credential typed into values, or a
+route naming a receiver that is not declared, fails `helm template` before anything is pushed. The
+runbook, with the netblock lookup and the mailbox drill, is `docs/07-operations.md` §7.3.

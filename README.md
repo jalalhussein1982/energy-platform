@@ -109,8 +109,11 @@ decisions: [`docs/adr/README.md`](docs/adr/README.md).
   ([`docs/07-operations.md`](docs/07-operations.md) §4.3).
 - **Alerting:** the ADR-037 rules are evaluated by a Prometheus in the namespace (no CRD, no cluster right) and delivered
   by Alertmanager to a receiver on the platform image whose log is the delivery record; a real channel (SMTP, a webhook) is
-  a values change ([ADR-040](docs/adr/ADR-040-alert-evaluation-and-delivery.md)). The delivery drill (`make alert-drill`)
-  passed on kind and on the demo on 2026-09-25 ([`docs/07-operations.md`](docs/07-operations.md) §4.4, §7.2).
+  a values change with its credential in a Secret the operator creates — a credential typed into values, or a route to
+  an undeclared receiver, is refused at render ([ADR-040](docs/adr/ADR-040-alert-evaluation-and-delivery.md) and its
+  amendment 1; the runbook is [`docs/07-operations.md`](docs/07-operations.md) §7.3). Nobody is paged until the maintainer
+  wires that channel. The delivery drill (`make alert-drill`) passed on kind and on the demo on 2026-09-25
+  ([`docs/07-operations.md`](docs/07-operations.md) §4.4, §7.2).
 - **Storage:** Bronze store A is Hetzner Object Storage (COMPLIANCE Object Lock). Store B is OCI
   Object Storage in Frankfurt (a retention rule): another provider, another country.
 - **Checked live on 2026-09-23:** the backup chain (WAL shipping, base backup, replication) and a

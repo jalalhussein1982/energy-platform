@@ -1,0 +1,41 @@
+# ADR-040 amendment 1 (Phase 14): the operator's alert channel, as the runbook shows it
+# (docs/07 §7.3). Rendered by tests/harness/test_chart.py; documentation names only
+# (RFC 2606 hosts, RFC 5737 addresses) — the real host, addresses and netblocks are the
+# operator's values, the password is the operator's Secret, never a value.
+alerting:
+  enabled: true
+  kubeStateMetrics:
+    apiServer:
+      cidrs: [10.0.0.1/32]
+  alertmanager:
+    # created by the operator in the release namespace, e.g.
+    #   kubectl create secret generic energy-platform-alertmanager --from-literal=smtp-password='…'
+    # mounted read-only at /etc/alertmanager/secrets/<key>; optional, so the pod starts before it exists
+    existingSecret: energy-platform-alertmanager
+    egress:
+      cidrs: [198.51.100.0/24]        # the mail provider's published submission netblocks (docs/07 §7.3)
+      ports: [587]                     # authenticated submission — Hetzner Cloud blocks outbound 25 by default
+    receivers:
+      - name: ops-email
+        email_configs:
+          - to: ops@example.net
+            from: energy-platform@example.net
+            smarthost: smtp.example.net:587
+            auth_username: energy-platform@example.net
+            auth_password_file: /etc/alertmanager/secrets/smtp-password   # the Secret's key, read at send time
+            require_tls: true
+            send_resolved: true
+    routes:
+      # 1. the two freshness alerts whose publication expectation is not calibrated yet
+      #    (a day-ahead target's lateness is detected up to a day late; the daily settlement's
+      #    publication timing is unverified — Phase 15): logged by the platform receiver, not paged
+      - receiver: platform-sink
+        matchers:
+          - alertname = EnergyPlatformTargetLate
+          - target =~ "ote_dam|ote_imbalance_settlement"
+      # 2. everything that pages goes to the operator's channel …
+      - receiver: ops-email
+        matchers: ["severity = page"]
+        continue: true
+      # 3. … and every alert, whatever its severity, stays in the receiver's log — the delivery record
+      - receiver: platform-sink

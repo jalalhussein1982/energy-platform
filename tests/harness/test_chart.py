@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
 import shutil
 import subprocess
 from collections import Counter
@@ -798,6 +799,7 @@ def test_alerting_renders_behind_its_flag_without_cluster_rights(tmp_path: Path)
             assert am_cfg["route"]["routes"][0]["receiver"] == "ops-webhook"
         else:
             assert len(am_egress) == 1  # no internet for Alertmanager unless declared
+
         # Grafana gets the Prometheus datasource and the ADR-037 dashboard
         ds = yaml.safe_load(
             named(docs, "ConfigMap")["ep-energy-platform-grafana-provisioning"]["data"][
@@ -814,3 +816,167 @@ def test_alerting_renders_behind_its_flag_without_cluster_rights(tmp_path: Path)
     with pytest.raises(subprocess.CalledProcessError) as refused:
         render(tmp_path, TENANT, extra=("--set", "alerting.enabled=true"))
     assert "alerting.kubeStateMetrics.apiServer.cidrs is required" in refused.value.stderr
+
+
+RECEIVER = CHART / "ci" / "receiver-values.yaml"
+SECRETS_DIR = "/etc/alertmanager/secrets"
+
+
+def _alertmanager_pod(docs: list[dict[str, Any]]) -> dict[str, Any]:
+    pod = named(docs, "Deployment")["ep-energy-platform-alertmanager"]["spec"]["template"]["spec"]
+    return dict(pod)
+
+
+def _alertmanager_config(docs: list[dict[str, Any]]) -> dict[str, Any]:
+    cm = named(docs, "ConfigMap")["ep-energy-platform-alertmanager"]
+    return dict(yaml.safe_load(cm["data"]["alertmanager.yml"]))
+
+
+def _matches(matcher: str, labels: dict[str, str]) -> bool:
+    """One Alertmanager matcher (`name = value`, `!=`, `=~`, `!~`; regexes anchored)."""
+    m = re.fullmatch(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*(=~|!~|!=|=)\s*\"?([^\"]*?)\"?\s*", matcher)
+    assert m, matcher
+    name, op, value = m.groups()
+    actual = labels.get(name, "")
+    if op == "=":
+        return actual == value
+    if op == "!=":
+        return actual != value
+    if op == "=~":
+        return re.fullmatch(value, actual) is not None
+    return re.fullmatch(value, actual) is None
+
+
+def _deliveries(route: dict[str, Any], labels: dict[str, str], inherited: str = "") -> set[str]:
+    """Alertmanager's walk of the routing tree: the first matching child handles the alert
+    (its siblings too while `continue: true`); the node's own receiver only when no child
+    matches. Returns the receivers that get the alert."""
+    receiver = str(route.get("receiver", inherited))
+    out: set[str] = set()
+    matched = False
+    for child in route.get("routes", []) or []:
+        if all(_matches(m, labels) for m in child.get("matchers", []) or []):
+            matched = True
+            out |= _deliveries(child, labels, receiver)
+            if not child.get("continue", False):
+                break
+    if not matched:
+        out.add(receiver)
+    return out
+
+
+def test_the_operators_receiver_credential_is_a_secret_file_never_a_value(tmp_path: Path) -> None:
+    """ADR-040 amendment 1 (P14-D1): `alerting.alertmanager.existingSecret` mounts the operator's
+    Secret read-only and optional under /etc/alertmanager/secrets, where the receiver's
+    `*_file` fields point; the demo names it, the profiles without a channel mount nothing."""
+    docs = render(tmp_path, TENANT, RECEIVER)
+    pod = _alertmanager_pod(docs)
+    secret_volumes = [v for v in pod["volumes"] if "secret" in v]
+    assert secret_volumes == [
+        {
+            "name": "secrets",
+            "secret": {"secretName": "energy-platform-alertmanager", "optional": True},
+        }
+    ]
+    mounts = {m["mountPath"]: m for m in pod["containers"][0]["volumeMounts"]}
+    assert mounts[SECRETS_DIR] == {"name": "secrets", "mountPath": SECRETS_DIR, "readOnly": True}
+    assert pod["automountServiceAccountToken"] is False
+    email = next(r for r in _alertmanager_config(docs)["receivers"] if r["name"] == "ops-email")
+    assert email["email_configs"][0]["auth_password_file"] == f"{SECRETS_DIR}/smtp-password"
+    assert "auth_password" not in email["email_configs"][0]
+    # the demo names the Secret the author will create; local and the all-flags render mount none
+    demo_endpoint = (
+        "bronze.replica.endpoint=https://ns.compat.objectstorage.eu-frankfurt-1.oraclecloud.com"
+    )
+    demo = _alertmanager_pod(render(tmp_path, TENANT, DEMO, extra=("--set", demo_endpoint)))
+    assert [v["secret"]["secretName"] for v in demo["volumes"] if "secret" in v] == [
+        "energy-platform-alertmanager"
+    ]
+    for values in (LOCAL, ALL_FLAGS):
+        pod = _alertmanager_pod(render(tmp_path, TENANT, values))
+        assert not [v for v in pod["volumes"] if "secret" in v], values.name
+        assert SECRETS_DIR not in {m["mountPath"] for m in pod["containers"][0]["volumeMounts"]}
+
+
+def test_a_credential_typed_into_receiver_values_is_refused_at_render(tmp_path: Path) -> None:
+    """05 C-76 (P14-D2a): the receivers render into a ConfigMap, so an inline `auth_password`
+    (or any credential-bearing key) fails the render and names the `*_file` alternative."""
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        render(
+            tmp_path,
+            TENANT,
+            RECEIVER,
+            extra=(
+                "--set",
+                "alerting.alertmanager.receivers[0].email_configs[0].auth_password=hunter2",
+            ),
+        )
+    assert "auth_password" in failure.value.stderr
+    assert "auth_password_file" in failure.value.stderr
+    assert "hunter2" not in failure.value.stderr  # the refusal never echoes the value
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        render(
+            tmp_path,
+            TENANT,
+            RECEIVER,
+            extra=(
+                "--set",
+                "alerting.alertmanager.receivers[0].webhook_configs[0].http_config.bearer_token=t0k",
+            ),
+        )
+    assert "bearer_token" in failure.value.stderr
+
+
+def test_a_route_naming_an_undeclared_receiver_is_refused_at_render(tmp_path: Path) -> None:
+    """05 C-77 (P14-D2b): Alertmanager would refuse the config at load and the pod would never
+    become ready; the render names the route's receiver instead. Nested routes included."""
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        render(
+            tmp_path,
+            TENANT,
+            RECEIVER,
+            extra=("--set", "alerting.alertmanager.routes[1].receiver=ops-typo"),
+        )
+    assert "ops-typo" in failure.value.stderr
+    with pytest.raises(subprocess.CalledProcessError) as failure:
+        render(
+            tmp_path,
+            TENANT,
+            RECEIVER,
+            extra=("--set", "alerting.alertmanager.routes[1].routes[0].receiver=nested-typo"),
+        )
+    assert "nested-typo" in failure.value.stderr
+
+
+def test_the_interim_night_routing_pages_failures_and_logs_the_uncalibrated_freshness(
+    tmp_path: Path,
+) -> None:
+    """P14-D3/D4: the documented example walked the way Alertmanager walks it — the two
+    freshness alerts without a calibrated publication expectation reach the log only, every
+    page reaches the operator's channel AND the log, a warning reaches the log; the egress rule
+    opens the submission port to the declared netblocks only."""
+    docs = render(tmp_path, TENANT, RECEIVER)
+    tree = _alertmanager_config(docs)["route"]
+    late = {"alertname": "EnergyPlatformTargetLate", "severity": "page"}
+    assert _deliveries(tree, {**late, "target": "ote_dam"}) == {"platform-sink"}
+    assert _deliveries(tree, {**late, "target": "ote_imbalance_settlement"}) == {"platform-sink"}
+    assert _deliveries(tree, {**late, "target": "ceps_load"}) == {"ops-email", "platform-sink"}
+    assert _deliveries(
+        tree, {"alertname": "EnergyPlatformRestoreDrillFailed", "severity": "page"}
+    ) == {
+        "ops-email",
+        "platform-sink",
+    }
+    assert _deliveries(
+        tree,
+        {
+            "alertname": "EnergyPlatformSourceUnavailable",
+            "target": "ceps_load",
+            "severity": "warning",
+        },
+    ) == {"platform-sink"}
+    egress = named(docs, "NetworkPolicy")["ep-energy-platform-allow-alertmanager-egress"]["spec"][
+        "egress"
+    ]
+    assert egress[1]["to"] == [{"ipBlock": {"cidr": "198.51.100.0/24"}}]
+    assert egress[1]["ports"] == [{"protocol": "TCP", "port": 587}]

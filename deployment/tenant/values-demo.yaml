@@ -67,7 +67,12 @@ alerting:
       # network = `kubectl get endpoints kubernetes` → 10.10.1.10:6443 (read 2026-09-25)
       cidrs: [10.43.0.1/32, 10.10.1.10/32]
       ports: [443, 6443]
-  # a real channel is the author's values change: alerting.alertmanager.receivers/routes + egress.cidrs
+  alertmanager:
+    # ADR-040 amendment 1 (Phase 14): the channel's credential lives in this Secret, which the author
+    # creates once in the namespace (Level 3) — the mount is optional, so the release runs before it exists:
+    #   kubectl -n energy-platform create secret generic energy-platform-alertmanager --from-literal=smtp-password='…'
+    # then the receiver, the routes and the egress netblocks follow ci/receiver-values.yaml (docs/07 §7.3)
+    existingSecret: energy-platform-alertmanager
 egress:
   # k3s kube-router applies a new pod's policy asynchronously (measured 2026-09-23: the
   # metadata service answered a fresh pod, refused it 15 s later): gate every platform pod (05 C-65)

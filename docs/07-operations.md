@@ -696,6 +696,63 @@ afterwards.
 The same steps on the demo are the author's (Level 3): `kubectl -n energy-platform apply` of
 the same Job from the drill script, `kubectl logs deploy/energy-platform-alert-sink`, delete.
 
+### 7.3 Wiring a person: the operator's channel on the demo (ADR-040 amendment 1, Phase 14)
+
+The receiver of §7.2 proves delivery to a log; nobody is notified until a channel exists. The
+chart takes the channel's credential from a Secret and refuses one typed into values (`05`
+C-76); the example the chart test renders and walks is
+`deployment/helm/energy-platform/ci/receiver-values.yaml`. For e-mail, the author's steps
+(Level 3), in order:
+
+1. **A mailbox that is read**, with an authenticated submission service: port 587 (STARTTLS)
+   or 465. Hetzner Cloud blocks outbound port 25 by default, and a mailbox provider's submission
+   service does not listen there anyway. The egress rule is an IP block (ADR-026), so a provider
+   behind rotating addresses is allow-listed by its **published netblocks**, not by one address:
+
+   ```bash
+   dig +short TXT _spf.<provider>           # e.g. _spf.google.com → include:_netblocks.google.com …
+   dig +short TXT _netblocks.google.com     # ip4:… ranges — one dig per include; these are the CIDRs
+   ```
+
+2. **The Secret**, once, in the namespace:
+
+   ```bash
+   kubectl -n energy-platform create secret generic energy-platform-alertmanager \
+     --from-literal=smtp-password='…'
+   ```
+
+   `values-demo.yaml` already names it (`alerting.alertmanager.existingSecret`); the mount is
+   optional, so the release ran before the Secret existed and the file appears in the pod within
+   about a minute of its creation (the kubelet's sync period).
+3. **The values**, in `values-demo.yaml` — no credential; an address, a host and netblocks are
+   not secrets: the receiver with `auth_password_file: /etc/alertmanager/secrets/smtp-password`,
+   the three routes of the example (the two uncalibrated freshness alerts — `ote_dam`,
+   `ote_imbalance_settlement`, §4.4 — to the log only; every page to the mailbox **and** the
+   log; a catch-all to the log) and `egress.cidrs` = the netblocks, `ports: [587]`. A render
+   before the push refuses a typo in a receiver's name (`05` C-77) and a credential in values
+   (`05` C-76):
+
+   ```bash
+   helm template energy-platform deployment/helm/energy-platform \
+     -f deployment/tenant/values-tenant.yaml -f deployment/tenant/values-demo.yaml \
+     -f <the targets values> --set image.digest=sha256:… | grep -A40 'alertmanager.yml: |'
+   ```
+
+4. **The push** (deploy-demo), then the drill of §7.2 on the demo: the failed Job → `firing`
+   in the mailbox and in the receiver's log; the deletion → `resolved` in both. A delivery in
+   the log without one in the mailbox is Alertmanager's notifier log
+   (`kubectl -n energy-platform logs deploy/energy-platform-alertmanager`): a refused netblock,
+   a wrong host, a rejected password.
+
+For a webhook (a chat tool, an incident service) the shape is the same: a URL that carries a
+token goes into the Secret and the receiver reads it as `url_file` / `api_url_file`; the
+endpoint's addresses and port are the egress rule.
+
+What this does **not** calibrate: `EnergyPlatformTargetLate` for the day-ahead and the daily
+settlement targets keeps firing at night and lands in the log only. The fix is a publication
+expectation in the manifest, read by freshness (Phase 15, an ADR-037 amendment) — not a wider
+`for:`, not a silenced night.
+
 ### 7.1 Dashboards — Grafana, private (ADR-039, Phase 11, 2026-09-24)
 
 `grafana.enabled` renders one Deployment (`docker.io/grafana/grafana` by digest, uid 472,

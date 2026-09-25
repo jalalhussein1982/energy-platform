@@ -136,3 +136,66 @@ control plane, and a tenant knows that address.
 
 `tests/harness/test_chart.py::test_alerting_renders_behind_its_flag_without_cluster_rights`,
 `tests/fetch/test_alert_sink.py`; the delivery drill on kind recorded in `docs/07` §7.2.
+
+## Amendment 1 (2026-09-25) — the operator's channel: its credential in a Secret, its routing tested, two refusals at render
+
+**Finding (post-review advice of 2026-09-25, item 2; Phase 14).** §1 left the real channel to
+`alerting.alertmanager.receivers` / `routes`, raw Alertmanager objects rendered with `toYaml`
+into the `<release>-alertmanager` ConfigMap; the Deployment mounted that ConfigMap and an
+`emptyDir`, nothing else. An authenticated SMTP receiver or a token-bearing webhook therefore
+had nowhere to put its credential but the ConfigMap and the values file — world-readable in the
+namespace and committed in Git. §4 said which channel an operator wires is not decided here;
+how one is wired *without leaking its credential* was not decided either. Two more things the
+first live cycle raised (`docs/07` §4.4): `EnergyPlatformTargetLate` paged at 01:45 UTC for
+`ote_dam` and `ote_imbalance_settlement`, two targets whose publication expectation the
+freshness code documents as uncalibrated (a day-ahead target's lateness is detected up to a day
+late; the daily settlement's publication timing is `[UNVERIFIED]`, `01` §10); and a `routes`
+entry naming a receiver that does not exist is refused by Alertmanager only at load — the pod
+never ready, the upgrade gate rolling back, the reason three `kubectl` commands away.
+
+**Decision.**
+
+1. **`alerting.alertmanager.existingSecret`** names a Secret the operator creates in the release
+   namespace. The Deployment mounts it read-only at `/etc/alertmanager/secrets`, one file per
+   key, `optional: true` — the pod starts before the Secret exists and the files appear when it
+   does. Receivers reference the files through Alertmanager's own `*_file` fields
+   (`auth_password_file`, `url_file`, `api_url_file`, `webhook_url_file`,
+   `http_config.basic_auth.password_file`, `http_config.authorization.credentials_file`), read
+   at send time, so the configuration loads without them. A dedicated Secret rather than
+   `secrets.existingSecret`: Alertmanager holds no platform credential (§1, the receiver side).
+   The demo names `energy-platform-alertmanager`.
+2. **Two refusals at render.** A credential-bearing key anywhere under
+   `alerting.alertmanager.receivers` (`auth_password`, `auth_secret`, `password`,
+   `credentials`, `bearer_token`, `api_key`, `api_secret`, `api_url`, `webhook_url`,
+   `routing_key`, `service_key`, `token`, `user_key`) fails the render and names the `*_file`
+   alternative without echoing the value (`05` C-76). A route at any depth whose `receiver` is
+   neither `platform-sink` nor a declared receiver fails the render by name (`05` C-77). A
+   plain webhook `url` is not refused — the platform receiver and an internal endpoint use one
+   — so a URL that carries a token belongs in the Secret and is read as `url_file`.
+3. **The interim routing for the two uncalibrated freshness alerts is a values example**,
+   `ci/receiver-values.yaml`, rendered by the chart test and walked the way Alertmanager walks
+   a routing tree (the first matching child, its siblings while `continue: true`, the parent's
+   receiver only when no child matches): `EnergyPlatformTargetLate` for `ote_dam` and
+   `ote_imbalance_settlement` → `platform-sink` only (logged, not paged); `severity = page` →
+   the operator's channel with `continue: true`; a catch-all → `platform-sink`, so the
+   receiver's log stays the delivery record of every alert. No rule changes: the calibration is
+   a publication expectation in the manifest, read by freshness (Phase 15, an ADR-037
+   amendment), not a wider `for:` and not a silenced night.
+4. **The runbook for the demo** is `docs/07` §7.3: the Secret, the values, the egress
+   netblocks on the authenticated submission port (Hetzner Cloud blocks outbound port 25 by
+   default; a provider behind rotating addresses is allow-listed by its published netblocks),
+   then the drill of §7.2 ending in a mailbox rather than a log.
+
+**Consequences.** Chart: `templates/alerting.yaml` (the mount, the two refusals),
+`values.yaml`, `values-demo.yaml`, `ci/receiver-values.yaml`; `05` C-76, C-77; tests
+`test_the_operators_receiver_credential_is_a_secret_file_never_a_value`,
+`test_a_credential_typed_into_receiver_values_is_refused_at_render`,
+`test_a_route_naming_an_undeclared_receiver_is_refused_at_render`,
+`test_the_interim_night_routing_pages_failures_and_logs_the_uncalibrated_freshness`. The demo:
+the author creates the Secret and sets the receiver values (Level 3); until then the push
+changes nothing there but an empty optional mount. Devil's advocate: the key list is a
+denylist and Alertmanager grows integrations, so a new integration's secret field would pass
+until the list is extended — the refusal is the gate for the common case, the Secret mount is
+what makes the right way the easy way; the routing walk in the test re-implements
+Alertmanager's tree semantics rather than calling `amtool`, which is not in the toolchain,
+and the test's docstring says so.
