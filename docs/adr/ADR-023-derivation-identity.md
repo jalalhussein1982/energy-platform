@@ -153,3 +153,43 @@ A; replay of old A after B stays at B; exact retry adds nothing);
 ## Verification refs
 
 none — design decision.
+
+## Amendment 3 (2026-09-25) — the derivation identity carries the implementation
+
+**Context.** Review 3 (R4, `codex-review/01-deep-review.md`) reproduced on both stores what
+decision 1 left to a release process that does not exist: `platform_version` is the package
+version, `0.0.1` since the skeleton commit and bumped by nothing, so a fix in parser or mapping
+code that leaves the manifest alone produces the same `derivation_id`, upserts under the same
+key (decision 2) and inserts nothing — the wrong value stays, the replay reports `noop`. The
+consequences paragraph above assumed the opposite ("every platform release changes
+`derivation_id` for every target"); the implementation never made it true. A manifest change
+or a hand-bumped version avoids the collision, which is exactly the kind of invariant a person
+forgets.
+
+**Decision.**
+
+1. `platform_version` in the identity is the **implementation version**:
+   `energy_platform.implementation_version()` = `<package version>+<digest>`, where the digest
+   is the first 12 hex of SHA-256 over every `.py` file of the `energy_platform` package
+   (relative path and bytes, sorted), computed once per process. The generic `parser_ref` uses
+   the same string (`generic:<decode>@<implementation version>`); a custom parser's
+   `custom:<sha256 of parser.py>` was content-addressed already.
+2. Consequences that now hold instead of being assumed: a code change is a new derivation for
+   every target; the same code is the same derivation on a laptop and in the image (the image
+   copies the same files; the digest is over sources, not bytecode); an exact retry under the
+   same code stays a no-op; a value-changing fix followed by `replay --derivation <old>` appends
+   the corrected versions and they outrank the old ones under decision 3 (same capture, later
+   registered derivation). A release without a replay leaves existing rows current, as before.
+3. The `derivations` table records the full string in `platform_version`, so an operator can
+   read which build produced a row. The MCP server's `serverInfo.version` stays the package
+   version.
+4. What this does not do: it does not reproduce old derivations from Bronze alone — old code is
+   not in the replica. ADR-036 amendment 5 states the rebuild guarantee accordingly.
+
+**Proof:** `tests/runtime/test_review3.py::test_r4_…` (a copy of the package with one byte
+changed has another digest, an unchanged copy the same one, bytecode does not count; a
+corrected implementation replays the reviewer's scenario as a new derivation with the
+corrected value while the same implementation is a no-op), `tests/store/test_store.py::
+test_review3_r4_the_stored_derivation_names_the_implementation` (both stores). The reviewer's
+`derivation_probe.py` simulates the correction by patching a function in memory, which cannot
+change a file's bytes, so it keeps reporting the defect by construction; the tests change bytes.

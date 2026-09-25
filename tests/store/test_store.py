@@ -10,10 +10,11 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+import energy_platform
 from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.contracts.registry import Transport
 from energy_platform.mapping.quality import QualityEvent
-from energy_platform.store import Claim, Freshness, Store
+from energy_platform.store import Claim, Freshness, Store, derivation_for
 from tests.store.rows import D_A, D_B, FETCH_1, FETCH_2, SHA_1, SHA_2, T0, obs
 
 NOW = datetime(2026, 9, 18, 0, 10, tzinfo=UTC)
@@ -831,3 +832,18 @@ def test_review2_dc08_freshness_counts_the_targets_own_current_rows_only(store: 
     assert store.newest_delivery_start(dataset_id, target_id="ote_idm_soap", transport="soap") == (
         day + timedelta(minutes=15)
     )
+
+
+def test_review3_r4_the_stored_derivation_names_the_implementation(store: Store) -> None:
+    """ADR-023 amendment 3: ``platform_version`` in ``derivations`` is the implementation
+    version (package version plus source digest), on both stores, round-tripped as stored."""
+    from energy_platform.parse import parser_ref
+    from tests.runtime.harness import T1
+
+    d = derivation_for(T1, parser_ref(T1))
+    assert d.platform_version == energy_platform.implementation_version()
+    assert d.parser_ref == f"generic:soap@{energy_platform.implementation_version()}"
+    stored = store.register_derivation(d, now=FETCH_1)
+    read = store.derivation(d.derivation_id)
+    assert read is not None and read.platform_version == stored.platform_version
+    assert read.platform_version.startswith("0.0.1+") and len(read.platform_version) == 18

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import energy_platform
 from energy_platform.contracts.manifest import Manifest, load_manifest
 from energy_platform.contracts.parser import (
     JsonDocument,
@@ -48,8 +49,10 @@ def test_required_fields_are_the_time_and_version_source_refs() -> None:
 
 
 def test_parser_ref_names_the_generic_parser_and_platform_version() -> None:
-    assert parser_ref(T1) == "generic:soap@0.0.1"
-    assert parser_ref(T2) == "generic:xlsx@0.0.1"
+    # ADR-023 amendment 3: the running implementation, package version plus source digest
+    assert parser_ref(T1) == f"generic:soap@{energy_platform.implementation_version()}"
+    assert parser_ref(T1).startswith("generic:soap@0.0.1+")
+    assert parser_ref(T2) == f"generic:xlsx@{energy_platform.implementation_version()}"
 
 
 def test_t1_items_become_records_with_optional_price_and_volume() -> None:

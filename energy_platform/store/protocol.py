@@ -95,16 +95,17 @@ class Derivation:
 
 
 def derivation_for(manifest: Manifest, parser_ref: str) -> Derivation:
-    """ADR-023 §1 components for this manifest under the running platform version."""
+    """ADR-023 §1 components for this manifest under the running implementation: the
+    platform version is ``implementation_version()`` (amendment 3 — package version plus a
+    digest of the package's sources), so a code change is a new derivation by itself."""
     contract = dataset(manifest.contract.dataset_id)
     if contract is None:
         raise ValueError(f"{manifest.contract.dataset_id!r} is not registered")
     block = manifest.mapping_block()
+    version = energy_platform.implementation_version()
     return Derivation(
-        derivation_id=derivation_id(
-            energy_platform.__version__, contract.contract_version, block, parser_ref
-        ),
-        platform_version=energy_platform.__version__,
+        derivation_id=derivation_id(version, contract.contract_version, block, parser_ref),
+        platform_version=version,
         contract_version=contract.contract_version,
         mapping_block=block,
         parser_ref=parser_ref,

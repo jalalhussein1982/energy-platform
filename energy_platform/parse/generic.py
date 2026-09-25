@@ -61,8 +61,9 @@ def mapped_source_fields(manifest: Manifest) -> tuple[str, ...]:
 
 
 def parser_ref(manifest: Manifest) -> str:
-    """ADR-023 §1 ``parser_ref`` for the generic parser of this manifest's decode kind."""
-    return f"generic:{manifest.contract.decode}@{energy_platform.__version__}"
+    """ADR-023 §1 ``parser_ref`` for the generic parser of this manifest's decode kind, at
+    the running implementation (amendment 3: package version plus source digest)."""
+    return f"generic:{manifest.contract.decode}@{energy_platform.implementation_version()}"
 
 
 def generic_parser(manifest: Manifest) -> Parser:
