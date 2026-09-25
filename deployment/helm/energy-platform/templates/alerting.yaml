@@ -14,7 +14,9 @@ Deployments, no CRD, no cluster right:
     delivery in its log — the delivery record (no credential, no platform environment).
 Network (ADR-026, default-deny stays): Prometheus → exporter, kube-state-metrics, Alertmanager;
 kube-state-metrics → the API server (alerting.kubeStateMetrics.apiServer, REQUIRED: a tenant
-knows its control plane's address — `kubectl get endpoints kubernetes`); Alertmanager → the
+knows its control plane — the `kubernetes` Service IP on 443 as the pod addresses it and the
+endpoint on 6443 as the node serves it; which one a CNI evaluates depends on where it translates
+the Service, so both are declared); Alertmanager → the
 receiver and, only when declared, external receivers; Grafana → Prometheus; ingress to
 Prometheus and Alertmanager from the namespace only (port-forward enters from the node).
 */ -}}
@@ -101,7 +103,6 @@ spec:
             - --storage.tsdb.path=/prometheus
             - --storage.tsdb.retention.time={{ $a.prometheus.retention }}
             - --web.listen-address=:9090
-            - --web.enable-lifecycle=false
           ports:
             - name: http
               containerPort: 9090
@@ -485,8 +486,10 @@ spec:
             cidr: {{ . }}
 {{- end }}
       ports:
+{{- range $a.kubeStateMetrics.apiServer.ports }}
         - protocol: TCP
-          port: {{ $a.kubeStateMetrics.apiServer.port }}
+          port: {{ . }}
+{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

@@ -747,9 +747,8 @@ def test_alerting_renders_behind_its_flag_without_cluster_rights(tmp_path: Path)
         # default-deny stays: kube-state-metrics reaches the API server by the declared CIDRs only
         policies = named(docs, "NetworkPolicy")
         egress = policies["ep-energy-platform-allow-kube-state-metrics-egress"]["spec"]["egress"]
-        assert [b["ipBlock"]["cidr"] for b in egress[0]["to"]] and egress[0]["ports"][0][
-            "port"
-        ] == 6443
+        assert [b["ipBlock"]["cidr"] for b in egress[0]["to"]]
+        assert {p["port"] for p in egress[0]["ports"]} >= {6443}
         am_egress = policies["ep-energy-platform-allow-alertmanager-egress"]["spec"]["egress"]
         assert (
             am_egress[0]["to"][0]["podSelector"]["matchLabels"]["energy-platform.io/role"]

@@ -49,8 +49,10 @@ alerting:
   enabled: true                 # ADR-040: Prometheus + Alertmanager + kube-state-metrics + the receiver; `make alert-drill`
   kubeStateMetrics:
     apiServer:
-      cidrs: [172.18.0.0/16]    # kind's control-plane container on Docker's `kind` network (kubectl get endpoints kubernetes)
-      port: 6443
+      # the `kubernetes` Service IP (serviceSubnet's first address) and kind's control-plane container on
+      # Docker's `kind` network (kind picks a free 172.16/12 subnet per machine: 172.18, 172.21, …)
+      cidrs: [10.96.0.1/32, 172.16.0.0/12]
+      ports: [443, 6443]
 drills:
   restore:
     enabled: true

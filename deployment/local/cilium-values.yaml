@@ -1,6 +1,11 @@
 # Cilium for the local kind cluster — the policy-enforcing CNI ADR-026 §4 requires. The chart
 # pins its own images by digest (image.useDigest). Sized for a laptop; Hubble off.
 policyEnforcementMode: default        # enforce every NetworkPolicy the chart declares
+# ADR-040: an ipBlock rule to the API server's endpoint names the control-plane NODE; Cilium
+# matches CIDR rules against nodes only in this mode (the capture pods' public rule excludes
+# 172.16/12, so the node stays blocked for them)
+policyCIDRMatchMode: [nodes]
+rollOutCiliumPods: true               # a config change restarts the agent (the default keeps the old config running)
 kubeProxyReplacement: false
 routingMode: tunnel
 tunnelProtocol: vxlan

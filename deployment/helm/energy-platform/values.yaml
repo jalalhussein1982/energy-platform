@@ -144,9 +144,9 @@ alerting:                                # ADR-040 (review 3 R3): the ADR-037 ru
     image:
       repository: registry.k8s.io/kube-state-metrics/kube-state-metrics
       digest: sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b   # v2.20.0, resolved 2026-09-25
-    apiServer:                           # REQUIRED when enabled: `kubectl get endpoints kubernetes` (default-deny needs the address)
-      cidrs: []
-      port: 6443
+    apiServer:                           # REQUIRED when enabled (default-deny needs the address): the `kubernetes` Service IP
+      cidrs: []                          #   (443, as the pod addresses it) AND the endpoint `kubectl get endpoints kubernetes`
+      ports: [443, 6443]                 #   (6443, as the node serves it) — a CNI evaluates one or the other, so declare both
 
 egress:                                  # ADR-026 layer 1
   privateCIDRs:

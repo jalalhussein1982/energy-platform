@@ -48,9 +48,15 @@ platform's Python package owns every socket (ADR-027 §3) and adds no dependency
      record; it holds no credential and no platform environment.
 2. **Network.** Default-deny stays. Prometheus → the exporter (9187), kube-state-metrics (8080)
    and Alertmanager (9093); kube-state-metrics → the API server, declared by the tenant as
-   `alerting.kubeStateMetrics.apiServer.cidrs` and `port` (`kubectl get endpoints kubernetes`;
-   the demo's server `10.10.1.10/32:6443`, kind's Docker network `172.18.0.0/16:6443`) and
-   **required** when the flag is on — the render fails without it; Alertmanager → the receiver
+   `alerting.kubeStateMetrics.apiServer.cidrs` and `ports` — the `kubernetes` Service IP on
+   443 as the pod addresses it **and** the endpoint on 6443 as the node serves it (`kubectl get
+   endpoints kubernetes`; the demo `10.43.0.1/32` + `10.10.1.10/32`, kind `10.96.0.1/32` +
+   `172.16.0.0/12`), because a CNI evaluates the policy before or after Service translation
+   and kube-state-metrics found the difference on kind (`10.96.0.1:443: i/o timeout`); Cilium
+   additionally needs `policyCIDRMatchMode: [nodes]` to match a rule that names a node, loaded
+   by a restarted agent (`rollOutCiliumPods: true`; a config change alone left the old agent
+   running and the rule dead, 2026-09-25) — and
+   **required** when the flag is on: the render fails without it; Alertmanager → the receiver
    (8080) and, for an external receiver, `alerting.alertmanager.egress.cidrs`/`ports` (empty by
    default: no internet); Grafana → Prometheus (9090) for the ADR-037 `freshness.json` dashboard,
    which the chart now provisions with the Prometheus datasource when the flag is on; ingress to
