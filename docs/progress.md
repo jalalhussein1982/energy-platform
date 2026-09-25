@@ -774,3 +774,14 @@ stay in the log until Phase 15.
 **Open / carried.** Author (Level 3): the failover decision (ADR-028 amendment 1); the teardown
 when the demo is done (own-cluster README §6); the ČEPS follow-up around 2026-10-02.
 Maintainer: Phase 15.
+
+The final report refreshed the same evening (four passages): pinned to `6147ba0`, the demo at
+Helm revision 29 of `327e45e`; the alerting paragraph and the evidence rows say the drill ended
+in the mailbox on 2026-09-26; the open item "Nobody is paged yet" became "two freshness alerts
+are routed to the log, not to a person" — the calibration question of Phase 15, stated as before.
+On the way, the check found a test that had expired rather than failed: the R2 CLI test
+keyed a live capture by a fixed Job name whose tick was 2026-09-24 23:15 UTC, and the schedule
+module honours a name's tick only within the last day (ADR-031 amendment 1) — one day after
+the test was written it fell through to the newest firing instant. The test now derives its
+tick from the clock, six hours back on the quarter-hour: inside the honoured day, not the
+newest instant, so the fallback would still answer differently. The code did not change.
