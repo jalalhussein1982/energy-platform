@@ -707,11 +707,19 @@ C-76); the example the chart test renders and walks is
 1. **A mailbox that is read**, with an authenticated submission service: port 587 (STARTTLS)
    or 465. Hetzner Cloud blocks outbound port 25 by default, and a mailbox provider's submission
    service does not listen there anyway. The egress rule is an IP block (ADR-026), so a provider
-   behind rotating addresses is allow-listed by its **published netblocks**, not by one address:
+   behind rotating addresses is allow-listed by its **published netblocks**, not by one address.
+   The SPF record is the wrong list: it names the provider's *outbound* senders, and the
+   submission host may resolve elsewhere (checked 2026-09-26: `_spf.google.com` carries
+   `74.125.0.0/16` and `209.85.128.0/17`; `smtp.gmail.com` answered `142.251.127.108`, in
+   neither — the symptom would be a dial timeout in the notifier log, never a rejected login).
+   Take the provider's complete published list instead; for Google that is `goog.json`, every
+   IPv4 prefix (130 on 2026-09-25; the pod network is IPv4), which is what `values-demo.yaml`
+   carries since 2026-09-26:
 
    ```bash
-   dig +short TXT _spf.<provider>           # e.g. _spf.google.com → include:_netblocks.google.com …
-   dig +short TXT _netblocks.google.com     # ip4:… ranges — one dig per include; these are the CIDRs
+   curl -s https://www.gstatic.com/ipranges/goog.json \
+     | python3 -c 'import json,sys; [print(p["ipv4Prefix"]) for p in json.load(sys.stdin)["prefixes"] if "ipv4Prefix" in p]'
+   dig +short A smtp.gmail.com               # must fall inside one of them; check once from the cluster's side too
    ```
 
 2. **The Secret**, once, in the namespace:
