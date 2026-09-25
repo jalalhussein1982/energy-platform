@@ -300,8 +300,9 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 - [x] 14.1 `alerting.alertmanager.existingSecret` (read-only, optional, `/etc/alertmanager/secrets/<key>` for the receivers' `*_file` fields; the demo names it), a credential in values and a route to an undeclared receiver refused at render (`05` C-76, C-77), `ci/receiver-values.yaml` walked as Alertmanager walks it, ADR-040 amendment 1, `07` §7.3 (the runbook), the chart, tenant and root READMEs, the ADR index
 - [x] 14.2 `docs/overview/final-report.md` tracked after its accuracy pass, pinned to `6bc8021`
 - [x] 14.3 roadmap, progress
+- [x] 14.4 follow-up (2026-09-26): the demo's receiver values — `ops-email` through Gmail's submission service, the example's three routes, the egress netblocks as every IPv4 prefix of Google's published `goog.json` (the SPF record does not cover the submission host; `07` §7.3 step 1 corrected), the chart test asserting the demo's declared egress
 
-**Left for the author (Level 3):** the Secret, the mailbox and the receiver values on the demo, then the drill of `07` §7.2 ending in the mailbox (§7.3); the failover decision (ADR-028 amendment 1); the teardown when the demo is done (own-cluster README §6); the ČEPS follow-up around 2026-10-02.
+**Left for the author (Level 3):** push (the Phase 14 commits and this follow-up are local; the Secret exists since 2026-09-25 22:40 UTC, the mailbox is the author's Gmail account), then the drill of `07` §7.2 ending in the mailbox (§7.3); the failover decision (ADR-028 amendment 1); the teardown when the demo is done (own-cluster README §6); the ČEPS follow-up around 2026-10-02.
 
 ---
 

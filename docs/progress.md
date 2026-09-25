@@ -703,3 +703,54 @@ values and run the drill of `07` §7.3 on the demo; the failover decision (ADR-0
 a phase of its own if funded); the teardown when the demo is done (own-cluster README §6); the
 ČEPS follow-up around 2026-10-02. Maintainer: Phase 15 — the manifest-level publication
 expectation read by freshness (ADR-037 amendment), which retires the interim routes.
+
+## 2026-09-26 — Phase 14 follow-up: the demo's mailbox wired; the runbook's netblock step corrected
+
+**What happened.** The author chose the mailbox: their own Gmail account, sender and recipient
+alike, an app password in the Secret. The Secret `energy-platform-alertmanager` exists in the
+namespace since 2026-09-25 22:40 UTC (a first one at 22:35 UTC had carried the runbook
+placeholder's angle brackets inside the value; recreated). Read-only checks against the demo
+confirmed the rest of the picture: the running Alertmanager pod is the one from revision 28
+(started 2026-09-25 01:04 UTC, volumes `config` and `data` only), so `/etc/alertmanager/secrets`
+does not exist there yet — the optional mount arrives with `6bc8021`, which, with the other
+Phase 14 commits, is still local. Nothing to fix on the cluster; the push does it.
+
+**A finding on the runbook.** `07` §7.3 step 1 took the egress netblocks from the provider's
+SPF record. That is the wrong list: SPF names the provider's *outbound* senders, and the
+submission host may resolve elsewhere. Checked 2026-09-26: `_spf.google.com` carries
+`74.125.0.0/16` and `209.85.128.0/17` (no includes any more); `smtp.gmail.com` answered
+`142.251.127.108`, in neither. With those two CIDRs the drill would have ended in a dial timeout
+in the notifier log, never a rejected login. The published source that does cover the submission
+hosts is Google's complete range list, `https://www.gstatic.com/ipranges/goog.json` (130 IPv4
+prefixes, creationTime 2026-09-25T13:07:32; the pod network is IPv4). Step 1 now says so, prints
+the list with one command, and asks for a `dig` of the submission host to confirm it falls
+inside.
+
+**Commits (local, unpushed, on top of Phase 14's four).**
+- `e1148a1` feat(demo): `values-demo.yaml` carries the receiver `ops-email` (`smtp.gmail.com:587`,
+  `auth_password_file` under the Secret's mount, `require_tls`, `send_resolved`), the three routes
+  of `ci/receiver-values.yaml` unchanged, and `egress.cidrs` = the 130 `goog.json` prefixes on
+  `ports: [587]`; the tenant README notes it. The chart test that iterates the local, demo and
+  all-flags value sets asserted "no internet for Alertmanager unless declared" for the demo too;
+  the demo now declares, so its branch asserts the declaration precisely (one external rule, port
+  587 only, public IPv4 networks, more than one, none repeated; the receiver set; the credential
+  read from the Secret's file and carried nowhere else; the routes in the example's order) and
+  the local set keeps the no-internet assertion. Ruff's S105 refused a literal path compared
+  against a key named `auth_password_file`; the existing receiver test's `SECRETS_DIR` f-string
+  is the pattern.
+- `4d1d6e7` docs(ops): `07` §7.3 step 1 as above.
+- this entry: roadmap 14.4, progress.
+
+Rendered with the deploy's inputs (tenant + demo + the targets values, a digest, the replica
+endpoint): 75 documents; `alertmanager.yml` carries the two receivers and the three routes;
+the Alertmanager egress policy has the sink rule and one external rule with 130 `ipBlock`s on
+587; the Deployment mounts `secrets` read-only and optional. No `amtool` on the laptop and no
+Docker daemon: the config's load is proven by the chart tests and by the pod's readiness on the
+deploy (the release is atomic). `make check` green (960 passed, 35 skipped; lint, helm-lint).
+
+**Open / carried.** Author (Level 3): `git push origin main` (seven commits), wait for
+`deploy-demo`, then `kubectl -n energy-platform exec deploy/energy-platform-alertmanager -- ls
+/etc/alertmanager/secrets` → `smtp-password`; a Gmail filter "never send to spam" on the sender
+address; the drill of `07` §7.2 until `firing` and `resolved` both arrive in the mailbox. The
+failover decision, the teardown and the ČEPS follow-up around 2026-10-02 as before. Maintainer:
+Phase 15 (the manifest-level publication expectation), which retires the two log-only routes.
