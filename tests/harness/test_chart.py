@@ -660,3 +660,22 @@ def test_local_object_stores_are_rustfs_with_the_bucket_init_hook_on_the_platfor
     assert {"ENERGY_PLATFORM_S3_ENDPOINT", "ENERGY_PLATFORM_S3_REPLICA_ENDPOINT"} <= hook_env
     assert hook["metadata"]["annotations"]["helm.sh/hook-weight"] == "-20"
     assert "ep-energy-platform-minio-init" not in named(docs, "Job")
+
+
+def test_r2_the_capture_container_learns_its_job_name_by_the_downward_api(tmp_path: Path) -> None:
+    """ADR-031 amendment 1 (review 3 R2): the run's instant is the CronJob controller's tick,
+    carried in the Job name; only the capture verb needs it."""
+    docs = render(tmp_path, TENANT)
+    by_verb: dict[str, list[dict[str, Any]]] = {}
+    for d in docs:
+        if d["kind"] != "CronJob" or not d["metadata"]["name"].startswith("ep-energy-platform-"):
+            continue
+        container = d["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0]
+        by_verb.setdefault(container["name"], []).append(container)
+    for c in by_verb["capture"]:
+        env = {e["name"]: e for e in c["env"]}
+        ref = env["ENERGY_PLATFORM_JOB_NAME"]["valueFrom"]["fieldRef"]["fieldPath"]
+        assert ref == "metadata.labels['batch.kubernetes.io/job-name']"
+    for verb in ("process", "backfill", "recapture"):
+        for c in by_verb.get(verb, []):
+            assert "ENERGY_PLATFORM_JOB_NAME" not in {e["name"] for e in c["env"]}

@@ -7,15 +7,21 @@ missing_capture runs, at most schedule.backfill.limit fetches per firing so a fr
 never floods a source). process runs process_cron = the cadence shifted by a few minutes so it
 never races the capture of the same instant. concurrencyPolicy: Forbid = at most one in-flight
 request per target (ADR-033 §2); startingDeadlineSeconds and activeDeadlineSeconds bound a
-missed or stuck run; the ledger supplies idempotency and missed-run detection.
+missed or stuck run; the ledger supplies idempotency and missed-run detection. The capture
+container receives its Job name (ENERGY_PLATFORM_JOB_NAME): the run's instant is the
+controller's tick, not the pod's start time (ADR-031 amendment 1).
 */ -}}
 {{- $root := . -}}
 {{- range .Values.targets }}
 {{- $target := . -}}
 {{- $manifest := printf "/app/targets/%s" .manifest -}}
 {{- $jitter := toString $root.Values.schedule.startJitterSeconds -}}
+{{- /* ADR-031 amendment 1 (review 3 R2): the capture verb keys its run by the CronJob
+     controller's own tick, carried in the Job name (`<cronjob>-<minutes since the epoch>`);
+     the downward API hands the pod's job-name label to the container */ -}}
+{{- $jobName := list (dict "name" "ENERGY_PLATFORM_JOB_NAME" "valueFrom" (dict "fieldRef" (dict "fieldPath" "metadata.labels['batch.kubernetes.io/job-name']"))) -}}
 {{- $jobs := list
-      (dict "verb" "capture" "role" "capture" "cron" .cron
+      (dict "verb" "capture" "role" "capture" "cron" .cron "extraEnv" $jobName
             "args" (list "capture" "-m" $manifest "--live" "--start-jitter-seconds" $jitter))
       (dict "verb" "process" "role" "process" "cron" (default .cron .process_cron)
             "args" (list "process" "-m" $manifest))
@@ -47,6 +53,6 @@ spec:
       backoffLimit: 0
       activeDeadlineSeconds: {{ $root.Values.schedule.activeDeadlineSeconds }}
       template:
-{{ include "energy-platform.podTemplate" (dict "root" $root "role" .role "target" $target.id "container" (include "energy-platform.container" (dict "root" $root "name" .verb "args" .args))) | indent 8 }}
+{{ include "energy-platform.podTemplate" (dict "root" $root "role" .role "target" $target.id "container" (include "energy-platform.container" (dict "root" $root "name" .verb "args" .args "extraEnv" .extraEnv))) | indent 8 }}
 {{- end }}
 {{- end }}

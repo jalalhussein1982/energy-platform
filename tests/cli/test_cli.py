@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -383,3 +384,62 @@ def test_validate_refuses_a_custom_parser_until_a_loader_exists(tmp_path: Path) 
     assert "custom parsers are not loaded" in result.stdout
     make_target(root, "ote_plain")
     assert runner.invoke(app, ["validate", "ote_plain", "--targets-root", str(root)]).exit_code == 0
+
+
+def test_r2_live_capture_without_an_instant_is_keyed_by_the_schedule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review 3 R2: ``capture --live`` with no ``--scheduled-for`` used ``now()``, so the run
+    never matched its cron instant. The CronJob's own tick, passed as the Job name, is the
+    run's instant; without a name the newest firing instant is."""
+    from energy_platform import cli
+    from energy_platform.fetch import Fetcher, FixtureTransport
+    from tests.synthetic import ote_im_price_period_response
+
+    def offline(manifest: object) -> Fetcher:
+        return Fetcher(
+            allowed_hosts=("www.ote-cr.cz",),
+            transport=FixtureTransport(ote_im_price_period_response(date(2026, 9, 24))),
+            offline=True,
+            sleep=lambda s: None,
+        )
+
+    monkeypatch.setattr(cli, "_live_fetcher", offline)
+    result = runner.invoke(
+        app,
+        [
+            "capture",
+            "-m",
+            str(EX / "manifests/ote_idm_soap.yaml"),
+            "--live",
+            "--bronze-dir",
+            str(tmp_path),
+        ],
+        env={
+            "ENERGY_PLATFORM_DSN": "",
+            "ENERGY_PLATFORM_JOB_NAME": "ep-capture-ote-idm-soap-29838195",
+        },
+    )
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.stdout)
+    assert report["scheduled_for"].startswith("2026-09-24 23:15:00")  # the tick, not now()
+    entries = FileCaptureLog(tmp_path).list("ote_idm_soap")
+    assert len(entries) == 1 and entries[0].scheduled_for == datetime(
+        2026, 9, 24, 23, 15, tzinfo=UTC
+    )
+    # no Job name: the newest firing instant of the */15 cadence, minute-exact
+    again = runner.invoke(
+        app,
+        [
+            "capture",
+            "-m",
+            str(EX / "manifests/ote_idm_soap.yaml"),
+            "--live",
+            "--bronze-dir",
+            str(tmp_path),
+        ],
+        env={"ENERGY_PLATFORM_DSN": "", "ENERGY_PLATFORM_JOB_NAME": ""},
+    )
+    assert again.exit_code == 0, again.output
+    when = datetime.fromisoformat(json.loads(again.stdout)["scheduled_for"])
+    assert when.second == 0 and when.microsecond == 0 and when.minute % 15 == 0

@@ -4,8 +4,10 @@
 rebuilds ledger rows from Bronze; ``process`` claims pending runs under a fence and writes
 Silver; ``replay`` never fetches; ``backfill`` fetches only periods with no capture-log entry
 and only within ``history.max_age``; ``detect_gaps`` classifies expected instants;
-``recapture`` is the ADR-033 correction re-poll; ``smoke`` the ADR-025 upgrade gate;
-``storage_probe`` the ADR-021 §3 storage-class probe; ``restore_drill`` the ADR-002 drill.
+``intended_instant`` names the run a
+scheduled capture is for (ADR-031 amendment 1); ``recapture`` is the ADR-033 correction
+re-poll; ``smoke`` the ADR-025 upgrade gate; ``storage_probe`` the ADR-021 §3 storage-class
+probe; ``restore_drill`` the ADR-002 drill.
 """
 
 from energy_platform.runtime.backfill import backfill
@@ -26,6 +28,7 @@ from energy_platform.runtime.process import ProcessReport, process, process_one
 from energy_platform.runtime.recapture import RecaptureReport, last_run_of_day, recapture
 from energy_platform.runtime.reconcile import reconcile
 from energy_platform.runtime.replay import replay_derivation, replay_range
+from energy_platform.runtime.schedule import instant_from_job_name, intended_instant, latest_instant
 from energy_platform.runtime.smoke import SmokeReport, fixture_fetcher_factory, smoke
 
 __all__ = [
@@ -48,7 +51,10 @@ __all__ = [
     "delivery_day_for",
     "detect_gaps",
     "fixture_fetcher_factory",
+    "instant_from_job_name",
+    "intended_instant",
     "last_run_of_day",
+    "latest_instant",
     "max_age_cutoff",
     "partition_bounds",
     "process",

@@ -60,3 +60,37 @@ cron evaluator is a few dozen lines of standard-library code, which is cheaper t
 ## Verification refs
 
 none — design decision.
+
+## Amendment 1 (2026-09-25) — the run's instant is the schedule's, never the pod's start time
+
+**Finding (review 3 R2, `codex-review/01-deep-review.md`).** `capture --live` without
+`--scheduled-for` keyed the run by `datetime.now(UTC)` and the CronJob template passed no
+instant, while decision 3 classifies by exact firing instants. A pod that starts at 23:15:25
+therefore never served the 23:15:00 instant: every scheduled capture on the demo since
+2026-09-23 became a phantom `missing_capture` after the tolerance, and the hourly backfill
+(limit 8, covering the four ticks of the hour) fetched the same day's file a second time —
+twice the source reads the manifests declare, a wrong ledger, no wrong value. Decision 2's
+tolerance only delayed the misclassification; it could not reconcile two identities.
+
+**Decision.**
+
+1. A scheduled capture is keyed by the **intended instant** (`energy_platform.runtime.schedule`),
+   taken in this order: the CronJob controller's own tick — a Job created by a CronJob is named
+   `<cronjob>-<minutes since the epoch>` of its scheduled time, and the chart hands the pod's
+   `batch.kubernetes.io/job-name` label to the capture container as `ENERGY_PLATFORM_JOB_NAME`
+   by the downward API — when it decodes to a firing instant of the cadence within the last
+   day; otherwise the newest firing instant of the cadence at or before now (a manual Job, a
+   laptop run). `--scheduled-for` still overrides both.
+2. The fallback never invents an older instant: a tick no capture served stays missing and
+   decision 3 reports it. A minute-exact `now` is the last resort for a cadence rarer than the
+   two-month search window.
+3. Runs already keyed by a wall-clock instant on the demo stay as they are (processed, their
+   captures valid); the phantom runs of their ticks were backfilled and are ordinary runs.
+
+**Proof:** `tests/runtime/test_review3.py::test_r2_…` (the reviewer's probe inverted: a
+25-second-late start, no phantom, no second fetch; the demo's own Job name decodes to its tick
+and wins over a 20-minute-late start; a name without a valid tick falls back; a missed tick is
+still detected; a Prague cadence and the autumn change-over day),
+`tests/cli/test_cli.py::test_r2_live_capture_without_an_instant_is_keyed_by_the_schedule`,
+`tests/harness/test_chart.py::test_r2_the_capture_container_learns_its_job_name_by_the_downward_api`.
+The reviewer's `schedule_probe.py` no longer reproduces the defect.

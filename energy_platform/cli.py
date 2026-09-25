@@ -74,6 +74,7 @@ from energy_platform.runtime import (
     smoke,
     storage_probe,
 )
+from energy_platform.runtime.schedule import JOB_NAME_ENV, intended_instant
 from energy_platform.silver import downgrade, upgrade
 from energy_platform.silver.migrate import create_schema, drop_schema, grant_reader
 from energy_platform.store import MemoryStore, Store, StoreUnavailable
@@ -336,7 +337,13 @@ def capture_cmd(
         when = _instant(scheduled_for) if scheduled_for else entry.scheduled_for
         factory: Any = _fixture_factory(payload, entry.content_type)
     else:
-        when = _instant(scheduled_for) if scheduled_for else datetime.now(UTC)
+        # ADR-031 amendment 1 (review 3 R2): the run is the schedule's instant — the CronJob
+        # controller's tick from the Job name, else the newest firing instant — never now()
+        when = (
+            _instant(scheduled_for)
+            if scheduled_for
+            else intended_instant(m, datetime.now(UTC), os.environ.get(JOB_NAME_ENV))
+        )
         factory = _live_fetcher
     rt = _runtime(m, _store(dsn, required=False), _bronze(bronze_dir), factory)
     _jitter(start_jitter)
