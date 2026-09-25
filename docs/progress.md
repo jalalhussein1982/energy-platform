@@ -754,3 +754,23 @@ deploy (the release is atomic). `make check` green (960 passed, 35 skipped; lint
 address; the drill of `07` §7.2 until `firing` and `resolved` both arrive in the mailbox. The
 failover decision, the teardown and the ČEPS follow-up around 2026-10-02 as before. Maintainer:
 Phase 15 (the manifest-level publication expectation), which retires the two log-only routes.
+
+## 2026-09-26 (later) — pushed; the drill ends in the mailbox
+
+With the author's permission ("proceed with these commands, you have permission"): `git push
+origin main` (`d5fa9ce..327e45e`, seven commits); deploy-demo run 36198752242 completed in
+under three minutes on `327e45e`; the Alertmanager pod rolled at 22:54 UTC, ready, no
+restarts, `/etc/alertmanager/secrets/smtp-password` present; the loaded configuration read
+back through a port-forward to `/api/v2/status` names `platform-sink` and `ops-email` and the
+three routes in the example's order. Then `deployment/local/drills/alert.sh` against the demo
+(`KUBECONFIG=~/.kube/energy-platform-demo.yaml KIND_CONTEXT=default`): PASS, exit 0 — the
+`firing` delivery in the receiver's log at 23:00:24 UTC and `[FIRING:1]
+EnergyPlatformRestoreDrillFailed (page)` in the mailbox at 23:00:24; the `resolved` delivery
+at 23:02:24 and `[RESOLVED] …` in the mailbox at 23:02:24; both in the inbox, not spam; no
+notifier error. Recorded in `07` §7.3; roadmap 14.5. The channel is wired: a person is
+notified of what pages, the log keeps every delivery, the two uncalibrated night-time alerts
+stay in the log until Phase 15.
+
+**Open / carried.** Author (Level 3): the failover decision (ADR-028 amendment 1); the teardown
+when the demo is done (own-cluster README §6); the ČEPS follow-up around 2026-10-02.
+Maintainer: Phase 15.

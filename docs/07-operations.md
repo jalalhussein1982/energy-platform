@@ -752,6 +752,23 @@ C-76); the example the chart test renders and walks is
    (`kubectl -n energy-platform logs deploy/energy-platform-alertmanager`): a refused netblock,
    a wrong host, a rejected password.
 
+Run on the demo, 2026-09-26 (Phase 14 follow-up). The author's Gmail account is sender and
+recipient; the Secret exists since 2026-09-25 22:40 UTC; the receiver values went in at
+`e1148a1` and the push of `327e45e` ran deploy-demo (run 36198752242), which rolled
+Alertmanager at 22:54 UTC with the mount present (`ls /etc/alertmanager/secrets` →
+`smtp-password`) and the configuration read back through `/api/v2/status` naming both
+receivers and the three routes. Then the drill script of §7.2 with
+`KUBECONFIG=~/.kube/energy-platform-demo.yaml KIND_CONTEXT=default`:
+
+| event (UTC) | the platform receiver's log | the mailbox |
+|---|---|---|
+| Job created 22:57:25, failed within seconds; alert active 23:00:14 (`for: 1m`) | `firing` received 23:00:24 | `[FIRING:1] EnergyPlatformRestoreDrillFailed (page)`, 23:00:24, inbox |
+| Job deleted on the firing delivery; alert resolved 23:02:14 | `resolved` received 23:02:24 | `[RESOLVED] EnergyPlatformRestoreDrillFailed (page)`, 23:02:24, inbox |
+
+Under three minutes from the failure to a person's inbox, two from the deletion to the
+all-clear; the log and the mailbox received each message in the same second; the notifier log
+carries no error; both messages landed in the inbox, not in spam. Exit 0. The channel is wired.
+
 For a webhook (a chat tool, an incident service) the shape is the same: a URL that carries a
 token goes into the Secret and the receiver reads it as `url_file` / `api_url_file`; the
 endpoint's addresses and port are the egress rule.

@@ -302,7 +302,9 @@ Write `docs/09-acceptance-report.md` with all runs *(numbered 09 since 2026-09-2
 - [x] 14.3 roadmap, progress
 - [x] 14.4 follow-up (2026-09-26): the demo's receiver values — `ops-email` through Gmail's submission service, the example's three routes, the egress netblocks as every IPv4 prefix of Google's published `goog.json` (the SPF record does not cover the submission host; `07` §7.3 step 1 corrected), the chart test asserting the demo's declared egress
 
-**Left for the author (Level 3):** push (the Phase 14 commits and this follow-up are local; the Secret exists since 2026-09-25 22:40 UTC, the mailbox is the author's Gmail account), then the drill of `07` §7.2 ending in the mailbox (§7.3); the failover decision (ADR-028 amendment 1); the teardown when the demo is done (own-cluster README §6); the ČEPS follow-up around 2026-10-02.
+- [x] 14.5 (2026-09-26, with the author's permission) pushed (`d5fa9ce..327e45e`, deploy-demo run 36198752242 rolled Alertmanager with the mount), the drill of `07` §7.2 run on the demo: `firing` and `resolved` in the log and in the mailbox within the same second, under three minutes from the failure (`07` §7.3)
+
+**Left for the author (Level 3):** the failover decision (ADR-028 amendment 1); the teardown when the demo is done (own-cluster README §6); the ČEPS follow-up around 2026-10-02.
 
 ---
 
