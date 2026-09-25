@@ -329,6 +329,12 @@ output from a current-code rebuild is a guarantee nobody can keep.
    after the snapshot is lag (its run) or ahead (its rows), never loss. The alert path
    delivered that failure (`EnergyPlatformRestoreDrillFailed`, 01:51:24 UTC) — the first real
    page of ADR-040.
+6. **A run whose capture was invalidated is not expected from the rebuild.** ADR-038 makes
+   reconcile skip an invalidated capture, so a fresh scratch never has a run for it, while
+   live keeps the run it processed before the decision. The processed-run comparison excludes
+   such live runs (the second manual drill of 2026-09-25, revision 27: every version
+   reproduced and "processed runs 273 < live 368" for the XLSX target — the 95 runs of the
+   21–22 September invalidations, confirmed on the live ledger).
 
 **Consequences.** After a value-changing release the nightly drill fails with `diverging` until
 the affected derivation is replayed (`energyctl replay --derivation`, ADR-016 §4) or the
@@ -338,7 +344,8 @@ passes with its old versions reported as historical. `docs/07` §5 and the final
 the guarantee in these words.
 
 **Proof (memory and PostgreSQL):** `tests/runtime/test_review3.py::test_r5_…` (including
-`test_r5_a_capture_replicated_between_rebuild_and_comparison_is_lag_not_loss` for decision 5),
+`test_r5_a_capture_replicated_between_rebuild_and_comparison_is_lag_not_loss` for decision 5,
+`test_r5_a_run_whose_capture_was_invalidated_is_not_expected_from_a_fresh_rebuild` for 6),
 `test_r6_…`, `tests/store/test_review3_drill.py` (the reviewer's daily+monthly fixtures on an
 empty scratch schema in either order; a target with no captures reports none of its siblings'
 rows; the `ignore_fields` revision passes with 192 historical versions; a value-changing

@@ -531,6 +531,22 @@ expected trace of ADR-031 amendment 1 meeting ADR-023 amendment 3: a tick's payl
 under the old code by its wall-clock run and again under the new code by its backfilled
 exact-tick run — the same value twice, named as history.
 
+**`restore-drill-manual-4` (revision 27, the snapshot rule; 01:57–02:53 UTC).** Phase 1
+against the restored database: **OK in 944.6 s**, all seven targets, the captures that landed
+during the run counted as lag (1–2 per 15-minute target) — the 01:30 failure does not recur.
+Phase 2, the Bronze-only rebuild: every version reproduced on every target (`ote_intraday_market_xlsx`
+100 128 = 100 128, `ceps_load` 17 632, `ote_intraday_market` 15 376, …) and still **FAILED in
+2 305.9 s** on one count: "processed runs 273 < live 368" for the XLSX target. The 95 runs are
+the ones whose captures the 21–22 September invalidations voided (confirmed on the live ledger:
+95 of 378 processed XLSX runs have an invalidated capture): a fresh rebuild never creates a run
+for an invalidated capture (ADR-038, reconcile skips it) while live keeps the run it processed
+before the decision — the rows agree, the run count could not. Fixed the same night (amendment
+5 decision 6): live runs whose capture is invalidated are not expected from the rebuild. Two
+more things the run measured: the drill container runs at the shared job limit of 500m CPU and
+was throttled the whole time (38 minutes for phase 2, 3 280 s of a 3 600 s deadline for the
+Job), so the drill now has its own `resources.drill` (1.5 CPU) and `drills.restore.activeDeadlineSeconds`
+(7 200); and the replica-log snapshot held: nothing landed during the run was read as loss.
+
 What the alert path did with the failure: `EnergyPlatformRestoreDrillFailed` became active at
 01:51:14 UTC (the Job failed 01:49:37, `for: 1m`) and was **delivered at 01:51:24** — the first
 real page of ADR-040, under the newest-Job rule. Two `EnergyPlatformTargetLate` alerts

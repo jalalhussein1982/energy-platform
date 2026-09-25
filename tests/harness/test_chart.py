@@ -522,6 +522,27 @@ def test_demo_replicates_every_fifteen_minutes_and_alerts_on_staleness(tmp_path:
     assert exprs["EnergyPlatformBaseBackupStale"].endswith("> 172800")
 
 
+def test_the_drill_has_its_own_deadline_and_cpu_budget(tmp_path: Path) -> None:
+    """07 §5.4 (2026-09-25): the replay is CPU-bound and grows with the history; the shared
+    job limits (500m) and a fixed 3600 s deadline cut the second manual drill short. Both are
+    values now, and the drill container does not run under the capture Jobs' limits."""
+    docs = render(tmp_path, TENANT, LOCAL)
+    drill = named(docs, "CronJob")["ep-energy-platform-restore-drill"]["spec"]["jobTemplate"][
+        "spec"
+    ]
+    assert drill["activeDeadlineSeconds"] == 7200
+    container = next(c for c in drill["template"]["spec"]["containers"] if c["name"] == "drill")
+    assert container["resources"]["limits"]["cpu"] == "1500m"
+    assert container["resources"]["requests"]["memory"] == "256Mi"
+    docs = render(
+        tmp_path, TENANT, LOCAL, extra=("--set", "drills.restore.activeDeadlineSeconds=5400")
+    )
+    drill = named(docs, "CronJob")["ep-energy-platform-restore-drill"]["spec"]["jobTemplate"][
+        "spec"
+    ]
+    assert drill["activeDeadlineSeconds"] == 5400
+
+
 def test_the_drill_refuses_database_modes_without_a_backup_chain(tmp_path: Path) -> None:
     """ADR-036 amendment 3 (review 2 DEP-02): cnpg / external render no backup objects the drill
     could restore, so enabling the drill with them is refused instead of silently accepted."""

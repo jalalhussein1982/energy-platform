@@ -638,6 +638,14 @@ replica taken before the rebuild (ADR-036 amendment 5 decision 5, regression tes
 failure was delivered as `EnergyPlatformRestoreDrillFailed` at 01:51:24 — ADR-040's first real
 page. `EnergyPlatformTargetLate` fired for `ote_dam` and `ote_imbalance_settlement` at 01:45.
 
+**Manual drill 4 (revision 27, 01:57–02:53 UTC):** phase 1 OK in 944.6 s (the snapshot rule
+holds); phase 2 reproduced every version and failed on "processed runs 273 < live 368" for
+the XLSX target — the 95 runs of the invalidated captures, which a fresh rebuild never creates
+(ADR-038). Fixed: those live runs are not expected (ADR-036 amendment 5 decision 6, regression
+test). The drill also gets its own CPU budget and deadline (`resources.drill`,
+`drills.restore.activeDeadlineSeconds`): 500m throttled phase 2 to 38 minutes, 3 280 s of a
+3 600 s budget (`07` §5.4).
+
 **Open / carried.** Author: a real receiver by values (SMTP or a webhook, `alerting.alertmanager.receivers/routes`
 + `egress.cidrs`); whether `EnergyPlatformTargetLate` should page for a day-ahead and a settlement target at night;
 run the delivery drill on the demo and wire a real receiver by values; decide on the failover

@@ -61,7 +61,9 @@ spec:
   jobTemplate:
     spec:
       backoffLimit: 0
-      activeDeadlineSeconds: 3600
+      # both phases plus the fetch and the restore share this budget; the replay is CPU-bound and
+      # grows with the captured history (2026-09-25: 944 s for phase 1 alone at revision 27)
+      activeDeadlineSeconds: {{ .Values.drills.restore.activeDeadlineSeconds }}
       template:
         metadata:
           labels:
@@ -161,7 +163,7 @@ spec:
               securityContext:
 {{ include "energy-platform.containerSecurity" . | indent 16 }}
               resources:
-{{ toYaml .Values.resources.job | indent 16 }}
+{{ toYaml .Values.resources.drill | indent 16 }}
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp

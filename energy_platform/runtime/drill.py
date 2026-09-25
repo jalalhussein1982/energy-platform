@@ -304,10 +304,17 @@ def _live_side(live: Store, manifest: Manifest, snapshot: tuple[CaptureEntry, ..
         historical_versions += 1
         retired.add(loser[2])
     expected = {fp for _, fp, _ in newest.values()}
+    # ADR-038: a run whose capture was invalidated is never rebuilt (reconcile skips the
+    # capture, so a fresh scratch has no run for it), while live keeps the run it processed
+    # before the decision — such a run is not expected from the rebuild (2026-09-25: 95 of
+    # the demo's 368 processed XLSX runs, the 21-22 September invalidations, read as a shortfall)
+    current_derivation = derivation_for(manifest, parser_ref(manifest)).derivation_id
     processed = 0
     lagging = 0
     for run in live.runs(target):
         if run.state != "processed":
+            continue
+        if run.capture_id is not None and live.is_invalidated(run.capture_id, current_derivation):
             continue
         if run.capture_id in replica_ids or bound is None:
             processed += 1

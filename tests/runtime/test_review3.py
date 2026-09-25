@@ -8,6 +8,7 @@ value guarantee). Store-level halves that must hold on PostgreSQL live in ``test
 
 from __future__ import annotations
 
+import itertools
 import re
 import shutil
 import sys
@@ -21,6 +22,7 @@ import energy_platform
 from energy_platform import implementation_version, source_digest
 from energy_platform.bronze import Bronze, MemoryBlobStore, MemoryCaptureLog
 from energy_platform.bronze.fixtures import load_fixture
+from energy_platform.contracts.invalidation import Invalidation
 from energy_platform.contracts.manifest import Manifest, load_manifest
 from energy_platform.mapping import MappingContext, MappingResult
 from energy_platform.parse import parser_ref
@@ -33,12 +35,14 @@ from energy_platform.runtime import (
     intended_instant,
     latest_instant,
     process,
+    reconcile,
     replay_range,
     restore_drill,
 )
 from energy_platform.runtime.process import map_payload
 from energy_platform.store import MemoryStore, derivation_for
-from tests.runtime.harness import SCHEDULED, T1, Clock, runtime
+from tests.runtime.harness import DAY, SCHEDULED, T1, Clock, runtime
+from tests.synthetic import ote_im_price_period_response
 
 PRAGUE = "Europe/Prague"
 
@@ -385,13 +389,50 @@ def test_r5_a_capture_replicated_between_rebuild_and_comparison_is_lag_not_loss(
 
 
 def _live_two_runs() -> tuple[MemoryStore, Bronze, Clock]:
+    """Two processed runs with distinct payloads (distinct versions), as production has."""
     clock = Clock(SCHEDULED + timedelta(minutes=1))
     store = MemoryStore()
     bronze = Bronze(MemoryBlobStore(), MemoryCaptureLog())
-    rt = runtime(T1, store=store, bronze=bronze, clock=clock)
+    serial = itertools.count(1)
+
+    def distinct() -> bytes:
+        return ote_im_price_period_response(DAY).replace(
+            b"170.13", f"{100 + next(serial)}.13".encode()
+        )
+
+    rt = runtime(T1, store=store, bronze=bronze, clock=clock, payload=distinct)
     for k in range(2):
         when = SCHEDULED + timedelta(minutes=15 * k)
         clock.now = when + timedelta(minutes=1)
         assert capture(rt, when).outcome == "ok"
     process(rt)
     return store, bronze, clock
+
+
+def test_r5_a_run_whose_capture_was_invalidated_is_not_expected_from_a_fresh_rebuild() -> None:
+    """The second manual drill of 2026-09-25 (revision 27): every version reproduced, and
+    still "processed runs 273 < live 368" for the XLSX target — the 95 runs whose captures the
+    21-22 September invalidations voided. A fresh rebuild never creates those runs (ADR-038:
+    reconcile skips an invalidated capture); live keeps the runs it processed before the
+    decision. They are not a shortfall."""
+    live, replica, clock = _live_two_runs()
+    first = replica.log.list(T1.target_id)[0]
+    decision = Invalidation(
+        target_id=T1.target_id,
+        capture_id=first.capture_id,
+        reason="the file under this run was another day's (docs/07 §4.3)",
+        recorded_by="tests",
+        recorded_at=clock.now,
+    )
+    assert replica.log.put_invalidation(decision) is True
+    rt = runtime(T1, store=live, bronze=replica, clock=clock)
+    reconcile(rt, window=None)  # mirrors the decision into the live ledger
+    assert live.is_invalidated(first.capture_id, None)
+    assert len([r for r in live.runs(T1.target_id) if r.state == "processed"]) == 2
+    report = restore_drill([T1], scratch=MemoryStore(), replica=replica, live=live, clock=clock)
+    t = report.targets[0]
+    assert report.ok, t.message
+    assert t.scratch_processed == 1 and t.live_processed == 1
+    assert t.missing_versions == 0 and t.extra_versions == 0
+    assert t.live is not None and t.scratch is not None and t.live.rows == t.scratch.rows == 192
+    assert t.message.startswith("identical")

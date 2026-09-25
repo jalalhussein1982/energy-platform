@@ -202,6 +202,7 @@ drills:
   restore:                               # ADR-002 / ADR-036 §5 (Task 5.10 renders the CronJob)
     enabled: false
     schedule: "30 3 * * *"
+    activeDeadlineSeconds: 7200          # fetch + restore + both phases; the replay grows with the history (07 §5.4)
 
 rclone:
   image:
@@ -212,6 +213,9 @@ resources:
   job:
     requests: {cpu: 50m, memory: 128Mi}
     limits: {cpu: 500m, memory: 512Mi}
+  drill:                                 # the restore drill's replay is CPU-bound: 500m throttled it to ~40 min per phase (07 §5.4)
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: 1500m, memory: 1Gi}
   postgres:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {cpu: "1", memory: 1Gi}
