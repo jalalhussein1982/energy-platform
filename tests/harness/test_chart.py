@@ -797,6 +797,29 @@ def test_alerting_renders_behind_its_flag_without_cluster_rights(tmp_path: Path)
             assert am_egress[1]["to"][0]["ipBlock"]["cidr"] == "203.0.113.0/24"
             assert {r["name"] for r in am_cfg["receivers"]} == {"platform-sink", "ops-webhook"}
             assert am_cfg["route"]["routes"][0]["receiver"] == "ops-webhook"
+        elif values is DEMO:
+            # the demo declares the operator's mailbox (07 §7.3, 2026-09-26): one external rule
+            # on the submission port only, its blocks a provider's published list — public IPv4
+            # networks, more than one address, none repeated; the receiver reads the credential
+            # from the Secret's file and carries none itself; the routes are the example's
+            assert len(am_egress) == 2
+            assert {p["port"] for p in am_egress[1]["ports"]} == {587}
+            blocks = [b["ipBlock"]["cidr"] for b in am_egress[1]["to"]]
+            networks = [ipaddress.ip_network(b) for b in blocks]
+            assert len(blocks) > 1 and len(set(blocks)) == len(blocks)
+            assert all(n.version == 4 and n.is_global for n in networks), blocks
+            assert {r["name"] for r in am_cfg["receivers"]} == {"platform-sink", "ops-email"}
+            email = next(r for r in am_cfg["receivers"] if r["name"] == "ops-email")
+            email_cfg = email["email_configs"][0]
+            assert email_cfg["auth_password_file"] == f"{SECRETS_DIR}/smtp-password"
+            assert "auth_password" not in email_cfg and email_cfg["require_tls"] is True
+            assert email_cfg["smarthost"].endswith(":587")
+            assert [r["receiver"] for r in am_cfg["route"]["routes"]] == [
+                "platform-sink",
+                "ops-email",
+                "platform-sink",
+            ]
+            assert am_cfg["route"]["routes"][1]["continue"] is True
         else:
             assert len(am_egress) == 1  # no internet for Alertmanager unless declared
 

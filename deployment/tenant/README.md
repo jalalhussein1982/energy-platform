@@ -112,3 +112,7 @@ its routes keep the two uncalibrated night-time freshness alerts (`ote_dam`, `ot
 in the log only and send every page to the channel *and* the log. A credential typed into values, or a
 route naming a receiver that is not declared, fails `helm template` before anything is pushed. The
 runbook, with the netblock lookup and the mailbox drill, is `docs/07-operations.md` §7.3.
+On the demo the values are set (2026-09-26): the receiver `ops-email` sends through Gmail's
+submission service (`smtp.gmail.com:587`, the author's account to itself, an app password in the
+Secret) and the egress netblocks are every IPv4 prefix of Google's published `goog.json` — the SPF
+record does not cover the submission host (§7.3 step 1).
