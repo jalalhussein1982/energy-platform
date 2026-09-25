@@ -234,5 +234,7 @@ taken before the rebuild (ADR-036 amendment 5 decision 5; `docs/07` §5.4); the 
 delivered as a real alert. The manual drill that followed passed phase 1 and found one more
 rule gap in phase 2 — runs whose captures were invalidated (ADR-038) are not created by a
 fresh rebuild and are no longer expected (decision 6); the drill also gained its own CPU budget
-and deadline. Left for the author: a real receiver by values, the night-time
+and deadline. The manual drill after that (revision 28, 03:01–03:46 UTC) passed both phases
+on the live data: 718.6 s against the restored database, 1 923.2 s for the Bronze-only
+rebuild, every version of every target reproduced (`docs/07` §5.4). Left for the author: a real receiver by values, the night-time
 `EnergyPlatformTargetLate` calibration, and the decision on the failover demonstration (R1).

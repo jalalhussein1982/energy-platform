@@ -646,6 +646,11 @@ test). The drill also gets its own CPU budget and deadline (`resources.drill`,
 `drills.restore.activeDeadlineSeconds`): 500m throttled phase 2 to 38 minutes, 3 280 s of a
 3 600 s budget (`07` §5.4).
 
+**Manual drill 5 (revision 28, 03:01–03:46 UTC): both phases OK** — 718.6 s against the
+restored database, 1 923.2 s for the Bronze-only rebuild, all seven targets, every version
+reproduced; the drill-failed alert resolved when this Job became the newest (`07` §5.4). Five
+deploys today (revisions 24 → 28), CI green on every push.
+
 **Open / carried.** Author: a real receiver by values (SMTP or a webhook, `alerting.alertmanager.receivers/routes`
 + `egress.cidrs`); whether `EnergyPlatformTargetLate` should page for a day-ahead and a settlement target at night;
 run the delivery drill on the demo and wire a real receiver by values; decide on the failover

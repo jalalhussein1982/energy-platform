@@ -547,6 +547,18 @@ was throttled the whole time (38 minutes for phase 2, 3 280 s of a 3 600 s deadl
 Job), so the drill now has its own `resources.drill` (1.5 CPU) and `drills.restore.activeDeadlineSeconds`
 (7 200); and the replica-log snapshot held: nothing landed during the run was read as loss.
 
+**`restore-drill-manual-5` (revision 28, decisions 5 and 6, the drill's own budget; 03:01–03:46
+UTC): both phases OK.** Phase 1 against the restored database **OK in 718.6 s** (944.6 s under
+the 500m limit), phase 2 the Bronze-only rebuild **OK in 1 923.2 s** (2 305.9 s), all seven
+targets in both: `ote_intraday_market_xlsx` 102 816 versions reproduced with 1 344 under a
+retired derivation and 285 of 285 runs (the 95 invalidated-capture runs no longer counted),
+`ceps_load` 17 738, `ote_intraday_market` 15 496 (the rebuild 44 ahead: a capture live had not
+processed yet), the rest identical; 1–2 lagging runs per 15-minute target, the captures that
+landed during the run. 45 minutes for the whole Job, 30 of them the Bronze-only replay of ~2 300
+captures, against a 7 200 s budget. `EnergyPlatformRestoreDrillFailed` was **delivered
+`resolved` at 03:02:24** the moment this Job became the newest of its kind — the rule clears on
+the next attempt and would page again if that attempt failed.
+
 What the alert path did with the failure: `EnergyPlatformRestoreDrillFailed` became active at
 01:51:14 UTC (the Job failed 01:49:37, `for: 1m`) and was **delivered at 01:51:24** — the first
 real page of ADR-040, under the newest-Job rule. Two `EnergyPlatformTargetLate` alerts
