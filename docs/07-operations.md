@@ -261,6 +261,10 @@ when the newest Job of the kind failed (ADR-040 §5; the same for `EnergyPlatfor
 `EnergyPlatformTargetLate` was `pending` for `ote_dam`, `ote_imbalance_settlement` and
 `ote_intraday_market_xlsx` at 01:09 UTC — the 30-minute `for` window decides whether those
 page; the author reads them with `kubectl … port-forward svc/energy-platform-prometheus 9090:9090`.
+The drill was run a second time on the demo at revision 26, under the corrected rule, at the
+author's request (01:19 UTC): the Job created 01:19:33, the alert active 01:22:14, **`firing`
+delivered 01:22:24**, the Job deleted, the alert ended 01:24:14, **`resolved` delivered
+01:24:24** — this time the whole group resolved, the day-old failed Jobs no longer count.
 
 ### 4.3 Incident, 2026-09-23: T2 backfills and corrections stored today's file (ADR-033 amendment 2)
 
