@@ -238,6 +238,18 @@ then deleted (`DELETE_SECRETS=1`); the namespace holds only `energy-platform` an
 From here on `deploy-demo` also runs on a push to `main` that touches what the demo runs
 (Phase 9, G6).
 
+### 4.4 The alerting stack reaches the demo (ADR-040, 2026-09-25)
+
+The first push of Phase 13 (af788bf) failed `deploy-demo` at Helm's pre-flight — `could not get
+information about the resource Role "energy-platform-kube-state-metrics"` — and changed
+nothing: the release stayed at revision 24, `deployed`. The OIDC deploy identity may manage
+ServiceAccounts but not Roles or RoleBindings (ADR-035 amendment 1, on purpose). Rather than
+widen it, the chart gates those two objects behind `alerting.kubeStateMetrics.rbac.create`,
+the demo sets it `false`, and the author applied `deployment/tenant/demo-kube-state-metrics-rbac.yaml`
+once with the admin kubeconfig (Level 3, 2026-09-25 01:05 UTC: `role … created`,
+`rolebinding … created`; `kubectl auth can-i list jobs.batch --as=system:serviceaccount:energy-platform:energy-platform-kube-state-metrics`
+→ `yes`). The next push deploys the stack; the delivery drill on the demo is the author's.
+
 ### 4.3 Incident, 2026-09-23: T2 backfills and corrections stored today's file (ADR-033 amendment 2)
 
 Found while measuring publication times from the capture log (Phase 9, G8), not by an alert.

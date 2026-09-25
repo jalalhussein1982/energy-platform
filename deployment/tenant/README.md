@@ -83,8 +83,15 @@ pushed; a laptop build would be arm64).
 addresses it and the k3s server's endpoint on the private network — `kubectl get endpoints
 kubernetes`; kube-router evaluates after the Service translation, so the second is the one that
 matters there, and both are harmless).
-The next push renders Prometheus, kube-state-metrics, Alertmanager and the platform receiver in
-the namespace (three new images pulled by digest). The author then runs the delivery drill there
+The deploy identity may not manage Roles (ADR-035 amendment 1), so `alerting.kubeStateMetrics.rbac.create`
+is `false` on the demo and the admin applies the Role and RoleBinding once:
+
+```bash
+kubectl --kubeconfig <admin> apply -f deployment/tenant/demo-kube-state-metrics-rbac.yaml
+```
+
+The push then renders Prometheus, kube-state-metrics (bound to that Role), Alertmanager and the
+platform receiver in the namespace (three new images pulled by digest). The author then runs the delivery drill there
 (the Job in `deployment/local/drills/alert.sh`, `kubectl logs deploy/energy-platform-alert-sink`)
 and wires a real channel by values: `alerting.alertmanager.receivers` / `routes` (raw Alertmanager
 objects) plus `alerting.alertmanager.egress.cidrs` for an external receiver. The receiver's log is

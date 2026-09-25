@@ -1,0 +1,38 @@
+# ADR-040: the Role and RoleBinding kube-state-metrics needs in the demo namespace, applied ONCE
+# by the cluster admin (Level 3) because the OIDC deploy identity may not manage RBAC objects
+# (ADR-035 amendment 1) — `alerting.kubeStateMetrics.rbac.create: false` in values-demo.yaml.
+# Identical to what the chart renders when rbac.create is true; the ServiceAccount itself is
+# the chart's (the deploy identity may manage serviceaccounts).
+#
+#   kubectl --kubeconfig <admin> apply -f deployment/tenant/demo-kube-state-metrics-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: energy-platform-kube-state-metrics
+  namespace: energy-platform
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/managed-by: admin
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: energy-platform-kube-state-metrics
+  namespace: energy-platform
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/managed-by: admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: energy-platform-kube-state-metrics
+subjects:
+  - kind: ServiceAccount
+    name: energy-platform-kube-state-metrics
+    namespace: energy-platform

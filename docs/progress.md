@@ -618,7 +618,14 @@ Numbers: 953 offline tests, 36 on PostgreSQL, 75 constraint rows, 41 ADRs. Ruff 
 the source tree (`extend-exclude = ["codex-review"]`) so the reviewer's `.py` probes stay as
 written. kind cluster torn down after the gate.
 
-**Open / carried.** Author: push (the demo receives R2–R6, the alerting stack and its API-server
-addresses `10.43.0.1/32` + `10.10.1.10/32` with the next deploy — three new images by digest);
+**Pushed 2026-09-25 00:58 UTC (bc87c58..af788bf, the author approving):** `ci` success;
+`deploy-demo` failed at Helm's pre-flight — the OIDC deploy identity may not read or create
+Roles (ADR-035 amendment 1) and the chart rendered one for kube-state-metrics; the release
+stayed at revision 24. Fix: `alerting.kubeStateMetrics.rbac.create` (default true; `false` on
+the demo), the admin manifest `deployment/tenant/demo-kube-state-metrics-rbac.yaml` applied
+once by the author (`07` §4.4), the deploy identity unchanged.
+
+**Open / carried.** Author: the second push (the demo receives R2–R6, the alerting stack and
+its API-server addresses `10.43.0.1/32` + `10.10.1.10/32` — three new images by digest);
 run the delivery drill on the demo and wire a real receiver by values; decide on the failover
 demonstration (R1); the teardown when the demo is done; the ČEPS `value1 = value2` question.

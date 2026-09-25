@@ -701,10 +701,22 @@ def test_alerting_renders_behind_its_flag_without_cluster_rights(tmp_path: Path)
         for r in roles:
             assert f"ep-energy-platform-{r}" in deployments, (values.name, r)
         assert "ClusterRole" not in kinds(docs) and "ClusterRoleBinding" not in kinds(docs)
-        role = named(docs, "Role")["ep-energy-platform-kube-state-metrics"]
-        assert role["rules"] == [
-            {"apiGroups": ["batch"], "resources": ["jobs", "cronjobs"], "verbs": ["list", "watch"]}
-        ]
+        if values is DEMO:
+            # the demo's deploy identity may not manage Roles (ADR-035 amendment 1): the admin
+            # applies the same objects once, the chart renders none
+            assert "Role" not in kinds(docs) and "RoleBinding" not in kinds(docs)
+        else:
+            role = named(docs, "Role")["ep-energy-platform-kube-state-metrics"]
+            assert role["rules"] == [
+                {
+                    "apiGroups": ["batch"],
+                    "resources": ["jobs", "cronjobs"],
+                    "verbs": ["list", "watch"],
+                }
+            ]
+            binding = named(docs, "RoleBinding")["ep-energy-platform-kube-state-metrics"]
+            assert binding["subjects"][0]["name"] == "ep-energy-platform-kube-state-metrics"
+        assert "ep-energy-platform-kube-state-metrics" in named(docs, "ServiceAccount")
         ksm = deployments["ep-energy-platform-kube-state-metrics"]["spec"]["template"]["spec"]
         assert ksm["serviceAccountName"] == "ep-energy-platform-kube-state-metrics"
         assert "--namespaces=" in " ".join(ksm["containers"][0]["args"])

@@ -36,7 +36,12 @@ platform's Python package owns every socket (ADR-027 §3) and adds no dependency
    - **kube-state-metrics** (`registry.k8s.io/kube-state-metrics/kube-state-metrics` v2.20.0 by
      digest) **namespaced**: `--namespaces=<release namespace> --resources=cronjobs,jobs`, its
      own ServiceAccount, a `Role` with `list`/`watch` on `batch` `jobs` and `cronjobs` and a
-     `RoleBinding` — no ClusterRole, no cluster right, the tenant contract kept;
+     `RoleBinding` — no ClusterRole, no cluster right, the tenant contract kept. A deploy
+     identity that may not manage Roles (the demo's OIDC identity, ADR-035 amendment 1, which
+     the first deploy of this ADR proved: Helm's pre-flight `get` on the Role was forbidden and
+     the release stayed untouched) sets `alerting.kubeStateMetrics.rbac.create: false` and the
+     cluster admin applies `deployment/tenant/demo-kube-state-metrics-rbac.yaml` once — the
+     identity stays as narrow as it was rather than gaining `roles`/`rolebindings` verbs;
    - **Alertmanager** (`docker.io/prom/alertmanager` v0.34.1 by digest, uid 65534) routes every
      alert, grouped by alert name and target, to the **platform receiver** and to whatever the
      operator adds by values (`alerting.alertmanager.receivers`, `alerting.alertmanager.routes`:

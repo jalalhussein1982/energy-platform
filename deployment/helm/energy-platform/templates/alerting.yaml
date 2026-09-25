@@ -143,7 +143,11 @@ metadata:
   labels:
 {{ include "energy-platform.labels" . | indent 4 }}
 automountServiceAccountToken: false
+{{- if $a.kubeStateMetrics.rbac.create }}
 ---
+{{- /* a deploy identity that may not touch RBAC (the demo's, ADR-035 amendment 1) sets
+     rbac.create=false and the cluster admin applies the same two objects once
+     (deployment/tenant/demo-kube-state-metrics-rbac.yaml) */}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -169,6 +173,7 @@ subjects:
   - kind: ServiceAccount
     name: {{ $fullname }}-kube-state-metrics
     namespace: {{ .Release.Namespace }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

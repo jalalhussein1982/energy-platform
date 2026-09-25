@@ -222,6 +222,8 @@ default), and kube-state-metrics addresses the API server by the `kubernetes` Se
 `alerting.kubeStateMetrics.apiServer` declares both, and Cilium needs `policyCIDRMatchMode:
 [nodes]` for a rule that names a node.
 
-Left for the author (Level 3): push (the demo receives R2–R6, the alerting stack and the
-demo's API-server addresses with the next deploy), run the delivery drill on the demo, wire a
-real receiver by values, and decide on the failover demonstration (R1).
+Left for the author (Level 3): the delivery drill on the demo once the deploy is through (the
+first push's deploy failed at Helm's pre-flight because the deploy identity may not manage
+Roles — `docs/07` §4.4; the kube-state-metrics Role is now admin-applied and the chart no longer
+renders it for the demo), a real receiver by values, and the decision on the failover
+demonstration (R1).

@@ -59,6 +59,9 @@ grafana:
 alerting:
   enabled: true                       # ADR-040 (review 3 R3): the rules evaluated on the demo, delivered to the platform receiver
   kubeStateMetrics:
+    rbac:
+      create: false                     # the OIDC deploy identity may not manage Roles (ADR-035 amendment 1): the author
+                                        # applied deployment/tenant/demo-kube-state-metrics-rbac.yaml once with the admin kubeconfig
     apiServer:
       # the `kubernetes` Service IP (k3s service-cidr 10.43.0.0/16) and the k3s server on the private
       # network = `kubectl get endpoints kubernetes` → 10.10.1.10:6443 (read 2026-09-25)
