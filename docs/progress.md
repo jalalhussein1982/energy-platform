@@ -799,3 +799,11 @@ plus the adversarial blind run (Run 5), each row with the attempt, the gate expe
 it and the level it may be run at (L0 laptop … L3 the demo with the author present); rows with
 *no gate known* are marked as the ones to run first; the record format, the severity scale and
 how a finding is closed (a `05` row, a negative test, an ADR). Index rows in `docs/README.md`.
+
+The observer (2026-09-26, Level 3 on the author's request): `deployment/tenant/demo-observer-rbac.yaml`
+(ServiceAccount, Role, RoleBinding — get/list/watch on pods, logs, events, Jobs, CronJobs,
+Deployments, NetworkPolicies, Roles; no Secrets, no ConfigMaps, no exec, no port-forward)
+applied on the demo; a 90-day bound token in `~/.kube/energy-platform-demo-observer.yaml`
+outside the repository; verified by `auth can-i` (reads yes, writes and Secrets no, nothing
+outside the namespace), a real log read and a real refused `get secret`. Runbook `07` §4.5,
+plan `11` §0 "Access". Revocation is one `delete serviceaccount`.

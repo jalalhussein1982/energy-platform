@@ -13,6 +13,8 @@
 
 **Set-up.** A clean clone (`docs/07` §8), `make check` green, `make local-up` green with its egress test, a throwaway branch per tier. For L3 rows: the admin kubeconfig, the author present, `docs/07` open.
 
+**Access.** The repository is public; L0 and L1 need only the clone and the README's tools. L2 needs a GitHub account (a fork suffices for CI; collaborator access is simpler). For the rows marked *L3 (read)* and *L3 (observe)* the author hands you the **observer kubeconfig** (`docs/07` §4.5): read-only, namespace-scoped, no Secrets, no ConfigMaps, no exec, no port-forward, valid 90 days, revocable at once. Every other L3 row is run by the author with you watching; you never hold a write credential.
+
 **Record**, one row per attempt, in `docs/evidence/misbehaviour-runs/<date>.md` (create it), later summarised into `docs/09-acceptance-report.md` as Run 5:
 
 | Field | What to write |

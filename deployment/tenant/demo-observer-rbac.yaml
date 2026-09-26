@@ -1,0 +1,64 @@
+# The observer: a read-only, namespace-scoped identity for an engineer who runs the plan of
+# docs/11-misbehaviour-test-plan.md and needs to WATCH the demo (the sink log, Jobs, CronJobs,
+# pods, events, policies) without any write, any Secret, any ConfigMap (Helm's release history
+# lives in ConfigMaps), any exec or port-forward. Applied ONCE by the cluster admin (Level 3),
+# like demo-kube-state-metrics-rbac.yaml, because the OIDC deploy identity may not manage RBAC
+# (ADR-035 amendment 1). Revoke by deleting the ServiceAccount: every token minted for it dies.
+#
+#   kubectl --kubeconfig <admin> apply -f deployment/tenant/demo-observer-rbac.yaml
+#   kubectl --kubeconfig <admin> -n energy-platform create token energy-platform-observer --duration=2160h
+#   (docs/07 §4.5: the kubeconfig built from that token, the checks, the revocation)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: energy-platform-observer
+  namespace: energy-platform
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/managed-by: admin
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: energy-platform-observer
+  namespace: energy-platform
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/managed-by: admin
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events", "services", "serviceaccounts"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: energy-platform-observer
+  namespace: energy-platform
+  labels:
+    app.kubernetes.io/name: energy-platform
+    app.kubernetes.io/instance: energy-platform
+    energy-platform.io/managed-by: admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: energy-platform-observer
+subjects:
+  - kind: ServiceAccount
+    name: energy-platform-observer
+    namespace: energy-platform

@@ -363,6 +363,41 @@ Found while measuring publication times from the capture log (Phase 9, G8), not 
   current view's 22 September xlsx rows come from `…T064500Z:1` only (not invalidated); the
   replay and the restore drill quarantine the 113 by construction (`runtime/process.py`).
 
+### 4.5 The observer: a read-only kubeconfig for an engineer (2026-09-26)
+
+An engineer running `docs/11-misbehaviour-test-plan.md` needs to watch the demo for the
+observation rows (the night route in the sink log, a live DST day, the month boundary) and
+must not be able to write, read a Secret, exec or port-forward. The identity is a
+ServiceAccount with a namespace-scoped Role, applied once by the admin like the
+kube-state-metrics RBAC (`deployment/tenant/demo-observer-rbac.yaml`): get, list and watch on
+pods, pod logs, events, services, service accounts, Jobs, CronJobs, Deployments, ReplicaSets,
+StatefulSets, NetworkPolicies, Roles and RoleBindings — nothing else. No ConfigMaps: Helm's
+release history lives there. No Secrets. No `pods/exec`, no `pods/portforward` (Grafana is
+reached by port-forward; the observer cannot).
+
+Created 2026-09-26 (Level 3, the author's request):
+
+```bash
+kubectl --kubeconfig <admin> apply -f deployment/tenant/demo-observer-rbac.yaml
+kubectl --kubeconfig <admin> -n energy-platform create token energy-platform-observer --duration=2160h
+```
+
+The token (a bound service-account token, 90 days, expiry 2026-12-25) went into a kubeconfig
+built from the admin file's cluster entry — the same server and CA, the token as the user,
+`energy-platform` as the context's namespace — at `~/.kube/energy-platform-demo-observer.yaml`,
+mode 0600, outside the repository. Verified with `kubectl auth can-i` under that file: `get
+pods`, `get pods/log`, `list jobs`, `list cronjobs`, `list events`, `get networkpolicies`, `get
+deployments` → **yes**; `get secrets`, `get configmaps`, `create jobs`, `delete pods`, `create
+pods/exec`, `create pods/portforward`, `patch deployments` → **no**; `get pods -n kube-system`,
+`list nodes`, `list namespaces` → **no**. A real read of the sink's log succeeded and a real
+`get secret` was refused by name.
+
+**Hand-over.** Send the file over a channel the engineer controls; it is a credential to the
+demo's namespace, read-only. **Revocation**: `kubectl --kubeconfig <admin> -n energy-platform
+delete serviceaccount energy-platform-observer` invalidates every token minted for it at once;
+re-apply the manifest and mint again for a new engineer. The API port is open to the internet
+(§14 of the threat model), so the token's reach is the Role's, not the network's.
+
 ## 5. Backups, replication, restore (ADR-002, ADR-036)
 
 **RPO per failure domain (ADR-036 amendment 2, 2026-09-24):** a worker 0; the database node 15 min
