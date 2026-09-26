@@ -16,6 +16,8 @@ its evidence, in the order they were written; `00`–`02` are frozen and change 
 | [`07-operations.md`](07-operations.md) | The runbook: image, local profile, Terraform, the live demo (§4.1), backups and restore, rollback drill, observability, the clean-clone gate (§8) |
 | [`08-adding-a-target.md`](08-adding-a-target.md) | **The contributor's page**: adding a data source, both routes |
 | [`09-acceptance-report.md`](09-acceptance-report.md) | Phase 7: three blind runs, findings, verdict |
+| [`10-tests-performed.md`](10-tests-performed.md) | The record: every kind of test the platform has been through, with the section that holds the evidence, and the honest boundary of what has not been tested |
+| [`11-misbehaviour-test-plan.md`](11-misbehaviour-test-plan.md) | The plan for the next engineer: 150+ misbehaviours across contributors, the chart, sources, security, alerting and operations, each with the gate expected to refuse it, the level it may be run at, and the record to keep |
 | [`architecture.md`](architecture.md) | Diagrams: data path, contributor and triage path, demo deployment |
 | [`threat-model.md`](threat-model.md) | 15 threats with mechanism, gate and residual risk (ADR-008) |
 | [`branch-protection.md`](branch-protection.md) | The `main` protection settings as enforced on GitHub |

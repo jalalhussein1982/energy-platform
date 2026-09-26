@@ -785,3 +785,17 @@ module honours a name's tick only within the last day (ADR-031 amendment 1) — 
 the test was written it fell through to the newest firing instant. The test now derives its
 tick from the clock, six hours back on the quarter-hour: inside the honoured day, not the
 newest instant, so the fallback would still answer differently. The code did not change.
+
+## 2026-09-26 (night) — the test record and the misbehaviour plan
+
+Two documents, on the author's request, for hand-over: `docs/10-tests-performed.md` records
+every kind of test the platform has been through (the twelve CI gates, the 77 negative tests,
+the four blind runs, V-1…V-14, the 19 bounded live reads, the drills of `07`, the identity and
+exposure probes, the three reviews) with the section that holds each piece of evidence, and
+states the boundary of what has not been tested. `docs/11-misbehaviour-test-plan.md` is the
+plan for the next engineer: 164 misbehaviours in six tiers (the contributor's shortcuts, the
+platform engineer's shortcuts, runtime and data, security and authority, alerting, operations)
+plus the adversarial blind run (Run 5), each row with the attempt, the gate expected to refuse
+it and the level it may be run at (L0 laptop … L3 the demo with the author present); rows with
+*no gate known* are marked as the ones to run first; the record format, the severity scale and
+how a finding is closed (a `05` row, a negative test, an ADR). Index rows in `docs/README.md`.
