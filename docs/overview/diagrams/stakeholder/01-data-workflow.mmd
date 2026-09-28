@@ -1,0 +1,12 @@
+flowchart TD
+    source["OTE and ČEPS public sources"] --> download["Download through approved addresses"]
+    download --> original[("Save the original document")]
+    original --> check["Read and check the values"]
+    original -. "Scheduled copy" .-> copy[("Protected archive at a second<br/>provider")]
+    check -->|Valid| database[("Store results and their history")]
+    check -->|Invalid| hold["Set aside for investigation"]
+    database --> use["Read through private queries and<br/>dashboards"]
+    classDef archive fill:#edf3f8,stroke:#516d86,color:#172b3a;
+    classDef attention fill:#fff4de,stroke:#956d24,color:#493509;
+    class original,copy,database archive;
+    class hold attention;

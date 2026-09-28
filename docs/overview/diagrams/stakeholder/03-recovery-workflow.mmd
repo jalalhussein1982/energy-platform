@@ -1,0 +1,13 @@
+flowchart TD
+    failure{"What has stopped?"}
+    failure -->|Processing worker| saved["Original download remains saved"]
+    saved --> retry["Platform can retry the processing"]
+    failure -->|Main server| outage["Service outage: no automatic<br/>takeover"]
+    outage --> operator["Operator prepares replacement<br/>infrastructure"]
+    backup[("Available backups and saved<br/>originals")] --> restore
+    operator --> restore["Operator restores and checks the<br/>system"]
+    restore --> resume["Collection and processing can resume"]
+    classDef attention fill:#fff4de,stroke:#956d24,color:#493509;
+    classDef manual fill:#edf3f8,stroke:#516d86,color:#172b3a;
+    class outage attention;
+    class operator,restore,backup manual;

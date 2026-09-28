@@ -27,4 +27,4 @@ its evidence, in the order they were written; `00`–`02` are frozen and change 
 | [`plans/`](plans/) | One plan per phase, with the decisions taken while executing it |
 | [`progress.md`](progress.md) | The development log from Phase 5 on; earlier entries in [`archive/`](archive/) |
 | [`reviews/`](reviews/) | Responses to the two external reviews: pre-coding (2026-09-19) and final against the brief (2026-09-24, 17 findings, Phase 10) |
-| [`overview/`](overview/) | A one-page illustrated explainer (HTML/PDF) |
+| [`overview/`](overview/) | A one-page illustrated explainer (HTML/PDF); the final report ([`final-report.md`](overview/final-report.md)) and its stakeholder edition, the one submitted ([`final-report-stakeholder.md`](overview/final-report-stakeholder.md), PDF, diagrams in `diagrams/stakeholder/`) |

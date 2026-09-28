@@ -1,0 +1,14 @@
+flowchart TD
+    idea["A person or agent proposes a source"] --> approved{"Source and measurements already<br/>approved?"}
+    approved -->|Yes| prepare["Prepare configuration, samples, and<br/>expected results"]
+    approved -->|No| request["Submit an approval request and stop"]
+    request --> decision["Maintainer investigates and decides"]
+    decision -. "If approved, start a new<br/>contribution" .-> prepare
+    prepare --> checks{"Validation and tests pass?"}
+    checks -->|No| fix["Correct the contribution"]
+    fix --> checks
+    checks -->|Yes| review["Submit the source folder for<br/>maintainer review"]
+    classDef decision fill:#fff4de,stroke:#956d24,color:#493509;
+    classDef human fill:#edf3f8,stroke:#516d86,color:#172b3a;
+    class approved,checks decision;
+    class decision,review human;

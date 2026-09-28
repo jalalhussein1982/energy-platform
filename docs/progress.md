@@ -807,3 +807,15 @@ applied on the demo; a 90-day bound token in `~/.kube/energy-platform-demo-obser
 outside the repository; verified by `auth can-i` (reads yes, writes and Secrets no, nothing
 outside the namespace), a real log read and a real refused `get secret`. Runbook `07` §4.5,
 plan `11` §0 "Access". Revocation is one `delete serviceaccount`.
+
+## 2026-09-28 — the submission
+
+The stakeholder edition of the final report goes into the repository as submitted:
+`docs/overview/final-report-stakeholder.md`, its PDF and the four workflow diagrams it embeds
+(`diagrams/stakeholder/`, Mermaid source with PNG and SVG renders); index row in `docs/README.md`.
+Before sending, a read-only check of the demo (Helm revision 30, every target's latest capture
+`ok`, backups, WAL shipping, A→B replication and the nightly restore drill green); the open
+`TargetLate` for `ote_dam` is the Phase 15 calibration — the silver table holds 96 of 96
+quarter-hours for every delivery day 22–29 September, while the gaps report counts 0 for
+27 September, so Phase 15 must fix the observed count as well as the expectation. The demo
+stays up until the reviewers say they are done; teardown is the author's, on that word.

@@ -1,0 +1,11 @@
+flowchart TD
+    repo["Version-controlled application and<br/>setup files"] --> setup["Prepare the chosen environment"]
+    owner["Operator supplies required tools,<br/>accounts, and access"] --> setup
+    setup --> deploy["Install the same application package<br/>with environment settings"]
+    deploy --> checks{"Deployment checks pass?"}
+    checks -->|Yes| run["Scheduled collection starts or<br/>continues"]
+    checks -->|No| reject["Reject the installation or roll back<br/>the failed upgrade"]
+    classDef decision fill:#fff4de,stroke:#956d24,color:#493509;
+    classDef setup fill:#edf3f8,stroke:#516d86,color:#172b3a;
+    class checks,reject decision;
+    class repo,owner,setup setup;
