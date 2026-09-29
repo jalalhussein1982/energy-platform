@@ -265,3 +265,7 @@ drills:
   restore:
     enabled: true
     schedule: "30 3 * * *"
+    # 2026-09-29: the nightly Job hit the chart default of 7 200 s (phase 2, the Bronze-only
+    # rebuild, replays the whole history and grew from 1 923 s on 09-25 to 5 429 s on 09-28);
+    # a stopgap worth about a week at ~1 000 s/day — the bounded rebuild is the Phase 15 item (07 §5.5)
+    activeDeadlineSeconds: 14400

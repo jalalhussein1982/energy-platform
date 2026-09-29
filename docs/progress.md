@@ -819,3 +819,15 @@ Before sending, a read-only check of the demo (Helm revision 30, every target's 
 quarter-hours for every delivery day 22–29 September, while the gaps report counts 0 for
 27 September, so Phase 15 must fix the observed count as well as the expectation. The demo
 stays up until the reviewers say they are done; teardown is the author's, on that word.
+
+## 2026-09-29 — the nightly restore drill outgrew its budget
+
+Four pages `EnergyPlatformRestoreDrillFailed` in the mailbox (03:32, 07:33, 11:34, 15:35 UTC;
+the 4-hour repeat of one unresolved alert). The Job of 01:30 UTC was killed by its own
+`activeDeadlineSeconds` (7 200 s): the Bronze-only rebuild replays the whole history and had
+grown from 1 923 s (25 September) to 5 429 s (28 September, a run that finished 73 s inside
+the budget). No restore or comparison failed; the backup chain completed all day. Stopgap:
+`drills.restore.activeDeadlineSeconds: 14400` in `values-demo.yaml` (about a week of headroom);
+the bounded rebuild, or phase 2 weekly, is a Phase 15 item and an ADR-036 amendment. Record in
+`07` §5.5. The push, and the deploy it triggers, are the author's.
+

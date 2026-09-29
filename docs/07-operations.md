@@ -601,6 +601,36 @@ real page of ADR-040, under the newest-Job rule. Two `EnergyPlatformTargetLate` 
 a day-ahead and a settlement target should count as late at 03:45 Prague is the calibration
 question §7 names, now with a delivery to look at.
 
+### 5.5 The drill outgrew its budget (2026-09-29 01:30 UTC) — killed by its own deadline, not a restore failure
+
+`energy-platform-restore-drill-29844090` ended with `DeadlineExceeded` ("Job was active longer
+than specified deadline") at 03:30:00 UTC, exactly `activeDeadlineSeconds` (7 200) after its
+start; Kubernetes deletes the pod with the Job, so the run left no log. `EnergyPlatformRestoreDrillFailed`
+became active 03:31:14 and was delivered to the mailbox at 03:32:24, then again at 07:33,
+11:34 and 15:35 — Alertmanager's default `repeat_interval` of 4 h for a page that stays
+unresolved (the rule clears only when the newest drill Job succeeds).
+
+The cause is in the two previous runs, both logged in full. Phase 2, the Bronze-only rebuild,
+replays every capture ever taken, so its time grows with the history:
+
+| Run | Phase 1 (restore + compare) | Phase 2 (Bronze-only rebuild) | Of the 7 200 s budget |
+|---|---|---|---|
+| `restore-drill-manual-5`, 2026-09-25 (§5.4) | 718.6 s | 1 923.2 s | 2 642 s |
+| `energy-platform-restore-drill-29842650`, 2026-09-28, OK | 1 672.5 s | 5 428.7 s | 7 127 s |
+| `energy-platform-restore-drill-29844090`, 2026-09-29 | — | — | killed at 7 200 s |
+
+The 28 September run finished 73 s inside the budget; phase 2 grows by roughly 1 000 s a day,
+most of it the XLSX intraday target (102 816 Silver versions on 25 September, 251 328 on the
+28th). CPU is not the lever: the drill already runs under its own 1.5-CPU limit (§5.4) on a
+node at 5 % load. Nothing was lost and nothing diverged: `pg-backup`, `pg-wal-ship` and
+`replicate` all completed on schedule through the day, and the run of 28 September remains the
+last full proof that the restore works.
+
+Stopgap in `values-demo.yaml`: `drills.restore.activeDeadlineSeconds: 14400`, about a week of
+headroom at the current growth. The durable fix is a Phase 15 item: the Bronze-only rebuild
+bounded to a window, or phase 2 weekly and phase 1 (well inside any budget) nightly — either is
+an ADR-036 amendment, since §5 of that ADR states the drill as a full replay.
+
 ### 5.3 The drill's memory does not grow with the table (2026-09-24)
 
 The first **scheduled** drill on the demo (01:30 UTC; the manual drill of 23 September had
