@@ -1005,18 +1005,29 @@ def test_the_interim_night_routing_pages_failures_and_logs_the_uncalibrated_fres
     assert egress[1]["ports"] == [{"protocol": "TCP", "port": 587}]
 
 
-def test_replicate_check_ages_objects_by_upload_time(tmp_path: Path) -> None:
-    """ADR-036 amendment 6: `--min-age` must mean time since upload to A, not the preserved mtime.
+def test_wal_segments_are_stamped_with_their_shipment_time(tmp_path: Path) -> None:
+    """ADR-036 amendment 6: the guard of the replication check must see when a WAL object landed.
 
-    A WAL segment is gzipped onto the Postgres volume by archive_command up to walSchedule before
-    pg-wal-ship moves it, and rclone keeps that mtime as object metadata — so a file that landed
-    on A seconds ago passed the 5-minute guard and failed the check (demo, 2026-10-05..08).
+    archive_command gzips a segment onto the Postgres volume up to walSchedule before pg-wal-ship
+    moves it, and rclone keeps the local mtime as the object's modtime — so the segment that
+    landed on A seconds before `rclone check --min-age 5m` reached it was "older than five
+    minutes" and "missing" from B on every run whose check met a shipment (demo, 2026-10-05..08).
+    The shipment touches each segment first: the modtime becomes the upload instant, on A and on
+    the copy on B alike. The check itself keeps aging both stores by that modtime —
+    `--use-server-modtime` is a global flag that also aged B's fresh copies by upload time and
+    failed every run (demo, 2026-10-08 20:37 UTC, 7 differences, all just copied).
     """
-    local = named(render(tmp_path, LOCAL), "CronJob")
-    script = local["ep-energy-platform-replicate"]["spec"]["jobTemplate"]["spec"]["template"][
+    jobs = named(render(tmp_path, LOCAL), "CronJob")
+    ship = jobs["ep-energy-platform-pg-wal-ship"]["spec"]["jobTemplate"]["spec"]["template"][
         "spec"
     ]["containers"][0]["args"][0]
-    check = next(line for line in script.splitlines() if line.startswith("rclone check "))
-    assert "--min-age 5m" in check and "--use-server-modtime" in check
-    copy = next(line for line in script.splitlines() if line.startswith("rclone copy "))
-    assert "--use-server-modtime" not in copy  # the copy decides by checksum, not by age
+    stamp = "find /wal-archive -maxdepth 1 -name '*.gz' | while read -r f; do touch \"$f\"; done"
+    assert stamp in ship and ship.index(stamp) < ship.index("rclone move /wal-archive")
+    check = next(
+        line
+        for line in jobs["ep-energy-platform-replicate"]["spec"]["jobTemplate"]["spec"]["template"][
+            "spec"
+        ]["containers"][0]["args"][0].splitlines()
+        if line.startswith("rclone check ")
+    )
+    assert check == "rclone check A:bronze B:bronze-replica --one-way --min-age 5m"

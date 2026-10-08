@@ -427,7 +427,7 @@ the demo cluster once it exists):
 | Job | Result |
 |---|---|
 | `pg-backup` (2026-09-22 shape: every 5 min locally, `*/15` by default; superseded by ADR-036 amendment 1, §5.2) | `pg_basebackup -Ft -z -X stream` + `rclone copy --immutable` of base and WAL archive: 96 MiB shipped in ~4 s to `A:bronze/backups/postgres/{base/<stamp>,wal}` |
-| `replicate` (`rclone copy --immutable --checksum` then `check --one-way --min-age 5m --use-server-modtime`) | first run: 1 difference — a capture had landed between copy and check, hence `--min-age`; then `0 differences found, 3 matching files`. The guard aged objects by their preserved mtime until ADR-036 amendment 6 (§5.6) |
+| `replicate` (`rclone copy --immutable --checksum` then `check --one-way --min-age 5m`) | first run: 1 difference — a capture had landed between copy and check, hence `--min-age`; then `0 differences found, 3 matching files`. The guard did not hold for WAL segments until `pg-wal-ship` stamped them (ADR-036 amendment 6, §5.6) |
 | `restore-drill` | see below |
 
 The first backup attempt failed with `no pg_hba.conf entry for replication connection`: the
@@ -657,10 +657,24 @@ shipped. Nothing was lost: the next run copied the segment each time (the 19:52 
 `…B1.gz`, the one missing at 19:40), `EnergyPlatformReplicationStale` stayed silent, and the
 replica never lagged by more than one interval.
 
-Fix (ADR-036 amendment 6): `rclone check … --min-age 5m --use-server-modtime` — the age is the
-time since upload to A. Pinned by `tests/harness/test_chart.py::test_replicate_check_ages_objects_by_upload_time`.
-The check's duration keeps growing with the bucket; `--fast-list` is the Phase 15 option if it
-matters. The deploy is the author's push; the first :07 or :37 run after it is the proof.
+**First fix, wrong (deployed 20:23 UTC, reverted the same hour).** `rclone check … --min-age 5m
+--use-server-modtime`, so that the age would be the time since upload. The flag is global: it aged
+B by upload time as well, and B's copies are seconds old when the check runs by construction. The
+run of 20:37 (`energy-platform-replicate-29858197`) finished its check in 13 s instead of
+2 min 45 s (no HEAD per object any more) and reported `7 differences found` — the seven objects
+the same run had copied at 20:37:32–34 (three captures, two WAL segments, two blobs). Every run
+would have failed from then on. A per-remote form does not exist (neither the backend env var nor
+a connection-string parameter changes anything, verified against a stub S3 server: only the
+global flag drops the HEAD and shows `LastModified`).
+
+**Fix (ADR-036 amendment 6).** The writer stamps the object: `pg-wal-ship` runs
+`find /wal-archive -maxdepth 1 -name '*.gz' | while read -r f; do touch "$f"; done` before
+`rclone move`, so the modtime stored with the segment on A, and preserved on its copy on B, is the
+shipment instant; the check is back to `--one-way --min-age 5m` and now sees when a segment
+landed. Pinned by `tests/harness/test_chart.py::test_wal_segments_are_stamped_with_their_shipment_time`.
+The proof is the first :07 or :37 run whose check meets a :x0 shipment after the deploy, and
+every run before it passing again. The check's duration keeps growing with the bucket;
+`--fast-list` is the Phase 15 option if it matters.
 
 ### 5.3 The drill's memory does not grow with the table (2026-09-24)
 

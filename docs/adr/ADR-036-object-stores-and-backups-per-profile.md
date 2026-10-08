@@ -370,18 +370,27 @@ up to `walSchedule` before `pg-wal-ship` moves it — so an object that landed o
 "older than five minutes". Nothing was lost: the next run copied the segment every time, and
 `EnergyPlatformReplicationStale` never fired. The alert was noise, and growing.
 
-**Decision.** The check runs with `--use-server-modtime`: rclone then takes the object's age from
-the S3 `LastModified` — "modification time becomes the time the object was uploaded" (rclone S3
-docs) — so `--min-age 5m` means *uploaded to A more than five minutes ago*, which is what §3
-intended. The copy keeps deciding by `--checksum --immutable` and does not get the flag. The
-schedule stays (`7,22,37,52` follows the capture cadence, amendment 2); the overlap with a `*/10`
-shipment is allowed and harmless now that the guard holds.
+**Decision.** The writer stamps the object, not the reader: `pg-wal-ship` touches every segment
+on the volume before `rclone move`, so the modtime rclone stores with the object — and preserves
+on the copy to B — is the shipment instant. Captures already behave so (the platform writes no
+mtime metadata, rclone reads `LastModified`). The check is unchanged: `--one-way --min-age 5m`,
+aging A and B by the same modtime, which now is for every object the instant it landed on A.
 
-**Consequences.** `cronjob-replicate.yaml` (the flag and its header comment); the guard is pinned
-by `tests/harness/test_chart.py::test_replicate_check_ages_objects_by_upload_time`; `docs/07`
-§5.6 records the incident. Not changed: `--fast-list` for the growing check (one listing per
-1 000 objects instead of one per prefix) is noted as a Phase 15 option, not taken here — one
-change, one cause. Rejected: moving the schedule off the :x0 instants (the guard was wrong, not
-the schedule; the shipment at :x0 is itself on a cadence that will keep meeting a growing
-check) and lengthening `--min-age` (a longer blind window for every capture, and still the wrong
-clock).
+**Rejected, after a deploy (20:23–20:37 UTC the same day).** `--use-server-modtime` on the check:
+rclone's own words — "modification time becomes the time the object was uploaded" — fit the
+source, but the flag is **global** (a `fs` option, not an S3 backend option: neither
+`RCLONE_CONFIG_A_USE_SERVER_MODTIME` nor the connection string `A,use_server_modtime=true:` has
+any effect, verified against a stub S3 server), so it aged B by upload time too, and B's
+copies are by construction seconds old when the check runs — the run of 20:37 reported `7
+differences`: exactly the seven objects it had itself just copied. Every run would have failed.
+Reverted in the same hour. Also rejected: moving the replicate schedule off the :x0 instants (the
+guard was on the wrong clock, not the schedule) and lengthening `--min-age` (a longer blind window
+for every capture, still the wrong clock).
+
+**Consequences.** `cronjob-pg-wal-ship.yaml` (the stamp and its header comment),
+`cronjob-replicate.yaml` (header comment: never the global flag, and why); pinned by
+`tests/harness/test_chart.py::test_wal_segments_are_stamped_with_their_shipment_time`; `docs/07`
+§5.6 records both incidents. Not changed: the check's duration grows with the bucket (the
+`--min-age` filter needs a HEAD per object for the metadata mtime — 2 min 45 s at 16 000; the
+same check under the global flag took 13 s); `--fast-list` or a listing without the age filter
+is a Phase 15 option, not taken here.

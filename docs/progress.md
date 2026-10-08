@@ -839,6 +839,13 @@ segment "missing" from B, uploaded to A by `pg-wal-ship` (`*/10`) seconds before
 reached it; the runs of :22 and :52 passed. The `--min-age 5m` guard aged objects by the mtime
 preserved in their metadata — the WAL `.gz` is gzipped by `archive_command` up to ten minutes
 before it is shipped — and the check had grown to 2 min 45 s over 16 000 objects, past the :10
-instant. Nothing lost, the next run copied the segment every time. Fix: `--use-server-modtime`
-on the check (ADR-036 amendment 6; `07` §5.6), pinned by a chart test written first and watched
-fail. The push, and the deploy it triggers, are the author's.
+instant. Nothing lost, the next run copied the segment every time.
+
+First fix `--use-server-modtime` on the check, pushed and deployed 20:23 UTC at the author's word:
+**wrong** — the flag is global, aged B's fresh copies by upload time too, and the 20:37 run
+reported the seven objects it had itself just copied (every run would have failed). Reverted in
+the same hour. Fix: `pg-wal-ship` touches each segment before `rclone move`, so the modtime the
+object carries (on A, and on its copy on B) is the shipment instant and the unchanged
+`--min-age 5m` guard holds (ADR-036 amendment 6 records both; `07` §5.6). Each pinned by a chart
+test written first and watched fail. Pushed and deployed at the author's word; the proof is the
+first :07/:37 run that meets a shipment.

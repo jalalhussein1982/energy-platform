@@ -7,10 +7,14 @@ object that differs at the same key fails the Job instead of being overwritten. 
 are segments archive_command is still writing; lost+found exists on block-device volumes and is
 not ours. RPO = archive_timeout (5 min) + walSchedule. The pod is pinned next to the Postgres pod
 because the wal-archive claim is ReadWriteOnce.
+ADR-036 amendment 6: every segment is touched before the move, so the modtime rclone stores with
+the object (and preserves on the copy to B) is the shipment instant, not the instant
+archive_command wrote the .gz up to walSchedule earlier — the replication check's
+`--min-age 5m` guard ages objects by that modtime and must see when the segment landed on A.
 */ -}}
 {{- if and (eq .Values.postgres.mode "statefulset") .Values.postgres.backup.enabled }}
 {{- $fullname := include "energy-platform.fullname" . -}}
-{{- $script := printf "SYSID=$(cat /work/SYSTEM_ID)\nrclone move /wal-archive A:%s/%s/$SYSID/wal/ --immutable --checksum --exclude '*.part' --exclude 'lost+found/**' --s3-no-check-bucket --stats-one-line -v\necho \"pg-wal-ship: shipped to A:%s/%s/$SYSID/wal/; $(find /wal-archive -maxdepth 1 -name '*.gz' | wc -l) segments left on the volume\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
+{{- $script := printf "SYSID=$(cat /work/SYSTEM_ID)\nfind /wal-archive -maxdepth 1 -name '*.gz' | while read -r f; do touch \"$f\"; done\nrclone move /wal-archive A:%s/%s/$SYSID/wal/ --immutable --checksum --exclude '*.part' --exclude 'lost+found/**' --s3-no-check-bucket --stats-one-line -v\necho \"pg-wal-ship: shipped to A:%s/%s/$SYSID/wal/; $(find /wal-archive -maxdepth 1 -name '*.gz' | wc -l) segments left on the volume\"" .Values.bronze.bucket .Values.bronze.backupPrefix .Values.bronze.bucket .Values.bronze.backupPrefix -}}
 {{- $env := include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE") -}}
 {{- $mounts := list (dict "name" "wal-archive" "mountPath" "/wal-archive") (dict "name" "work" "mountPath" "/work" "readOnly" true) -}}
 {{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "ship" "script" $script "env" $env "mounts" $mounts) -}}
