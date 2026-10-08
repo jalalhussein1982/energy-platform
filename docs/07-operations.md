@@ -672,9 +672,15 @@ global flag drops the HEAD and shows `LastModified`).
 `rclone move`, so the modtime stored with the segment on A, and preserved on its copy on B, is the
 shipment instant; the check is back to `--one-way --min-age 5m` and now sees when a segment
 landed. Pinned by `tests/harness/test_chart.py::test_wal_segments_are_stamped_with_their_shipment_time`.
-The proof is the first :07 or :37 run whose check meets a :x0 shipment after the deploy, and
-every run before it passing again. The check's duration keeps growing with the bucket;
-`--fast-list` is the Phase 15 option if it matters.
+Deployed 20:50:43 UTC (8985c35). Proof the same evening: the runs of 20:52 and 21:07 passed
+(`0 differences`, 16 065 and 16 074 matching files; the 21:07 check ended at 21:10:01, four
+seconds before the shipment, so it did not meet it), then the run of 21:37
+(`energy-platform-replicate-29858257`): `pg-wal-ship-29858260` uploaded `…C9.gz` and `…CA.gz`
+to A at 21:40:06, the check walked the bucket until 21:40:15 and reported `0 differences found,
+16 094 matching files` — the shape that had failed at 19:10:16, 19:40:14 and 20:10:13. The
+alert resolved at 20:53 (the first success after the 20:37 failure) and has not fired since. The
+check's duration keeps growing with the bucket; `--fast-list` is the Phase 15 option if it
+matters.
 
 ### 5.3 The drill's memory does not grow with the table (2026-09-24)
 

@@ -847,5 +847,6 @@ reported the seven objects it had itself just copied (every run would have faile
 the same hour. Fix: `pg-wal-ship` touches each segment before `rclone move`, so the modtime the
 object carries (on A, and on its copy on B) is the shipment instant and the unchanged
 `--min-age 5m` guard holds (ADR-036 amendment 6 records both; `07` §5.6). Each pinned by a chart
-test written first and watched fail. Pushed and deployed at the author's word; the proof is the
-first :07/:37 run that meets a shipment.
+test written first and watched fail. Pushed and deployed at the author's word (20:50 UTC). Proof:
+the 21:37 run's check met the 21:40 shipment (two segments uploaded 21:40:06, check ended
+21:40:15) and reported 0 differences; resolved mail 20:53, quiet since.
