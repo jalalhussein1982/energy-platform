@@ -831,3 +831,14 @@ the budget). No restore or comparison failed; the backup chain completed all day
 the bounded rebuild, or phase 2 weekly, is a Phase 15 item and an ADR-036 amendment. Record in
 `07` §5.5. The push, and the deploy it triggers, are the author's.
 
+## 2026-10-08 — the replication check met the WAL shipment
+
+26 mails, 13 firing/resolved pairs of `EnergyPlatformReplicationFailed` in one day (and one pair
+on 5 October): every `replicate` run of :07 and :37 failed its `rclone check` with the newest WAL
+segment "missing" from B, uploaded to A by `pg-wal-ship` (`*/10`) seconds before the check
+reached it; the runs of :22 and :52 passed. The `--min-age 5m` guard aged objects by the mtime
+preserved in their metadata — the WAL `.gz` is gzipped by `archive_command` up to ten minutes
+before it is shipped — and the check had grown to 2 min 45 s over 16 000 objects, past the :10
+instant. Nothing lost, the next run copied the segment every time. Fix: `--use-server-modtime`
+on the check (ADR-036 amendment 6; `07` §5.6), pinned by a chart test written first and watched
+fail. The push, and the deploy it triggers, are the author's.

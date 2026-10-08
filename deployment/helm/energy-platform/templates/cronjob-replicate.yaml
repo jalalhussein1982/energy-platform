@@ -3,13 +3,18 @@ ADR-036 §3: Bronze replication A → B is `rclone copy --immutable --checksum` 
 (never `sync`, nothing is ever deleted or overwritten on B): `bronze/blobs`, the capture log
 under `captures/` (ADR-002 layout) and the Postgres backup prefix — a replica without the
 capture log is not a Bronze (found by the first restore drill),
-followed by `rclone check --one-way --min-age 5m` (objects younger than five minutes may have
-landed after the copy; the next run copies them): a difference fails the Job — the alert.
+followed by `rclone check --one-way --min-age 5m --use-server-modtime` (objects uploaded to A less
+than five minutes ago may have landed after the copy; the next run copies them): a difference
+fails the Job — the alert. `--use-server-modtime` (ADR-036 amendment 6) makes the age the time
+since UPLOAD: without it rclone ages an object by the mtime preserved in its metadata, and a WAL
+segment gzipped by archive_command up to walSchedule before pg-wal-ship moved it passed the
+guard seconds after landing — the newest segment was "missing" from B on every run whose check
+overlapped a :x0 shipment (demo, 2026-10-05..08, docs/07 §5.6).
 Provider "Other" for any S3-compatible endpoint (OCI verified in V-13). No internet egress:
 the object-store NetworkPolicy rule is the only one this pod matches.
 */ -}}
 {{- if .Values.bronze.replica.enabled }}
-{{- $script := printf "rclone copy A:%s B:%s --immutable --checksum --s3-no-check-bucket --stats-one-line -v\nrclone check A:%s B:%s --one-way --min-age 5m\necho \"replicate: A→B verified (blobs, capture log, backups)\"" .Values.bronze.bucket .Values.bronze.replica.bucket .Values.bronze.bucket .Values.bronze.replica.bucket -}}
+{{- $script := printf "rclone copy A:%s B:%s --immutable --checksum --s3-no-check-bucket --stats-one-line -v\nrclone check A:%s B:%s --one-way --min-age 5m --use-server-modtime\necho \"replicate: A→B verified (blobs, capture log, backups)\"" .Values.bronze.bucket .Values.bronze.replica.bucket .Values.bronze.bucket .Values.bronze.replica.bucket -}}
 {{- $env := printf "%s\n%s" (include "energy-platform.rcloneEnv" (dict "root" . "alias" "A" "store" .Values.bronze "secret" "BRONZE")) (include "energy-platform.rcloneEnv" (dict "root" . "alias" "B" "store" .Values.bronze.replica "secret" "BRONZE_REPLICA")) -}}
 {{- $container := include "energy-platform.rcloneContainer" (dict "root" . "name" "replicate" "script" $script "env" $env "mounts" list) -}}
 apiVersion: batch/v1

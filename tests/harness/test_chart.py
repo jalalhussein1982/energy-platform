@@ -1003,3 +1003,20 @@ def test_the_interim_night_routing_pages_failures_and_logs_the_uncalibrated_fres
     ]
     assert egress[1]["to"] == [{"ipBlock": {"cidr": "198.51.100.0/24"}}]
     assert egress[1]["ports"] == [{"protocol": "TCP", "port": 587}]
+
+
+def test_replicate_check_ages_objects_by_upload_time(tmp_path: Path) -> None:
+    """ADR-036 amendment 6: `--min-age` must mean time since upload to A, not the preserved mtime.
+
+    A WAL segment is gzipped onto the Postgres volume by archive_command up to walSchedule before
+    pg-wal-ship moves it, and rclone keeps that mtime as object metadata — so a file that landed
+    on A seconds ago passed the 5-minute guard and failed the check (demo, 2026-10-05..08).
+    """
+    local = named(render(tmp_path, LOCAL), "CronJob")
+    script = local["ep-energy-platform-replicate"]["spec"]["jobTemplate"]["spec"]["template"][
+        "spec"
+    ]["containers"][0]["args"][0]
+    check = next(line for line in script.splitlines() if line.startswith("rclone check "))
+    assert "--min-age 5m" in check and "--use-server-modtime" in check
+    copy = next(line for line in script.splitlines() if line.startswith("rclone copy "))
+    assert "--use-server-modtime" not in copy  # the copy decides by checksum, not by age

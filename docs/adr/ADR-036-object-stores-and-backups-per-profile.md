@@ -352,3 +352,36 @@ rows; the `ignore_fields` revision passes with 192 historical versions; a value-
 implementation without a replay is `diverging` and fails, after the replay passes with the old
 versions historical); `tests/runtime/test_drill.py` (loss and a tampered value still fail). The
 reviewer's `recovery_probes.py` no longer reproduces either defect.
+
+
+## Amendment 6 (2026-10-08) — the replication check ages an object by its upload time
+
+**Finding (demo, 2026-10-05 15:42 UTC once, then 13 firing/resolved pairs on 2026-10-08).**
+`EnergyPlatformReplicationFailed` paged after every `replicate` run of :07 and :37 and resolved
+after every run of :22 and :52. Each failed log ends in the same shape: `1 files missing`, and the
+file is always the newest WAL segment (`backups/postgres/<sysid>/wal/…gz`), uploaded to A by
+`pg-wal-ship` (`*/10`) at :10:0x or :40:0x — inside the `rclone check` of a run whose copy had
+finished at :07:3x. The check walks the whole bucket (16 000 objects on 8 October, about
+2 min 45 s; it grows ~1 700 objects a day), so it ends after :10 / :40 and first overlapped a
+shipment around 5 October. The `--min-age 5m` guard of §3 was meant for exactly this window and
+did not hold: rclone ages an object by the modification time kept in its metadata
+(`X-Amz-Meta-Mtime`), and the WAL `.gz` is written on the Postgres volume by `archive_command`
+up to `walSchedule` before `pg-wal-ship` moves it — so an object that landed on A seconds ago was
+"older than five minutes". Nothing was lost: the next run copied the segment every time, and
+`EnergyPlatformReplicationStale` never fired. The alert was noise, and growing.
+
+**Decision.** The check runs with `--use-server-modtime`: rclone then takes the object's age from
+the S3 `LastModified` — "modification time becomes the time the object was uploaded" (rclone S3
+docs) — so `--min-age 5m` means *uploaded to A more than five minutes ago*, which is what §3
+intended. The copy keeps deciding by `--checksum --immutable` and does not get the flag. The
+schedule stays (`7,22,37,52` follows the capture cadence, amendment 2); the overlap with a `*/10`
+shipment is allowed and harmless now that the guard holds.
+
+**Consequences.** `cronjob-replicate.yaml` (the flag and its header comment); the guard is pinned
+by `tests/harness/test_chart.py::test_replicate_check_ages_objects_by_upload_time`; `docs/07`
+§5.6 records the incident. Not changed: `--fast-list` for the growing check (one listing per
+1 000 objects instead of one per prefix) is noted as a Phase 15 option, not taken here — one
+change, one cause. Rejected: moving the schedule off the :x0 instants (the guard was wrong, not
+the schedule; the shipment at :x0 is itself on a cadence that will keep meeting a growing
+check) and lengthening `--min-age` (a longer blind window for every capture, and still the wrong
+clock).

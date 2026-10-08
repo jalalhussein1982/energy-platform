@@ -427,7 +427,7 @@ the demo cluster once it exists):
 | Job | Result |
 |---|---|
 | `pg-backup` (2026-09-22 shape: every 5 min locally, `*/15` by default; superseded by ADR-036 amendment 1, §5.2) | `pg_basebackup -Ft -z -X stream` + `rclone copy --immutable` of base and WAL archive: 96 MiB shipped in ~4 s to `A:bronze/backups/postgres/{base/<stamp>,wal}` |
-| `replicate` (`rclone copy --immutable --checksum` then `check --one-way --min-age 5m`) | first run: 1 difference — a capture had landed between copy and check, hence `--min-age`; then `0 differences found, 3 matching files` |
+| `replicate` (`rclone copy --immutable --checksum` then `check --one-way --min-age 5m --use-server-modtime`) | first run: 1 difference — a capture had landed between copy and check, hence `--min-age`; then `0 differences found, 3 matching files`. The guard aged objects by their preserved mtime until ADR-036 amendment 6 (§5.6) |
 | `restore-drill` | see below |
 
 The first backup attempt failed with `no pg_hba.conf entry for replication connection`: the
@@ -630,6 +630,37 @@ Stopgap in `values-demo.yaml`: `drills.restore.activeDeadlineSeconds: 14400`, ab
 headroom at the current growth. The durable fix is a Phase 15 item: the Bronze-only rebuild
 bounded to a window, or phase 2 weekly and phase 1 (well inside any budget) nightly — either is
 an ADR-036 amendment, since §5 of that ADR states the drill as a full replay.
+
+### 5.6 The replication check met the WAL shipment (2026-10-05 and 2026-10-08) — a guard on the wrong clock
+
+26 mails on 8 October: `EnergyPlatformReplicationFailed` **firing** at 09:12, 10:42, 11:42, 12:42,
+14:12, 14:42, 15:13, 15:42, 16:12, 16:42, 17:12, 19:12 and 19:42 UTC, **resolved** eleven minutes
+after each; one earlier pair on 5 October (15:42 / 15:53). Every firing follows a `replicate` run
+of :07 or :37 (Prague schedule `7,22,37,52`), every resolve a run of :22 or :52. The failed pods
+(`energy-platform-replicate-29858107`, `…137`, `…167`) all end the same way:
+
+```
+19:07:31 INFO  : 1.774 MiB / 1.774 MiB, 100%            ← copy done
+19:10:16 ERROR : backups/postgres/7688704544311951385/wal/000000010000000F000000AB.gz: file not in S3 bucket energy-platform-bronze-replica
+19:10:16 NOTICE: S3 bucket energy-platform-bronze-replica: 1 files missing
+19:10:16 NOTICE: S3 bucket energy-platform-bronze-replica: 15998 matching files
+```
+
+The missing object is always the newest WAL segment, which `pg-wal-ship` (`*/10`) had uploaded to
+A at :10:0x — the run of 20:10 shows `…B7.gz: Copied (new)` at 20:10:06, the check of the
+20:07 run reports `…B7.gz` missing at 20:10:13. The check now walks about 16 000 objects
+(2 min 45 s) and ends after :10 / :40; the runs of :22 and :52 have no shipment inside their
+window and pass. The `--min-age 5m` guard, added for exactly this race on the first run
+(§5 table), did not hold because rclone ages an object by the mtime kept in its metadata, and the
+WAL `.gz` is written on the Postgres volume by `archive_command` up to ten minutes before it is
+shipped. Nothing was lost: the next run copied the segment each time (the 19:52 run copies
+`…B1.gz`, the one missing at 19:40), `EnergyPlatformReplicationStale` stayed silent, and the
+replica never lagged by more than one interval.
+
+Fix (ADR-036 amendment 6): `rclone check … --min-age 5m --use-server-modtime` — the age is the
+time since upload to A. Pinned by `tests/harness/test_chart.py::test_replicate_check_ages_objects_by_upload_time`.
+The check's duration keeps growing with the bucket; `--fast-list` is the Phase 15 option if it
+matters. The deploy is the author's push; the first :07 or :37 run after it is the proof.
 
 ### 5.3 The drill's memory does not grow with the table (2026-09-24)
 
