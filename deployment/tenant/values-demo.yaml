@@ -235,10 +235,14 @@ alerting:
         matchers:
           - alertname = EnergyPlatformTargetLate
           - target =~ "ote_dam|ote_imbalance_settlement"
-      # 2. everything that pages goes to the operator's mailbox …
-      - receiver: ops-email
-        matchers: ["severity = page"]
-        continue: true
+      # 2. everything that pages goes to the operator's mailbox … — OFF since 2026-10-12 at the
+      #    author's request: with the submission in review and nobody on call, the pages (the
+      #    nightly drill past its budget, 07 §5.5; the intraday day-end quarter-hour, 07 §7.3) only
+      #    filled the mailbox. The receiver and the egress rule above stay; uncommenting these
+      #    three lines re-arms the channel (07 §7.3).
+      # - receiver: ops-email
+      #   matchers: ["severity = page"]
+      #   continue: true
       # 3. … and every alert, whatever its severity, stays in the receiver's log — the delivery record
       - receiver: platform-sink
 egress:

@@ -814,12 +814,14 @@ def test_alerting_renders_behind_its_flag_without_cluster_rights(tmp_path: Path)
             assert email_cfg["auth_password_file"] == f"{SECRETS_DIR}/smtp-password"
             assert "auth_password" not in email_cfg and email_cfg["require_tls"] is True
             assert email_cfg["smarthost"].endswith(":587")
+            # 2026-10-12: the mailbox route is off at the author's request (07 §7.3) — the
+            # receiver and its egress rule stay declared, so re-arming is the one route; what
+            # stays pinned is the receiver's shape (credential from the Secret's file, TLS, 587)
             assert [r["receiver"] for r in am_cfg["route"]["routes"]] == [
                 "platform-sink",
-                "ops-email",
                 "platform-sink",
             ]
-            assert am_cfg["route"]["routes"][1]["continue"] is True
+            assert "ops-email" not in {r["receiver"] for r in am_cfg["route"]["routes"]}
         else:
             assert len(am_egress) == 1  # no internet for Alertmanager unless declared
 

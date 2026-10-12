@@ -850,3 +850,17 @@ object carries (on A, and on its copy on B) is the shipment instant and the unch
 test written first and watched fail. Pushed and deployed at the author's word (20:50 UTC). Proof:
 the 21:37 run's check met the 21:40 shipment (two segments uploaded 21:40:06, check ended
 21:40:15) and reported 0 differences; resolved mail 20:53, quiet since.
+
+## 2026-10-12 — the mailbox route is off
+
+56 alert mails in two weeks (`EnergyPlatformRestoreDrillFailed` every four hours of the day
+after each night's over-budget drill, `07` §5.5; `EnergyPlatformTargetLate` for the two
+intraday targets at night; the replication pairs of 8 October until their fix) and not one
+asked for an action: the author asked for the notifications to stop. The route
+`severity = page → ops-email` is commented out in `values-demo.yaml`; the receiver, the Secret's
+mount and the egress netblocks stay, so re-arming is the three lines of the route. Alerts keep
+landing in the platform receiver's log and in Alertmanager. The chart test's demo branch pins
+the new shape (two routes, the receiver's credential still from the Secret's file) — an updated
+expectation of the demo's declared state, not a loosened one (`07` §7.3). Pushed to main at the
+author's request; deploy-demo rolls Alertmanager.
+

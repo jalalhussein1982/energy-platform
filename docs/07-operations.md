@@ -894,6 +894,17 @@ settlement targets keeps firing at night and lands in the log only. The fix is a
 expectation in the manifest, read by freshness (Phase 15, an ADR-037 amendment) — not a wider
 `for:`, not a silenced night.
 
+**Off since 2026-10-12** (the author's request). With the submission in review and nobody on
+call, the channel had delivered 56 mails in two weeks — the nightly drill past its budget (§5.5,
+a page every four hours until the next night's run), the intraday day-end quarter-hour (above),
+the replication flapping of §5.6 until its fix — and none of them asked for an action. The
+route `severity = page → ops-email` is commented out in `values-demo.yaml`; the receiver, the
+Secret's mount and the egress rule stay, so re-arming the channel is uncommenting the three
+lines of that route and the push. Every alert still lands in the platform receiver's log (§7.2)
+and in Alertmanager's own state (`/api/v2/alerts`); the proof above stands as recorded. The
+chart test pins the new shape (two routes, the receiver's credential still from the Secret's
+file).
+
 ### 7.1 Dashboards — Grafana, private (ADR-039, Phase 11, 2026-09-24)
 
 `grafana.enabled` renders one Deployment (`docker.io/grafana/grafana` by digest, uid 472,
