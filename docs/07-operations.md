@@ -159,6 +159,25 @@ added, 1 changed, 0 destroyed`, 8 s): the live rules carry the current address, 
 same variables exits 0 (no changes), and SSH from the laptop to the server answers again. The
 Terraform state and the firewall agree for the first time since the hand edit of 01:40 UTC.
 
+**Teardown, 2026-11-02 ~21:15 UTC** (`hcloud-destroy-20261102-210726.tfplan`, Terraform 1.16.3): the
+author asked for the Hetzner machines to go — the monthly cost — and the README's step 6 was
+followed: a `plan -destroy` targeted at `module.nodes`, `module.network`, `module.security` and
+`module.storage.hcloud_volume.postgres`, variable values taken from the 2026-09-24 plan file
+(the admin address was unchanged), **0 to add, 0 to change, 8 to destroy**; the four bucket
+resources left out. Checked first: the CLI inventory matched the state resource for resource, and
+the backup chain was current on both stores (base `20261102T011816Z` on A and B; WAL shipped to
+A at 20:00 UTC and on B at 20:07 — at most ten minutes of ledger writes after that are gone with
+the volume). **Applied by the author** (`Apply complete! Resources: 0 added, 0 changed, 8
+destroyed`, about 1 min 40 s; the agent went in 32 s, the subnet waited for it, the server in 32 s
+after the agent). After it: `hcloud` lists no server, volume, firewall, network, primary IP or SSH
+key; the state holds the four bucket resources only (serial 50, copied to
+`~/.config/energy-platform/state/`); both plan files deleted (they embed the token and the S3
+keys). What stays, by design: bucket A `energy-platform-bronze` under its 90-day COMPLIANCE lock
+(about €5 a month until the lock on the last writes expires, around 2027-02-01) and bucket B on
+OCI (Always Free). `demo_cluster_url` and the observer kubeconfig (§4.5) now point at nothing;
+`deploy-demo`, `nightly-live-smoke` and `weekly-drills` are to be disabled (`gh workflow disable`),
+an author step.
+
 ## 4. Tenant and demo deploys
 
 `make deploy-tenant ENV=demo` layers `deployment/tenant/values-demo.yaml` on

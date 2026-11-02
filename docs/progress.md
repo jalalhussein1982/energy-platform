@@ -864,3 +864,16 @@ the new shape (two routes, the receiver's credential still from the Secret's fil
 expectation of the demo's declared state, not a loosened one (`07` §7.3). Pushed to main at the
 author's request; deploy-demo rolls Alertmanager.
 
+## 2026-11-02 — the Hetzner demo is torn down
+
+The author no longer wants the monthly cost and asked for the machines to go; the reviewers had
+not asked for the live demo past the 2026-09-28 submission. Own-cluster README step 6: a targeted
+`plan -destroy` (8 to destroy, the four bucket resources excluded), the inventory and the backup
+chain checked first (base of 01:18 UTC and WAL to 20:00 UTC on both stores), applied by the
+author at about 21:15 UTC — `0 added, 0 changed, 8 destroyed`. Hetzner holds nothing but the
+locked bucket; the state keeps the four bucket resources; plan files deleted. Record in `07` §3.
+
+**Open / carried.** Author (Level 3): `gh workflow disable deploy-demo.yml nightly-live-smoke.yml
+weekly-drills.yml` (the next scheduled runs would fail against a dead cluster); the push of this
+commit. Bucket A can be emptied and deleted after about 2027-02-01, bucket B at will; both are
+author steps. The observer kubeconfig of `07` §4.5 is dead. ČEPS `value1 = value2` question as before.
