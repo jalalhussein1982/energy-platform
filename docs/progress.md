@@ -877,3 +877,17 @@ locked bucket; the state keeps the four bucket resources; plan files deleted. Re
 weekly-drills.yml` (the next scheduled runs would fail against a dead cluster); the push of this
 commit. Bucket A can be emptied and deleted after about 2027-02-01, bucket B at will; both are
 author steps. The observer kubeconfig of `07` §4.5 is dead. ČEPS `value1 = value2` question as before.
+
+## 2026-11-02 (later) — the OCI replica is purged; the Hetzner bucket waits on a ticket
+
+The author's October OCI invoice (698.27 CZK) was Object Storage *requests*: ~74 million from the
+replicate CronJob's quarter-hourly `rclone check` over a bucket of 40 000 objects (`07` §3; a gap in
+ADR-028 §5's cost model, which priced storage and egress only). At the author's request the
+replica's unlocked retention rule was deleted, all 39 800 objects bulk-deleted (0 failures) and the
+bucket removed; the tenancy is empty. Bucket A on Hetzner cannot be emptied (COMPLIANCE lock to
+2027-01-31); the author's empty personal bucket in the same project was deleted and a Hetzner
+support request for early deletion of bucket A is open. No copy of the demo data remains apart
+from bucket A.
+
+**Open / carried.** Author: the Hetzner ticket (then S3 credentials, API token and project
+cleanup); if refused, account closure or the purge on 2027-02-01. ČEPS `value1 = value2` as before.

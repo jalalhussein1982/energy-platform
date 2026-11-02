@@ -178,6 +178,17 @@ OCI (Always Free). `demo_cluster_url` and the observer kubeconfig (§4.5) now po
 `deploy-demo`, `nightly-live-smoke` and `weekly-drills` are to be disabled (`gh workflow disable`),
 an author step.
 
+**Bucket B purged, 2026-11-02 ~22:00 UTC.** The October OCI invoice (698.27 CZK incl. VAT = 577.09 CZK
+net) was *Object Storage – Requests* alone: about 74 million in the month, against an Always Free
+allowance of 50 000. The `replicate` CronJob's `rclone check` (four runs an hour) walked every object
+of the replica — 40 000 by month end — so the day's cost rose from 8 CZK (2 October) to 30 CZK (31
+October) with the object count; storage (10.5 GB of the free 20 GB) was never charged. ADR-028 §5
+priced OCI storage and egress and did not price requests: a cost-model gap, recorded here. At the
+author's request the replica's 90-day retention rule (`bronze-replica-immutable`, never locked) was
+deleted, `oci os object bulk-delete` removed 39 800 objects with 0 failures, and the bucket was
+deleted; the tenancy holds no bucket. Bucket A on Hetzner is now the last copy of the demo data,
+under its COMPLIANCE lock until 2027-01-31, with a support request open for its early deletion.
+
 ## 4. Tenant and demo deploys
 
 `make deploy-tenant ENV=demo` layers `deployment/tenant/values-demo.yaml` on
